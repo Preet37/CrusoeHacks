@@ -24,6 +24,8 @@ export interface TwinClient {
   send(msg: AnyClientMessage): void
   on<T extends ServerMessageType>(type: T, cb: (msg: ServerMessageOf<T>) => void): () => void
   on(type: string, cb: (msg: AnyServerMessage) => void): () => void
+  /** Chronological snapshot + draw stream, including messages before a lazy board mounts. */
+  onBoard(cb: (msg: AnyServerMessage) => void): () => void
   onAny(cb: (msg: AnyServerMessage) => void): () => void
   onState(cb: (state: ConnState) => void): () => void
   close(): void
@@ -108,6 +110,9 @@ export function createClient(opts: {
   const { room, user, workspace, code } = opts
   const mock = opts.mock ?? isMockMode()
   const typed = new Map<string, Set<(m: AnyServerMessage) => void>>()
+  const boardCbs = new Set<(m: AnyServerMessage) => void>()
+  const boardReplay: AnyServerMessage[] = []
+  const BOARD_REPLAY_LIMIT = 512
   const any = new Set<(m: AnyServerMessage) => void>()
   const stateCbs = new Set<(s: ConnState) => void>()
   const pending: string[] = []
@@ -134,6 +139,13 @@ export function createClient(opts: {
     return null
   }
   const remember = (m: AnyServerMessage) => {
+    if (m.type === 'board_snapshot' || m.type === 'draw') {
+      if (m.type === 'board_snapshot' || (m as { op?: string }).op === 'clear')
+        boardReplay.length = 0
+      boardReplay.push(m)
+      if (boardReplay.length > BOARD_REPLAY_LIMIT)
+        boardReplay.splice(0, boardReplay.length - BOARD_REPLAY_LIMIT)
+    }
     const k = replayKey(m)
     if (k === null) return
     let bucket = replay.get(m.type)
@@ -146,6 +158,8 @@ export function createClient(opts: {
   const dispatch = (msg: AnyServerMessage) => {
     remember(msg)
     typed.get(msg.type)?.forEach((cb) => cb(msg))
+    if (msg.type === 'draw' || msg.type === 'board_snapshot')
+      boardCbs.forEach((cb) => cb(msg))
     any.forEach((cb) => cb(msg))
   }
 
@@ -238,6 +252,12 @@ export function createClient(opts: {
         queueMicrotask(() => set!.has(fn) && msgs.forEach((m) => fn(m)))
       }
       return () => set!.delete(fn)
+    },
+    onBoard(cb) {
+      boardCbs.add(cb)
+      // Synchronous replay preserves order against any subsequent WebSocket frame.
+      for (const message of boardReplay) cb(message)
+      return () => boardCbs.delete(cb)
     },
     onAny(cb) {
       any.add(cb)

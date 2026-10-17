@@ -828,12 +828,7 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
       if (m.type === 'draw') board.enqueue(m as unknown as Op)
       else if (m.type === 'board_snapshot') board.snapshot(m as unknown as Parameters<BoardController['snapshot']>[0])
     }
-    const offDraw = client.on('draw', (m) => handle(m))
-    const offSnap = client.on('board_snapshot', (m) => handle(m))
-    return () => {
-      offDraw()
-      offSnap()
-    }
+    return client.onBoard(handle)
   }, [client])
 
   useEffect(() => {

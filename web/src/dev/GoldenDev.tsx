@@ -25,6 +25,7 @@ async function loadGolden(): Promise<Golden> {
 
 function createFakeClient(onSend: (m: AnyClientMessage) => void) {
   const typed = new Map<string, Set<(m: AnyServerMessage) => void>>()
+  const board = new Set<(m: AnyServerMessage) => void>()
   const any = new Set<(m: AnyServerMessage) => void>()
   const client: TwinClient = {
     room: 'golden',
@@ -41,6 +42,10 @@ function createFakeClient(onSend: (m: AnyClientMessage) => void) {
       set.add(fn)
       return () => set!.delete(fn)
     },
+    onBoard(cb) {
+      board.add(cb)
+      return () => board.delete(cb)
+    },
     onAny(cb) {
       any.add(cb)
       return () => any.delete(cb)
@@ -53,6 +58,7 @@ function createFakeClient(onSend: (m: AnyClientMessage) => void) {
   }
   const emit = (m: AnyServerMessage) => {
     typed.get(m.type)?.forEach((cb) => cb(m))
+    if (m.type === 'draw' || m.type === 'board_snapshot') board.forEach((cb) => cb(m))
     any.forEach((cb) => cb(m))
   }
   return { client, emit }
