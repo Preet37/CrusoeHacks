@@ -12,25 +12,39 @@ export function TwinAvatar({ className = '' }: { className?: string }) {
   )
 }
 
-const STATE_LABEL: Record<StatusState, string> = {
-  listening: 'Listening',
-  thinking: 'Thinking',
-  speaking: 'Speaking',
-  hand_raised: 'Hand raised',
-}
+const QUIET_S = 30
 
-export function TwinTile({ status, muted }: { status: StatusState; muted: boolean }) {
+export function TwinTile({
+  status,
+  muted,
+  sketching,
+  handRaisedAt,
+  onLetSpeak,
+}: {
+  status: StatusState
+  muted: boolean
+  sketching?: boolean
+  handRaisedAt?: number | null
+  onLetSpeak?: () => void
+}) {
+  const quietLeft = handRaisedAt ? Math.max(0, QUIET_S - Math.floor((Date.now() - handRaisedAt) / 1000)) : 0
+  let pill: React.ReactNode
+  if (muted) pill = <span className="tw-pill muted">Muted · won't speak</span>
+  else if (status === 'speaking') pill = <span className="tw-pill speaking"><span className="eq"><i /><i /><i /></span>Speaking</span>
+  else if (status === 'hand_raised')
+    pill = (
+      <button className="tw-pill add" onClick={onLetSpeak} title="Twin is holding back. Click to let it speak now.">
+        ✋ Has something to add{quietLeft > 0 ? ` · quiet ${quietLeft}s` : ''} <b>Let it speak</b>
+      </button>
+    )
+  else if (sketching) pill = <span className="tw-pill sketch"><span className="pen">✎</span>Sketching on the board…</span>
+  else if (status === 'thinking') pill = <span className="tw-pill thinking"><span className="typing"><i /><i /><i /></span>Thinking</span>
+  else pill = <span className="tw-pill">Listening</span>
+
   return (
-    <div className={`tile twin ${status} ${status === 'speaking' ? 'speaking' : ''}`}>
+    <div className={`tile twin ${status} ${status === 'speaking' ? 'speaking' : ''} ${sketching ? 'sketching' : ''}`}>
       <TwinAvatar />
-      <div className="state glass">
-        {status === 'thinking' ? (
-          <span className="typing"><i /><i /><i /></span>
-        ) : status === 'hand_raised' ? (
-          <span className="hand" role="img" aria-label="hand raised">✋</span>
-        ) : null}
-        {muted ? 'Muted' : STATE_LABEL[status]}
-      </div>
+      <div className="tw-pills">{pill}</div>
       <div className="name glass">
         Twin <span className="badge">AI</span>
       </div>

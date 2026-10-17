@@ -323,3 +323,36 @@ input { font: inherit; }
   .controls .mid { justify-self: center; flex-wrap: wrap; justify-content: center; }
 }
 .side[hidden] { display: none; }
+
+/* Twin tile state pills (RC-19) */
+.tw-pills { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 20px); }
+.tw-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text);
+  background: var(--glass-strong); border: 1px solid var(--border);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  animation: pop 400ms var(--spring); overflow: hidden; text-overflow: ellipsis;
+}
+.tw-pill.speaking { background: linear-gradient(135deg, var(--twin-a), var(--twin-b)); color: #fff; border-color: transparent; }
+.tw-pill.thinking { position: relative; }
+.tw-pill.thinking::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.35) 50%, transparent 80%);
+  background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+}
+.tw-pill.sketch { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.tw-pill.sketch .pen { display: inline-block; animation: scribble 0.6s ease-in-out infinite alternate; }
+.tw-pill.add { cursor: pointer; background: rgba(255, 159, 10, 0.18); color: var(--warn); border-color: rgba(255, 159, 10, 0.4); }
+.tw-pill.add b { color: var(--text); padding-left: 6px; border-left: 1px solid rgba(255, 159, 10, 0.4); }
+.tw-pill.add:hover { background: rgba(255, 159, 10, 0.28); }
+.tw-pill.muted { color: var(--danger); }
+.eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+.eq i { width: 3px; background: currentColor; border-radius: 2px; animation: eq 0.8s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: 0.2s; }
+.eq i:nth-child(3) { animation-delay: 0.4s; }
+.tile.twin.sketching .twin-avatar { animation: think 2.4s linear infinite; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes scribble { from { transform: rotate(-12deg) translateX(-1px); } to { transform: rotate(10deg) translateX(1px); } }
+@keyframes eq { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+.strip .tw-pills { bottom: 40px; }
+.strip .tw-pill.add b { display: none; }
