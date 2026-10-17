@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { handleStopAudio, type StopAudioMsg } from './bargeIn'
 import { EchoGuard } from './echoGuard'
+import { startVad } from './vad'
 import { AudioPlayer, type AudioMsg } from './player'
 import { Speech } from './speech'
 import type { TwinClient } from './ws'
@@ -85,10 +86,13 @@ export function useCallAudio(opts: {
     // With speakers we wait for actual words so Twin's own voice can't trigger a barge-in.
     const speech = new Speech({ earlyTrigger: mode === 'headphones' ? 'speech' : 'interim' })
     let bargedThisUtterance = false
+    let lastBargeAt = 0
 
     const bargeIn = () => {
-      if (bargedThisUtterance || !player.isPlaying()) return
+      if (!player.isPlaying()) return
+      if (bargedThisUtterance && Date.now() - lastBargeAt < 1500) return
       bargedThisUtterance = true
+      lastBargeAt = Date.now()
       player.stopAll() // stop locally FIRST
       client.send({ type: 'barge_in', speaker: user, ts: Date.now() })
     }
@@ -100,7 +104,7 @@ export function useCallAudio(opts: {
       },
       onInterim: (text) => {
         if (mode === 'speakers' && guard.isEcho(text)) return
-        if (mode === 'speakers' && player.isPlaying() && guard.novelWords(text).length < 2) return
+        if (mode === 'speakers' && player.isPlaying() && guard.novelWords(text).length < 1) return
         bargeIn()
         client.send({ type: 'user_text', speaker: user, text, final: false, ts: Date.now() })
         cbRef.current.onInterim(text)
@@ -119,7 +123,18 @@ export function useCallAudio(opts: {
       onError: (e) => setSpeechError(e.fatal ? e.message : null),
     })
     setSpeechError(null)
-    return () => speech.stop()
+    // B1: energy-based barge-in on the echo-cancelled mic (works with laptop speakers too).
+    let stopVad: () => void = () => {}
+    let disposed = false
+    void startVad({ active: () => player.isPlaying(), onVoice: bargeIn }).then((stop) => {
+      if (disposed) stop()
+      else stopVad = stop
+    })
+    return () => {
+      disposed = true
+      stopVad()
+      speech.stop()
+    }
   }, [client, user, micOn, mode, speechSupported])
 
   return {
