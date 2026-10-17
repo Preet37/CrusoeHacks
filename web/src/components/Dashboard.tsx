@@ -6,6 +6,7 @@ import { meetingHistory, scopedRoom, signOut, slug, type WorkspaceSession } from
 import { createClient, serverHttpBase, type TwinClient } from '../lib/ws'
 import { Scoreboard } from './optional'
 import PermissionsCard from './PermissionsCard'
+import TicketsBoard from './TicketsBoard'
 import { TwinAvatar } from './ParticipantTile'
 
 interface CalMeeting {
@@ -81,7 +82,6 @@ export default function Dashboard({
   const [meetings, setMeetings] = useState<Meeting[] | null>(null)
   const [info, setInfo] = useState<WorkspaceInfo | null>(null)
   const [integ, setInteg] = useState<Record<string, Record<string, unknown>> | null>(null)
-  const [pushing, setPushing] = useState<Record<string, string>>({})
   const [auto, setAuto] = useState(loadAuto)
   const [lobby, setLobby] = useState<TwinClient | null>(null)
   const [repo, setRepo] = useState('')
@@ -162,20 +162,6 @@ export default function Dashboard({
     }
   }
 
-  const pushJira = async (id: string) => {
-    setPushing((p) => ({ ...p, [id]: 'Pushing…' }))
-    try {
-      const q = new URLSearchParams({ workspace: session.workspace, code: session.code })
-      const r = await fetch(`${serverHttpBase()}/tickets/${encodeURIComponent(id)}/push_jira?${q}`, { method: 'POST' })
-      const d = await r.json().catch(() => ({}))
-      const url = d?.links?.jira ?? d?.url ?? d?.jira_url
-      setPushing((p) => ({ ...p, [id]: r.ok ? (url ? `url:${url}` : 'Pushed') : d?.detail || d?.error || `Failed (${r.status})` }))
-      if (r.ok) refresh()
-    } catch {
-      setPushing((p) => ({ ...p, [id]: 'Server unreachable' }))
-    }
-  }
-
   const validRepo = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(repo.trim())
   const now = Date.now()
   const upcoming = calendar.slice().sort((a, b) => todayAt(a.scheduled) - todayAt(b.scheduled))
@@ -212,6 +198,8 @@ export default function Dashboard({
           Sign out
         </button>
       </header>
+
+      <TicketsBoard session={session} />
 
       <main className="dash-cols">
         <div className="dash-col">
@@ -302,20 +290,7 @@ export default function Dashboard({
                                 Copy agent prompt
                               </button>
                             )}
-                            {t.id && !links.some(([k]) => k === 'jira') && (() => {
-                              const st = pushing[t.id!]
-                              if (st?.startsWith('url:'))
-                                return (
-                                  <a className="pill small" href={st.slice(4)} target="_blank" rel="noreferrer">
-                                    Open in Jira
-                                  </a>
-                                )
-                              return (
-                                <button className="pill small on" disabled={st === 'Pushing…'} title={st || 'Create this ticket in Jira'} onClick={() => void pushJira(t.id!)}>
-                                  {st && st !== 'Pushing…' && st !== 'Pushed' ? 'Retry Jira' : st || 'Push to Jira'}
-                                </button>
-                              )
-                            })()}
+                            {/* Tickets are created in Jira automatically when the meeting ends (see the Tickets board). */}
                             {links.map(([k, v]) => (
                               <a key={k} href={v} target="_blank" rel="noreferrer" className="pill small">
                                 {k}

@@ -1,4 +1,5 @@
 """FastAPI app: /health, /state (debug), /calendar, /simulate/calendar_join, and the meeting WebSocket at /ws."""
+import asyncio
 import hmac
 import json
 import os
@@ -55,7 +56,12 @@ async def integrations_status(workspace: str = "", code: str = ""):
 @app.get("/tickets")
 async def tickets_list(workspace: str = "", code: str = "", room: str = ""):
     import integrations
-    return {"tickets": integrations.list_tickets(_ticket_scope(workspace, code, room), room or None)}
+    tickets = integrations.list_tickets(_ticket_scope(workspace, code, room), room or None)
+    for t in tickets:  # patches can be large: the dashboard downloads them from /agent.patch
+        agent = t.get("agent")
+        if isinstance(agent, dict) and "patch" in agent:
+            t["agent"] = {**{k: v for k, v in agent.items() if k != "patch"}, "has_patch": bool(agent["patch"])}
+    return {"tickets": tickets}
 
 
 @app.get("/tickets/{ticket_id}/brief.md")
@@ -73,6 +79,41 @@ async def ticket_brief(ticket_id: str, workspace: str = "", code: str = "", room
     md = integrations.agent_brief_markdown(ticket, session, meeting, trusted, issue)
     name = f"{key or ticket_id}-agent-brief.md"
     return PlainTextResponse(md, media_type="text/markdown; charset=utf-8",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.post("/tickets/{ticket_id}/agent")
+async def ticket_agent_run(ticket_id: str, workspace: str = "", code: str = "", room: str = ""):
+    """Start (or retry) the Ticket Agent for one ticket. Progress shows on GET /tickets as ticket.agent."""
+    from fastapi.responses import JSONResponse
+    import integrations
+    from integrations import ticket_agent
+    trusted = _ticket_scope(workspace, code, room)
+    try:
+        ticket, session, meeting = integrations.find_ticket(ticket_id, trusted, room or None)
+    except integrations.TicketError as e:
+        return JSONResponse({"error": str(e)}, status_code=e.status)
+    if integrations.ticket_permission(session, trusted) == "off":
+        return JSONResponse({"error": integrations.TICKETS_OFF}, status_code=403)
+    started = ticket_agent.start(ticket_id, trusted or getattr(session, "workspace", None),
+                                 room or getattr(session, "room", None) or (meeting or {}).get("room"))
+    return {"ok": True, "started": started, "running": ticket_agent.is_running(ticket_id)}
+
+
+@app.get("/tickets/{ticket_id}/agent.patch")
+async def ticket_agent_patch(ticket_id: str, workspace: str = "", code: str = "", room: str = ""):
+    from fastapi.responses import JSONResponse, PlainTextResponse
+    import integrations
+    trusted = _ticket_scope(workspace, code, room)
+    try:
+        ticket, _session, _meeting = integrations.find_ticket(ticket_id, trusted, room or None)
+    except integrations.TicketError as e:
+        return JSONResponse({"error": str(e)}, status_code=e.status)
+    patch = (ticket.get("agent") or {}).get("patch")
+    if not patch:
+        return JSONResponse({"error": "No patch yet"}, status_code=404)
+    name = f"{ticket.get('jira_key') or ticket_id}-agent.patch"
+    return PlainTextResponse(patch, media_type="text/x-diff; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
@@ -332,7 +373,11 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
             if not session.sockets:
                 try:
                     from brain.meeting_store import save_meeting
-                    save_meeting(session)
+                    saved = save_meeting(session)
+                    # Meeting ended: tickets go to Jira automatically (and their Ticket Agents start).
+                    if saved and saved.get("tickets"):
+                        import integrations
+                        asyncio.create_task(integrations.auto_push_meeting(saved))
                 except Exception:
                     log.exception('[%s] could not save meeting summary', room)
                 # Nobody left: the next join is a brand-new meeting (fresh history, board, topic).
