@@ -92,7 +92,7 @@ async def _prewarm_acks() -> None:
 
     async def run() -> None:
         try:
-            n = await tts.prewarm(list(responder.ACKS) + list(mouth.PREWARM_PHRASES))
+            n = await tts.prewarm(list(responder.ACKS) + [mouth.SKETCH_ACK])
             log.info("prewarmed %d ack phrases", n)
         except Exception:  # noqa: BLE001
             log.exception("ack prewarm failed")

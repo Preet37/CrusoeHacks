@@ -112,7 +112,8 @@ def _sentence(text) -> str:
 
 def narration(labels: list[str]) -> str:
     """One sentence grounded in labels that were actually drawn; "" when none."""
-    labels = [l for l in labels if l][:NARRATE_MAX_LABELS]
+    limit = 2 if any("/" in label for label in labels) else NARRATE_MAX_LABELS
+    labels = [l.split(" Owner:", 1)[0] for l in labels if l][:limit]
     if not labels:
         return ""
     if len(labels) == 1:

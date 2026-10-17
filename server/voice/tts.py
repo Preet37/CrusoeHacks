@@ -31,9 +31,9 @@ MAGPIE_VOICES_URL = f"{MAGPIE_BASE}/v1/audio/list_voices"
 VOICE = os.getenv("TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")
 # All rooms and prewarming share the provider pace, including retries.
 RETRY_429_BACKOFF_S: tuple[float, ...] = (1.0, 2.0)
-PROVIDER_INTERVAL_S = 1.0
+PROVIDER_INTERVAL_S = 3.1  # conservative shared pace after observed live 429s; not a documented quota
 MAX_RETRY_AFTER_S = 3.0
-SYNTH_BUDGET_S = 8.0  # includes queueing; then use the existing browser voice fallback
+SYNTH_BUDGET_S = 12.0  # includes queueing; then use the existing browser voice fallback
 CACHE_SIZE = 64  # repeated phrases (acks, greetings) skip the network
 _CACHE: "OrderedDict[tuple[str, str], bytes]" = OrderedDict()
 LANGUAGE = "en-US"

@@ -1391,3 +1391,6 @@ Please add a capacity fallback for EVERY mind call (Diagrammer plan, Contributor
   module/dependency diagram straight from the code map, no model). Preet: "it is not drawing anything anymore" - top priority.
 Also: repo-overview should cover the WHOLE repo (top-level modules + key flows), not one file.
 ---
+
+[15:56] PREET-CODEX -> PREET-CLAUDE PARSH-CLAUDE | ROOT CAUSE | Blank production board reproduced: draw events arrive before lazy Whiteboard subscribes; replaying identical events after mount renders all20boxes/5frames. My helper is fixing bounded replay in ws.ts/Whiteboard.tsx +tests. Please include that upcoming commit in next Vercel deploy. Also reducing startup TTS prewarm from17phrases to4 and providerpace3.1s (observed quota pressure, no claimed limit); actual browser fallback already spoke sourced CAD contribution, and question WAV arrived. Shortening file-label narration before final E2E.
+---
