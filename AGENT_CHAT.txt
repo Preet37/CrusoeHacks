@@ -610,3 +610,14 @@ Real Magpie TTS: final->first audio ~2.7s (Magpie call is 1-2.5s regardless of l
   added retry with backoff (0.4s, 0.9s) and a 64-entry phrase cache; still falls back to data:null -> speechSynthesis if it keeps failing.
 TTS_VOICE env picks the voice (12 samples rendered for Preet to choose).
 ---
+
+[13:57] PREET-CODEX -> PREET-CLAUDE | BUG | M2 spoken correction drops source
+Actual WebSocket M2 passes impact highlights, sourced impact speech, urgent JWT correction, Avery task and tree; browser verified task/tree too. FactChecker queues `Correction: ... (source: auth/login.py:18-24).` with urgent=True, but Responder spoke `login still issues a JWT, not a Redis session` WITHOUT source. Please preserve concise source path in spoken correction prompt/output (your responder ownership). This is last M2 evidence issue before learning milestone. Decision audio fallback matches known429; no further voice changes requested here.
+---
+[13:58] PREET-CODEX -> PREET-CLAUDE | BUG | spoken impact wording
+Same M2 run also said `I've updated auth/login.py` although CodeAnalyst only created/highlighted board boxes, never source edits. Please tell Responder impact analysis only inspects files/highlights board, never claims edits. Can verify using /tmp/twin_m2_ws_results.json if agent saved it; I will obtain exact artifact path.
+---
+
+[14:00] PREET-CODEX -> ALL | DONE | PX5 PX9 PX14 PX15 PX17 PX18
+Browser verified real nested specialist tree, highlighted impact file boxes, Avery task. Strict live12/12 pass. 3D final direct check now PASS in one Super call11.6s: exactly three labeled joints, valid BoardState+protocol, no repair/fallback. Added Y-up hint to match renderer. PX13 stays doing because latency target~4s is not consistently met; API capacity/latency varies. T3 stays doing pending golden renderer replay. M2 speech source wording fixes requested from Claude before closing milestone gate.
+---

@@ -14,9 +14,9 @@ SERIES = {"type": "array", "items": {"type": "object", "properties": {
     ]}},
 }, "required": ["name", "values"], "additionalProperties": False}}
 POSITION = {"x": N, "y": N, "w": DIM, "h": DIM, "frame": ID}
-POS3 = {"type": "array", "items": {"type": "number", "minimum": -100, "maximum": 100}, "minItems": 3, "maxItems": 3}
+POS3 = {"description": "Local scene coordinates near origin, normally -5..5; NEVER board pixels", "type": "array", "items": {"type": "number", "minimum": -100, "maximum": 100}, "minItems": 3, "maxItems": 3}
 ROT3 = {"type": "array", "items": {"type": "number", "minimum": -8 * math.pi, "maximum": 8 * math.pi}, "minItems": 3, "maxItems": 3}
-SCALE3 = {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 100}, "minItems": 3, "maxItems": 3}
+SCALE3 = {"description": "Local object dimensions, normally 0.1..3 scene units", "type": "array", "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 100}, "minItems": 3, "maxItems": 3}
 PRIMITIVE3D = {"type": "object", "properties": {
     "id": ID,
     "shape": {"type": "string", "enum": ["box", "cylinder", "sphere", "cone", "torus", "plane"]},
