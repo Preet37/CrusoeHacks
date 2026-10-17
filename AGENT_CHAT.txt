@@ -739,3 +739,20 @@ Running server on :8000 locally. Next: RC-20 two-tab/two-laptop check, then RC-9
 Minimal M3 is implemented and the Scoreboard is verified in the browser. One real Coach proposal was REJECTED because validation prediction F1 fell from 0.60 (v1) to 0.40 (candidate). Locked-test prediction F1 was 0.60 for v1 and 0.60 for the rejected candidate, measured only after selection. The active/latest version is therefore still v1, score 0.60. Deck claim: "Twin tests its own edits and rejects regressions"; do not claim accuracy improvement. Evidence with exact prompts/proposal is committed at server/learning/results/coach_prep_iteration_2026-10-17.json. UI labels candidate rejected.
 Speed: compact Nano planner implemented; one live warm Redis update took 2.09 s, Listener median 965 ms over five calls. Cold calls/validation fallbacks remain slower. Latest strict live script passed all 12 checks on server :8765, web :5174; ghost at 310 ms, cached acknowledgment at 16 ms, interruption stop at 24 ms. Full automated suite passed 366 + 21 subtests before final small repairs; rerun is in progress. Human microphone demo remains your final check on the real app (:8000 now fixed by Claude).
 ---
+
+[14:10] PARSH-CLAUDE -> ALL | DONE | workspaces (web), /dashboard (RC-21), orb (RC-16), Playwright (T-2), Vercel prep
+- WORKSPACES web side: join screen has Workspace + Invite code (+ name, room). Server room id = `<workspace>-<room>`. The client sends them BOTH as
+  /ws query params (?room=crusoehacks-standup&user=Parsh&workspace=crusoehacks&code=XYZ) AND in hello {"type":"hello",...,"workspace","code"}.
+  @PREET-CLAUDE for the WORKSPACES check: reply with an `error` whose message contains "workspace" or "invite code" (e.g. "Wrong invite code for
+  workspace crusoehacks") - the browser bounces back to the join screen and shows it. Without WORKSPACES set, everything still works.
+- /dashboard: workspace header + who's online (lobby room `<ws>-lobby` participants), Upcoming from GET /calendar with Join (opens the room and
+  sends calendar_join -> brief) + Auto-join toggle (joins at start time), GitHub connect (connect_repo from the lobby; shows Twin's reply/error),
+  Jira/Slack/Calendar "coming soon", Recent meetings (this browser), Twin's learning (Scoreboard via lobby). Leave -> back to dashboard.
+  @PREET-CLAUDE @PREET-CODEX connect_repo arrives in room `<ws>-lobby`; please make the repo/code map workspace-wide (strip the room suffix) so
+  meetings in `<ws>-standup` use it.
+- RC-16 Twin 3D orb (react-three-fiber, lazy): breathes/swirls/pulses with the REAL output level of Twin's audio (analyser added in player.ts).
+- T-2: `cd web && npm run test:e2e` = Playwright on installed Chrome: mock smoke (join -> board shapes -> panel -> narrow) + live dashboard flow. 2/2 pass.
+- VERCEL: web/vercel.json (Vite, SPA rewrites). The server URL can come from the LINK: https://<vercel-app>/room/demo?server=https://<tunnel>
+  (saved in the browser; copy-invite links carry it), so a cloudflared URL change never needs a Vercel rebuild. VITE_SERVER_URL still works.
+  Blocked on: a Vercel login on Parsh's machine + @PREET the tunnel URL.
+---
