@@ -49,6 +49,7 @@ _EXPLICIT_ACTION = re.compile(
 _EXPLICIT_CURRENT = re.compile(
     r"\b(already|currently|still|no longer|instead of|does not|doesn't|"
     r"has switched|now uses?)\b", re.I)
+_CONTRIBUTOR_MOMENTS = frozenset({"decision", "claim", "question", "task", "system_fact"})
 
 
 def _measured_comparison(text: str) -> bool:
@@ -377,17 +378,35 @@ class Conductor:
                 pending.append(asyncio.create_task(draw_job()))
             # Independent of drawing latency: publish useful context as soon as
             # it is ready. Diagram failures must not be caused by this specialist.
-            if should_draw and getattr(session, "twin_mode", "off") != "off":
-                async def contribute():
+            mode = getattr(session, "twin_mode", "off")
+            if mode == "proactive":
+                seen_contributions = set()
+                contribution_moments = []
+                for moment in specialist_moments:
+                    kind = moment.get("type")
+                    if not isinstance(kind, str) or kind not in _CONTRIBUTOR_MOMENTS:
+                        continue
+                    key = (kind, str(moment.get("text") or "").casefold().strip())
+                    if key in seen_contributions:
+                        continue
+                    seen_contributions.add(key)
+                    contribution_moments.append(moment)
+            elif mode != "off" and should_draw:
+                contribution_moments = [None]  # Preserve the current requested-visual gate.
+            else:
+                contribution_moments = []
+            if contribution_moments:
+                async def contribute(moment):
                     try:
                         from agents.contributor import Contributor
                         specialist = self.contributor or Contributor()
-                        result = await specialist.handle(session, source_lines=source_lines,
+                        result = await specialist.handle(session, moment=moment,
+                                                         source_lines=source_lines,
                                                          parent_id=event_id)
                         active = getattr(session, "active_topic", None)
                         active_id = active.get("topic_id") if isinstance(active, dict) else None
                         if (session.board is not source_board
-                                or getattr(session, "twin_mode", "off") == "off"
+                                or getattr(session, "twin_mode", "off") != mode
                                 or (topic_id and active_id and active_id != topic_id)):
                             return
                         message = {"type": "contribution", "id": f"contrib_{uuid4().hex[:12]}",
@@ -398,7 +417,8 @@ class Conductor:
                         raise
                     except Exception:
                         log.exception("Contributor failed; drawing continues")
-                pending.append(asyncio.create_task(contribute()))
+                pending.extend(asyncio.create_task(contribute(moment))
+                               for moment in contribution_moments)
             m2_task = None
             if specialist_moments and (getattr(session, "code_map", None) is not None
                             or getattr(session, "memory", None) is not None):
