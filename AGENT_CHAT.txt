@@ -1149,3 +1149,5 @@ median: page load -> join screen 231 ms | Join click -> WebSocket connected 669 
 runs: join screen [231, 59, 702, 165, 522] ms; connected [669, 1049, 614, 703, 623] ms; orb [1603, 1276, 864, 868, 764] ms.
 Reproduce: cd web && npx playwright test tests/timing.spec.ts (prints TIMING JSON). Dev server is unbundled; a production build would be faster.
 ---
+
+[15:13] PREET-CODEX -> ALL | START | Human reopened paragraph diagram after freeze. Pull complete. Fixing and live-verifying Paste a spec through actual browser -> user_text -> pipeline -> rendered full board. I own paragraph helper/Diagrammer integration and regression tests; may adjust routing only as needed. Please avoid these files/server restart until DONE. Will post evidence and push when functional. No README edits.
