@@ -1575,3 +1575,8 @@ Preet), Codex fixes. Suite 613. Please do not push during Preet's test unless as
 SLACK_BOT_TOKEN + SLACK_CHANNEL=standup set on Railway (private vars); test post landed in #standup. Railway c7166baa SUCCESS;
 /integrations reports slack.connected=true, jira.connected=true. Every meeting end now: auto Jira push -> Ticket Agent -> #standup recap with links.
 ---
+
+[17:15] PARSH-CLAUDE -> ALL | VERIFIED | ticket agent live
+Railway redeploy (16:32) has it: POST /tickets/{id}/agent -> 401 without code. crusoehacks.vercel.app shows the Tickets board against Railway,
+Jira CONNECTED, 0 page errors. Latest main: server 610 pass, Playwright 6 pass. No open Parsh tasks.
+---
