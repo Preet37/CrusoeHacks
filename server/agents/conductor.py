@@ -7,6 +7,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from uuid import uuid4
 
 import config
 import llm
@@ -117,11 +118,12 @@ def _specialist_moments(moments: list[dict], source_lines: list[dict]) -> list[d
 
 class Conductor:
     def __init__(self, diagrammer=None, code_analyst=None,
-                 fact_checker=None, task_planner=None):
+                 fact_checker=None, task_planner=None, contributor=None):
         self.diagrammer = diagrammer or Diagrammer()
         self.code_analyst = code_analyst or CodeAnalyst()
         self.fact_checker = fact_checker or FactChecker()
         self.task_planner = task_planner or TaskPlanner()
+        self.contributor = contributor
 
     async def _route_m2(self, session, moments: list[dict], budgets: list[JobBudget],
                         parent_id: str) -> dict[int, set[str]]:
@@ -373,6 +375,30 @@ class Conductor:
             should_draw = bool(draw_moments or (topic_id is not None and topic_changed))
             if should_draw and not defer_claim_draw:
                 pending.append(asyncio.create_task(draw_job()))
+            # Independent of drawing latency: publish useful context as soon as
+            # it is ready. Diagram failures must not be caused by this specialist.
+            if should_draw and getattr(session, "twin_mode", "off") != "off":
+                async def contribute():
+                    try:
+                        from agents.contributor import Contributor
+                        specialist = self.contributor or Contributor()
+                        result = await specialist.handle(session, source_lines=source_lines,
+                                                         parent_id=event_id)
+                        active = getattr(session, "active_topic", None)
+                        active_id = active.get("topic_id") if isinstance(active, dict) else None
+                        if (session.board is not source_board
+                                or getattr(session, "twin_mode", "off") == "off"
+                                or (topic_id and active_id and active_id != topic_id)):
+                            return
+                        message = {"type": "contribution", "id": f"contrib_{uuid4().hex[:12]}",
+                                   "topic_id": topic_id, **result}
+                        session.latest_contribution = message
+                        await session.broadcast(message)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        log.exception("Contributor failed; drawing continues")
+                pending.append(asyncio.create_task(contribute()))
             m2_task = None
             if specialist_moments and (getattr(session, "code_map", None) is not None
                             or getattr(session, "memory", None) is not None):
