@@ -26,7 +26,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-9 | done | Barge-in: on `barge_in`, cancel responder + TTS, send `stop_audio`, status listening | PC-7 | Talking over Twin stops it; no stale audio arrives after |
 | PC-10 | done | Work-update queue: Diagrammer (PREET-CODEX) calls `session.push_update(text)`; responder delivers per turn_taking | PC-8 | After a diagram change and a pause, Twin mentions it once |
 | PC-11 | done | Latency logging per turn (ARCHITECTURE.md section 6) to console + `server/learning/runs/latency.jsonl` | PC-7 | File has rows with the 4 timings |
-| PC-12 | todo | M2: wire Fact Checker and Code Analyst results into work updates; `task` messages | M1 done | Planted false claim gets a spoken correction with source |
+| PC-12 | doing | M2: wire Fact Checker and Code Analyst results into work updates; `task` messages | M1 done | Planted false claim gets a spoken correction with source |
 
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 

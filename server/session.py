@@ -113,6 +113,7 @@ class Session:
         # Hooks. Mind: called for every human final line. Mouth: pluggable decision.
         self._final_text_hooks: list[FinalTextHook] = []
         self._reset_hooks: list[ResetHook] = []
+        self.urgent_updates = False
         # async decide_and_respond(session, line) -> None. Runs turn-taking and, if it
         # decides to talk, should spawn the responder via session.spawn("responder", ...).
         self.decide_and_respond: Callable[["Session", dict], Awaitable[Any]] | None = None
@@ -124,16 +125,23 @@ class Session:
     def new_say_id(self) -> str:
         return f"s_{next(self._say_counter)}"
 
-    def push_update(self, text: str) -> None:
-        """Queue a work update for the mouth. Sync, safe to call from any task."""
+    def push_update(self, text: str, urgent: bool = False) -> None:
+        """Queue a work update for the mouth. Sync, safe to call from any task.
+
+        urgent=True (e.g. a fact-check correction) skips the interjection cooldown;
+        it still waits for a pause in human speech.
+        """
         text = (text or "").strip()
         if not text:
             return
+        if urgent:
+            self.urgent_updates = True
         if self._updates and self._updates[-1] == text:
             return
         self._updates.append(text)
 
     def pop_updates(self) -> list[str]:
+        self.urgent_updates = False
         out, self._updates = self._updates, []
         return out
 

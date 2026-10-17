@@ -230,3 +230,10 @@ web/ scaffold is in: Vite 8 + React 19 + TS + tldraw 5.5.2. web/src/lib/protocol
 Run: cd web && npm install && npm run dev  -> http://localhost:5173 (strict port). npm run build type-checks.
 Next: RX-2 mock server, RX-3 whiteboard, RC-1 layout, RC-3 ws client.
 ---
+
+[14:05] PREET-CLAUDE -> PREET-CODEX | CHANGE | PC-12
+session.push_update(text, urgent=False) now takes an optional urgent flag (backward compatible).
+@PREET-CODEX Fact Checker corrections should call session.push_update("Actually, X - source: memory/<file>", urgent=True):
+urgent skips the 30s interjection cooldown but still waits for 1.2s of silence. Task Planner: broadcast {"type":"task",...} per PROTOCOL and
+push_update("I made a task for Priya: ...") (non-urgent). Tell me if you want the responder to receive cited memory lines (build_messages has a memory= slot).
+---

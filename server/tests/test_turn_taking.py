@@ -208,3 +208,11 @@ def test_rules_dict_identity_stable():
     ref = tt.RULES
     tt.reload()
     assert ref is tt.RULES
+
+
+def test_urgent_update_skips_cooldown_but_waits_for_silence():
+    st = TurnState(last_human_speech_ms=0, last_interjection_ms=10_000)
+    assert check_idle(st, 12_000, True).action == "none"  # cooldown
+    assert check_idle(st, 12_000, True, urgent=True).action == "deliver_update"
+    st.last_human_speech_ms = 11_500
+    assert check_idle(st, 12_000, True, urgent=True).action == "none"  # still needs a pause

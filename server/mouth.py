@@ -115,7 +115,7 @@ class Mouth:
         if not has:
             self._updates_since = None
         age = now - self._updates_since if self._updates_since else 0
-        d = turn_taking.check_idle(self.state, now, has, age)
+        d = turn_taking.check_idle(self.state, now, has, age, urgent=bool(getattr(s, "urgent_updates", False)))
         if d.action == "deliver_update":
             turn_taking.mark_interjection(self.state, now)
             self.speak("work update", trigger_ts=now, updates=s.pop_updates())

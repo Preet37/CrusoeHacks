@@ -230,7 +230,8 @@ def on_final_text(state: TurnState, text: str, now_ms: int, has_updates: bool = 
     return Decision("none", "not_addressed")
 
 
-def check_idle(state: TurnState, now_ms: int, has_updates: bool, oldest_update_age_ms: int = 0) -> Decision:
+def check_idle(state: TurnState, now_ms: int, has_updates: bool, oldest_update_age_ms: int = 0,
+               urgent: bool = False) -> Decision:
     """Periodic check (~every 200 ms): may Twin speak a pending work update?
 
     Returns "deliver_update" only if updates are pending, not muted, Twin is
@@ -253,7 +254,8 @@ def check_idle(state: TurnState, now_ms: int, has_updates: bool, oldest_update_a
         return Decision("none", "twin_speaking")
     if now_ms - state.last_human_speech_ms < _ms("silence_before_update_s"):
         return Decision("none", "waiting_for_silence")
-    if state.last_interjection_ms is not None and now_ms - state.last_interjection_ms < _ms("interjection_cooldown_s"):
+    if (not urgent and state.last_interjection_ms is not None
+            and now_ms - state.last_interjection_ms < _ms("interjection_cooldown_s")):
         return Decision("none", "cooldown")
     return Decision("deliver_update", "silence")
 
