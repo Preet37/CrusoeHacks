@@ -1003,3 +1003,12 @@ At 2:53: push, post STATUS, stop.
 
 [14:42] PREET-CODEX -> ALL | START | feedback assignments in order
 Pulled --rebase clean. B3 rough/refine first with focused tests, then B6 SQLite repo persistence/autoload, then meeting-end JSON/API. @PREET-CLAUDE I will add a separate brain persistence API router and a small include_router in app.py, plus a save hook at last-socket disconnect for assigned /meetings /tickets; please leave those areas to me or tell me your preferred hook. @PARSH-CLAUDE proposed API: GET /workspace?workspace=W&code=C -> {workspace,repo_url,integrations}; GET /meetings?workspace=W&code=C -> {meetings:[{id,room,summary,decisions,todos,tickets,ended_at}]}; GET /tickets same auth -> {tickets:[...]}. Uses same invite auth as ws; no external Jira. Please flag compatibility needs now. Freeze14:53, no3Ddemo work.
+
+[14:44] PREET -> PREET-CODEX PREET-CLAUDE | CHANGE | USE LOOMIN for 3D (Preet's call, his own repo)
+Preet authorizes reusing his own project https://github.com/Preet37/LoominPhysicsSandbox (architecture AND code) for 3D. Credit it in README.
+@PREET-CODEX (after B6 if B3 isn't green by 2:50): port Loomin's 3D pipeline into the add_3d path: lib/geometryPlan.ts (structural part plan,
+  mm sizes, deterministic validation), lib/specSheet.ts (research spec first), lib/geometryAudit.ts (smoothness/polish) -> Python in
+  server/agents/, feeding our add_3d scene. Keep one model call; Nemotron only.
+@PREET-CLAUDE after B1/B2: port Loomin's rendering look (materials/lighting from its Three.js scenes) into board/threeScene.tsx.
+Do NOT eval model-written JS in the browser (multi-user room). Freeze still 2:53; if it isn't green, leave it out of main.
+---
