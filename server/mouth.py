@@ -40,6 +40,7 @@ class Mouth:
         self.listener = _make_listener(session)
         self._updates_since: int | None = None
         self._idle_task: asyncio.Task | None = None
+        self._turn: dict | None = None
 
     # ------------------------------------------------------------ wiring
     def attach(self) -> None:
@@ -99,10 +100,33 @@ class Mouth:
                 await session.barge_in()
             await session.set_status("hand_raised")
         elif d.action == "respond":
-            self.speak(d.reason, trigger_ts=line.get("ts") or now, updates=session.pop_updates())
+            updates = self._take_unstarted_turn() + session.pop_updates()
+            self.speak(d.reason, trigger_ts=line.get("ts") or now, updates=updates)
+        elif self._unstarted_turn_running():
+            # Newest wins: a human kept talking before Twin said anything, so restart
+            # the turn with the fresh transcript instead of answering stale input.
+            pending = self._turn
+            updates = self._take_unstarted_turn()
+            log.info("[%s] newest wins: restarting unstarted turn", session.room)
+            self.speak(pending["reason"], trigger_ts=line.get("ts") or now, updates=updates)
+
+    def _unstarted_turn_running(self) -> bool:
+        s = self.session
+        t = s._tasks.get("responder") if hasattr(s, "_tasks") else None
+        return bool(t is not None and not t.done() and self._turn and not s.speaking)
+
+    def _take_unstarted_turn(self) -> list[str]:
+        """Cancel a responder turn that has not produced audio yet; return its updates."""
+        if not self._unstarted_turn_running():
+            return []
+        updates = list(self._turn.get("updates") or [])
+        self.session.cancel("responder")
+        self._turn = None
+        return updates
 
     def speak(self, reason: str, *, trigger_ts: int, updates: list[str]) -> None:
         self._updates_since = None
+        self._turn = {"reason": reason, "updates": list(updates)}
         self.session.spawn("responder", responder.respond(
             self.session, reason, trigger_ts=trigger_ts, updates=updates))
 

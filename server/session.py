@@ -299,6 +299,8 @@ class Session:
             return
         self.status = state
         await self.broadcast(Status(state=state))
+        if state in ("speaking", "listening"):
+            await self.broadcast_participants()  # Twin's speaking ring, without waiting for the ticker
 
     async def add_line(self, speaker: str, text: str, ts: int | None = None) -> dict:
         line = {"speaker": speaker, "text": text, "ts": ts if ts is not None else now_ms()}

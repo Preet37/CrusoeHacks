@@ -44,3 +44,50 @@ async def test_not_now_raises_hand(monkeypatch):
     await m.on_final(s, {"speaker": "Preet", "text": "hold on, not now", "ts": 0})
     assert s.status == "hand_raised"
     await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_newest_wins_restarts_unstarted_turn(monkeypatch):
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: None)
+    calls = []
+    gate = asyncio.Event()
+
+    async def fake_respond(session, reason, *, trigger_ts=None, updates=None):
+        calls.append((reason, list(updates or [])))
+        await gate.wait()  # never produces audio until released
+
+    monkeypatch.setattr(mouth.responder, "respond", fake_respond)
+    s = Session("nw")
+    m = mouth.attach(s)
+    s.push_update("I drew redis")
+    await m.on_final(s, {"speaker": "Preet", "text": "Twin, what do you think?", "ts": 1})
+    await asyncio.sleep(0)
+    first = s._tasks["responder"]
+    await m.on_final(s, {"speaker": "Preet", "text": "and also about billing", "ts": 2})
+    await asyncio.sleep(0)
+    assert first.cancelled() or first.done()
+    assert [c[0] for c in calls] == ["name", "name"]
+    assert calls[1][1] == ["I drew redis"]  # updates carried into the restarted turn
+    gate.set()
+    await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_started_turn_is_not_restarted(monkeypatch):
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: None)
+    calls = []
+
+    async def fake_respond(session, reason, *, trigger_ts=None, updates=None):
+        calls.append(reason)
+        session.speaking = True
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(mouth.responder, "respond", fake_respond)
+    s = Session("nw2")
+    m = mouth.attach(s)
+    await m.on_final(s, {"speaker": "Preet", "text": "Twin, go ahead", "ts": 1})
+    await asyncio.sleep(0)
+    await m.on_final(s, {"speaker": "Preet", "text": "mm interesting", "ts": 2})
+    await asyncio.sleep(0)
+    assert calls == ["name"]
+    await mouth.detach(s)
