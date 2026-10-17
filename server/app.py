@@ -1,5 +1,7 @@
 """FastAPI app: /health, /state (debug), /calendar, /simulate/calendar_join, and the meeting WebSocket at /ws."""
+import hmac
 import json
+import os
 import logging
 from pathlib import Path
 
@@ -102,10 +104,47 @@ async def simulate_calendar_join(room: str = "demo", meeting: str = "Daily stand
     return {"ok": True, "brief": brief}
 
 
+def workspace_table() -> dict[str, str]:
+    """WORKSPACES=name:code,name2:code2 (server/.env). Empty = no workspaces, rooms stay isolated."""
+    out: dict[str, str] = {}
+    for item in os.getenv("WORKSPACES", "").split(","):
+        name, _, code = item.strip().partition(":")
+        if name.strip() and code.strip():
+            out[name.strip().lower()] = code.strip()
+    return out
+
+
+def check_workspace(workspace: str, code: str) -> tuple[str | None, str | None]:
+    """(trusted_workspace, error). Only a valid invite code makes a workspace trusted."""
+    workspace = (workspace or "").strip().lower()
+    if not workspace:
+        return None, None
+    table = workspace_table()
+    if not table:
+        return None, None  # workspaces not configured: everything still works, rooms isolated
+    expected = table.get(workspace)
+    if expected is None or not hmac.compare_digest(expected, (code or "").strip()):
+        return None, f"Wrong invite code for workspace {workspace}"
+    return workspace, None
+
+
 @app.websocket("/ws")
-async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
+async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", workspace: str = "", code: str = ""):
     await ws.accept()
+    trusted, ws_error = check_workspace(workspace, code)
+    if ws_error:
+        await ws.send_text(json.dumps(protocol.dump(Error(message=ws_error, recoverable=False))))
+        await ws.close(code=4403)
+        return
     session = get_session(room)
+    if trusted and getattr(session, "workspace", None) != trusted:
+        session.workspace = trusted  # set BEFORE the brain attaches (shared repo maps per workspace)
+        if getattr(session, "_mind_runtime_ready", False):
+            try:
+                from brain import runtime as mind_runtime
+                mind_runtime.attach(session)
+            except Exception:  # noqa: BLE001
+                log.exception("brain re-attach for workspace failed")
     mouth.attach(session)
     session.add_socket(ws, user)
     log.info("[%s] %s connected (%d sockets)", room, user, len(session.sockets))
