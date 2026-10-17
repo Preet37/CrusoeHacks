@@ -60,4 +60,6 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
         pass
     finally:
         session.remove_socket(ws)
+        if not session.sockets:
+            await mouth.detach(session)
         log.info("[%s] %s disconnected (%d sockets)", room, user, len(session.sockets))

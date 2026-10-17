@@ -130,6 +130,32 @@ class Mouth:
             await s.set_status("listening")
 
 
+async def detach(session) -> None:
+    """Last socket left: stop the idle loop, the Listener and any running turn.
+
+    History and board stay on the Session so a reconnect picks up where it was.
+    """
+    mouth = getattr(session, "mouth", None)
+    if mouth is None:
+        return
+    session.mouth = None
+    session.decide_and_respond = None
+    if mouth.on_final_mind in session._final_text_hooks:
+        session._final_text_hooks.remove(mouth.on_final_mind)
+    if mouth.on_reset in session._reset_hooks:
+        session._reset_hooks.remove(mouth.on_reset)
+    if mouth._idle_task is not None:
+        mouth._idle_task.cancel()
+    if mouth.listener is not None:
+        try:
+            await mouth.listener.close()
+        except Exception:  # noqa: BLE001
+            log.exception("listener close failed")
+    session.cancel_all()
+    session.current_say_id = None
+    session.speaking = False
+
+
 def attach(session) -> Mouth:
     mouth = getattr(session, "mouth", None)
     if mouth is None:
