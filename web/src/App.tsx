@@ -1,5 +1,57 @@
-import 'tldraw/tldraw.css'
+import { useEffect, useState } from 'react'
+import JoinScreen, { type JoinChoice } from './components/JoinScreen'
+import MeetingRoom from './components/MeetingRoom'
+import { unlockAudio } from './lib/player'
+import { createClient, type TwinClient } from './lib/ws'
+import './styles/theme.css'
+
+/** Room from /room/<name>, else ?room=, else "demo". */
+function roomFromUrl() {
+  const m = location.pathname.match(/^\/room\/([^/]+)/)
+  if (m) return decodeURIComponent(m[1])
+  return new URLSearchParams(location.search).get('room') || 'demo'
+}
 
 export default function App() {
-  return <div style={{ padding: 24 }}>Twin web scaffold (RX-1). Meeting room lands in RC-1.</div>
+  const [room] = useState(roomFromUrl)
+  const [joined, setJoined] = useState<JoinChoice | null>(null)
+  const [client, setClient] = useState<TwinClient | null>(null)
+
+  useEffect(() => {
+    if (!location.pathname.startsWith('/room/')) {
+      history.replaceState(null, '', `/room/${encodeURIComponent(room)}${location.search}`)
+    }
+  }, [room])
+
+  useEffect(() => {
+    if (!joined) return
+    const c = createClient({ room, user: joined.name })
+    setClient(c)
+    return () => {
+      c.close()
+      setClient(null)
+    }
+  }, [joined, room])
+
+  if (!joined || !client) {
+    return (
+      <JoinScreen
+        room={room}
+        onJoin={(choice) => {
+          void unlockAudio() // AudioContext needs a user gesture; the Join click is one.
+          setJoined(choice)
+        }}
+      />
+    )
+  }
+
+  return (
+    <MeetingRoom
+      client={client}
+      user={joined.name}
+      initialCam={joined.cam}
+      initialMic={joined.mic}
+      onLeave={() => setJoined(null)}
+    />
+  )
 }

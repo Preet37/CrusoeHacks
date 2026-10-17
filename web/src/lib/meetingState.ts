@@ -76,7 +76,8 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
           break
         case 'transcript': {
           const speaker = String(msg.speaker)
-          const line: Line = { id: ++lineSeq, speaker, text: String(msg.text), ts: Number(msg.ts ?? Date.now()) }
+          // ts = local receive time, so caption timing never depends on the server clock.
+          const line: Line = { id: ++lineSeq, speaker, text: String(msg.text), ts: Date.now() }
           set((p) => {
             const interim = { ...p.interim }
             delete interim[speaker]
