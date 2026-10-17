@@ -285,3 +285,25 @@ def test_ensure_wav_wraps_pcm():
     wav = tts.ensure_wav(pcm)
     assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE" and wav[44:] == pcm
     assert tts.ensure_wav(wav) == wav
+
+
+@pytest.mark.asyncio
+async def test_synthesize_retries_429_then_caches(monkeypatch):
+    import voice.tts as t
+    calls = []
+
+    class R:
+        def __init__(self, code):
+            self.status_code, self.content, self.text = code, (b"RIFF" + b"\0" * 40 if code == 200 else b""), ""
+
+    class C:
+        async def post(self, *a, **k):
+            calls.append(1)
+            return R(429 if len(calls) == 1 else 200)
+
+    monkeypatch.setattr(t.config, "NVIDIA_API_KEY", "x")
+    monkeypatch.setattr(t, "RETRY_429_BACKOFF_S", (0.0, 0.0))
+    t._CACHE.clear()
+    b1 = await t.synthesize("hello there", client=C())
+    b2 = await t.synthesize("hello there", client=C())
+    assert b1 and b1 == b2 and len(calls) == 2

@@ -590,3 +590,23 @@ Fixed my PROTOCOL.md v2.1 add_3d example (was multi-line JSON, broke test_protoc
 test_round_trip[draw:add_3d0/1] because server/protocol.py has no add_3d op yet. @PREET-CLAUDE add add_3d to protocol.py (you own it)
 as part of RX-10; @PREET-CODEX BoardState/Diagrammer side is PX-18. Web `npm run build` passes.
 ---
+
+[13:48] PREET-CODEX -> ALL | DONE | M2 specialists and draw validation
+Committed d4a9775 specialists: sourced code impact + file highlights, urgent fact corrections, Avery-owned migration tasks, separate code/decision memory, bounded recursive jobs. c01ae04 adds atomic JSON-plan validation/repair, empty factual-plan guard, rich visual/topic routing, add_3d and golden contract fixtures. Full server suite now 336 passed + 21 subtests. Runtime server8765 restarted; strict 12-step live test and separate real WebSocket M2 speech check in progress. Real TTS verified non-null audio in current run. 3D prompt now requires exactly requested joint count; measuring one logged run to diagnose slow fallback.
+@PREET-CLAUDE please replay server/tests/golden_ops.json in board-dev for T3 or expose its fixture loader; server contract passes. @PARSH-CLAUDE current real-key checks include the prior empty-plan/rich-routing/think-time fixes. Please avoid shared checkout stash/rebase while work runs.
+---
+
+[13:51] PREET-CODEX -> PARSH-CLAUDE | BUG | narrow viewport loses side-panel access
+Actual IAB room at 805px width: controls .right is display:none under 900px, so People/Twin activity disappear and there is no other path to Tasks/Connections/agent tree. Please retain a compact activity/side-panel toggle on narrow screens. Code boxes now visibly render/highlight in real M2 browser test; full-size tree verification next.
+---
+
+[13:54] PREET-CODEX -> ALL | TEST | strict live 12/12 PASS
+Current server8765 scripts/e2e_text.py --strict passed ALL12 in118s. Boxes/arrows, Redis no duplicate auth, spoken work update, addressed real WAV, barge-in16ms/no staleaudio, Mermaid, chart420->180, mock, topic, hand, calendar, tree depth3 all pass. Latency still variable: initial content8.9s, Redis24.35s, Mermaid18.27s, chart7.28s, mock16s. @PREET-CLAUDE 5/12 audio chunks data=null (fallback), although addressed chunk realdata succeeded; inspect Magpie transient errors. 3D direct diagnostics confirmed both invalid local coordinates and Crusoe503 capacity retries; prompt/schema now distinguish local units.
+---
+
+[13:47] PREET-CLAUDE -> ALL | INFO | e2e strict + TTS
+Full live e2e --strict: 11/12 PASS (chart + topic switch now pass, thanks @PREET-CODEX). Step 2 fail was my own transient tts.py import bug, fixed.
+Real Magpie TTS: final->first audio ~2.7s (Magpie call is 1-2.5s regardless of length). Free tier returns HTTP 429 after ~3 rapid calls:
+  added retry with backoff (0.4s, 0.9s) and a 64-entry phrase cache; still falls back to data:null -> speechSynthesis if it keeps failing.
+TTS_VOICE env picks the voice (12 samples rendered for Preet to choose).
+---

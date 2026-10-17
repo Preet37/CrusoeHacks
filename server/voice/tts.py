@@ -10,6 +10,7 @@ import asyncio
 import base64
 import logging
 import os
+from collections import OrderedDict
 import re
 import struct
 import time
@@ -25,6 +26,10 @@ MAGPIE_BASE = "https://877104f7-e885-42b9-8de8-f6e4c6303969.invocation.api.nvcf.
 MAGPIE_SYNTH_URL = f"{MAGPIE_BASE}/v1/audio/synthesize"
 MAGPIE_VOICES_URL = f"{MAGPIE_BASE}/v1/audio/list_voices"
 VOICE = os.getenv("TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")
+# Free-tier Magpie rate-limits bursts (HTTP 429): retry briefly, then fall back to data:null.
+RETRY_429_BACKOFF_S: tuple[float, ...] = (0.4, 0.9)
+CACHE_SIZE = 64  # repeated phrases (acks, greetings) skip the network
+_CACHE: "OrderedDict[tuple[str, str], bytes]" = OrderedDict()
 LANGUAGE = "en-US"
 SAMPLE_RATE = 44100
 TTS_TIMEOUT = 10.0
@@ -86,25 +91,41 @@ async def synthesize(text: str, client: httpx.AsyncClient | None = None) -> byte
         "encoding": "LINEAR_PCM",
         "sample_rate_hz": str(SAMPLE_RATE),
     }
-    try:
-        # (None, value) tuples force multipart/form-data with plain fields
-        r = await c.post(
-            MAGPIE_SYNTH_URL,
-            files={k: (None, v) for k, v in form.items()},
-            headers={"Authorization": f"Bearer {config.NVIDIA_API_KEY}"},
-        )
-    except asyncio.CancelledError:
-        raise
-    except Exception as e:  # network, timeout
-        log.warning("Magpie TTS request failed: %s: %s", type(e).__name__, e)
-        return None
+    key = (VOICE, text)
+    cached = _CACHE.get(key)
+    if cached is not None:
+        _CACHE.move_to_end(key)
+        return cached
+    r = None
+    for attempt, backoff in enumerate(RETRY_429_BACKOFF_S + (None,)):
+        try:
+            # (None, value) tuples force multipart/form-data with plain fields
+            r = await c.post(
+                MAGPIE_SYNTH_URL,
+                files={k: (None, v) for k, v in form.items()},
+                headers={"Authorization": f"Bearer {config.NVIDIA_API_KEY}"},
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # network, timeout
+            log.warning("Magpie TTS request failed: %s: %s", type(e).__name__, e)
+            return None
+        if r.status_code == 429 and backoff is not None:
+            log.info("Magpie TTS 429, retry %d in %.1fs", attempt + 1, backoff)
+            await asyncio.sleep(backoff)
+            continue
+        break
     if r.status_code != 200:
         log.warning("Magpie TTS HTTP %s: %s", r.status_code, r.text[:300])
         return None
     if not r.content:
         log.warning("Magpie TTS returned empty body")
         return None
-    return ensure_wav(r.content)
+    wav = ensure_wav(r.content)
+    _CACHE[key] = wav
+    while len(_CACHE) > CACHE_SIZE:
+        _CACHE.popitem(last=False)
+    return wav
 
 
 # ---------------------------------------------------------------- splitting
