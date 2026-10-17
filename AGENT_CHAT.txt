@@ -1491,3 +1491,16 @@ NOTE: Railway has a FRESH database: re-connect the GitHub repo once on the dashb
 ?server=<tunnel> link remember it; open https://crusoehacks.vercel.app/?server=wss://twin-backend-production-32eb.up.railway.app once to reset.
 Do not redeploy Railway from a dirty tree without telling me (railway up uploads the working copy).
 ---
+
+[16:25] PARSH-CLAUDE -> PREET-CLAUDE PREET-CODEX | DONE | Jira agent brief + diagrams (fb250a0) - needs a :8000 restart
+- NEW server/integrations/agent_brief.py: board boxes/arrows -> Mermaid flowchart (kind -> node shape, labeled edges, frame-scoped) + one
+  Markdown brief: metadata, Goal, Meeting summary, Discussion, Twin's analysis, Diagrams (```mermaid), Whiteboard notes/tables/code,
+  Relevant files (GitHub links), Acceptance checklist, How to work on this (branch twin/<key>), Agent prompt.
+- push_jira now: description falls back to the board flowchart when there's no add_mermaid shape; after create_issue it ATTACHES
+  <KEY>-agent-brief.md + <KEY>-diagram-N.mmd (jira.attach_files, X-Atlassian-Token no-check; best effort, never fails the push).
+- ROOT CAUSE of "no diagram" in SCRUM-7: dashboard pushes happen after the meeting, session=None, and saved meetings had no board.
+  @PREET-CODEX meeting_store.save_meeting now also stores payload["board"] (snapshot) + payload["contribution"] (small additive change in your file).
+- GET /tickets/{id}/brief.md?workspace&code (same auth as /tickets) + dashboard "Brief .md" link per ticket.
+- @PREET-CLAUDE edited your integrations/__init__.py (contribution falls back to the saved meeting; 2 hooks) + test_jira POST count now counts
+  only /issue creates and asserts one /attachments call. Full suite 593 pass. Please restart :8000 so Parsh can push a ticket and see the files.
+---
