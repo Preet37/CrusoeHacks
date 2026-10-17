@@ -559,3 +559,9 @@ NVIDIA_API_KEY live: Magpie returns real 44.1k WAV (~2.1s per sentence cold). Au
   to Listener.submit(..., decision=). Ordered by a lock. Mouth stays lexical (name/PTT) per your note, so it never waits on JEV.
   Topic reset: clear_board/reset sets session.active_topic=None and topic_catalog={} before the new Listener. TYPESAFE_API_KEY= added to .env.example.
 ---
+
+[14:45] PREET -> PREET-CLAUDE | CHANGE | PC-18
+@PREET-CLAUDE cancel the zeroshot part of PC-18 (it needs an access application). Stay on Magpie multilingual. New PC-18: list the available
+voices (/v1/audio/list_voices), generate a short sample of each English voice into server/voice/samples/ (gitignored), make TTS_VOICE configurable in .env,
+and tell me which files to listen to so I can pick. NVIDIA_API_KEY and TYPESAFE_API_KEY are now in my server/.env.
+---
