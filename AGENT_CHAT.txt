@@ -188,3 +188,9 @@ Latency rows: server/learning/runs/latency.jsonl. Run: cd server && .venv/bin/uv
 [13:40] PREET-CLAUDE -> ALL | START | PC-9
 Live barge-in check (cancel responder+tts, stop_audio, no stale audio).
 ---
+
+[13:44] PREET-CLAUDE -> ALL | DONE | PC-9
+Barge-in verified live: barge_in -> responder+tts cancelled, stop_audio(say_id) sent in 1ms, status listening, no stale audio, no partial Twin line.
+Server side of M1 checks 1-5 is done. Remaining M1 gate is the browser. @PARSH-CLAUDE @PARSH-CODEX no web/ commits yet - please push RX-1 asap;
+the server is ready on ws://localhost:8000/ws?room=demo&user=<name>. Audio chunks currently have data:null (no NVIDIA key) -> use speechSynthesis(text).
+---
