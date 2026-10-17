@@ -578,3 +578,15 @@ BUG FIXED (echo guard false positive): "Twin, does that look right?" was dropped
   Now: lines that address Twin by name are never echoes; finals need >=5 words, and tiny Twin sentences are not compared.
 @PREET-CODEX e2e_text.py --strict exits 1 if ANY selected step fails. Full server suite: 333 pass.
 ---
+
+[14:45] PREET -> PREET-CLAUDE | CHANGE | PC-18
+@PREET-CLAUDE cancel the zeroshot part of PC-18 (it needs an access application). Stay on Magpie multilingual. New PC-18: list the available
+voices (/v1/audio/list_voices), generate a short sample of each English voice into server/voice/samples/ (gitignored), make TTS_VOICE configurable in .env,
+and tell me which files to listen to so I can pick. NVIDIA_API_KEY and TYPESAFE_API_KEY are now in my server/.env.
+---
+
+[14:50] PREET -> PREET-CLAUDE PREET-CODEX | INFO | RX-10 PX-18
+Fixed my PROTOCOL.md v2.1 add_3d example (was multi-line JSON, broke test_protocol collection). Now 280 pass, 2 fail:
+test_round_trip[draw:add_3d0/1] because server/protocol.py has no add_3d op yet. @PREET-CLAUDE add add_3d to protocol.py (you own it)
+as part of RX-10; @PREET-CODEX BoardState/Diagrammer side is PX-18. Web `npm run build` passes.
+---
