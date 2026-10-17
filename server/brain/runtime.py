@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import atexit
+import asyncio
 import hashlib
 import logging
 import os
@@ -15,12 +16,45 @@ from brain.code_map import CodeMap
 from brain.memory import MemoryStore
 from brain.repo_connector import connect_repo
 from brain.workspace_registry import REGISTRY
+from brain.workspace_registry import workspace_key
+from brain.workspace_store import get_workspace
 
 log = logging.getLogger(__name__)
 DEMO = Path(__file__).resolve().parents[2] / 'demo_project'
 STATE_DIR = Path(__file__).resolve().parents[1] / 'learning' / 'runs' / 'memory'
 _demo = None
 _demo_lock = threading.Lock()
+
+
+def _restore_saved_repo(session) -> None:
+    """Schedule one nonblocking restore for a workspace with a saved URL."""
+    key = workspace_key(session)
+    if key is None or REGISTRY.current(key) is not None:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return  # A later attach from the WebSocket loop can schedule it.
+    try:
+        url = get_workspace(key)["repo_url"]
+    except Exception:
+        log.exception("Could not read saved repository for workspace %s", key)
+        return
+    if not url or not REGISTRY.claim_restore(key):
+        return
+    # Reserve the generation before scheduling: a later manual connect must
+    # supersede this restore even if the event loop starts the jobs out of order.
+    generation = REGISTRY.claim(key)
+    task = loop.create_task(connect_repo(session, url, restore_generation=generation),
+                            name=f"restore-repo-{key}")
+
+    def finished(done: asyncio.Task) -> None:
+        if REGISTRY.current(key) is None:
+            REGISTRY.release_failed_restore(key, generation)
+        if not done.cancelled() and done.exception() is not None:
+            log.warning("Saved repository restore failed for %s", key)
+
+    task.add_done_callback(finished)
 
 
 def demo_map() -> CodeMap:
@@ -53,6 +87,7 @@ def attach(session) -> None:
         session.brief_provider = brief_provider
     if getattr(session, '_mind_runtime_ready', False):
         REGISTRY.register(session)
+        _restore_saved_repo(session)
         return
     try:
         session.code_map = demo_map()
@@ -76,6 +111,7 @@ def attach(session) -> None:
                     session.memory.add_fact(claim, source, scope=session.code_fact_scope, subject=subject)
         REGISTRY.register(session)
         session._mind_runtime_ready = True
+        _restore_saved_repo(session)
     except Exception:
         # Keep the conversation usable if a local code map or state file fails.
         log.exception('Could not initialize code-aware meeting context')

@@ -17,6 +17,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("twin.app")
 
 app = FastAPI(title="Twin")
+from brain.persistence_api import router as persistence_router
+app.include_router(persistence_router)
 # Two-laptop demo: any origin (LAN IP, cloudflared tunnel) may call the API.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -128,7 +130,10 @@ def check_workspace(workspace: str, code: str) -> tuple[str | None, str | None]:
         return None, None
     table = workspace_table()
     if not table:
-        return None, None  # workspaces not configured: everything still works, rooms isolated
+        from brain.workspace_auth import authenticate
+        if authenticate(workspace, (code or '').strip()):
+            return workspace, None
+        return None, f"Wrong invite code for workspace {workspace}"
     expected = table.get(workspace)
     if expected is None or not hmac.compare_digest(expected, (code or "").strip()):
         return None, f"Wrong invite code for workspace {workspace}"
@@ -141,7 +146,9 @@ def room_owner(room: str) -> str | None:
     if live is not None and getattr(live, "workspace", None):
         return live.workspace
     r = (room or "").lower()
-    for name in workspace_table():
+    from brain.workspace_auth import workspace_names
+    names = set(workspace_table()) | set(workspace_names())
+    for name in sorted(names, key=len, reverse=True):
         if r.startswith(f"{name}-"):
             return name
     return None
@@ -150,6 +157,8 @@ def room_owner(room: str) -> str | None:
 def room_access_error(room: str, trusted: str | None) -> str | None:
     """A workspace room needs that workspace's valid invite code on every join."""
     owner = room_owner(room)
+    if trusted and not (room or '').lower().startswith(trusted + '-'):
+        return 'Room is outside the authenticated workspace; check workspace and invite code'
     if owner is None or owner == trusted:
         return None
     return f"Room {room} belongs to workspace {owner}: wrong or missing invite code"
@@ -210,4 +219,10 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
             log.exception("[%s] participants broadcast failed", room)
         if not session.sockets:
             await mouth.detach(session)
+            if not session.sockets:
+                try:
+                    from brain.meeting_store import save_meeting
+                    save_meeting(session)
+                except Exception:
+                    log.exception('[%s] could not save meeting summary', room)
         log.info("[%s] %s disconnected (%d sockets)", room, user, len(session.sockets))

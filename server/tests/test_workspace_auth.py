@@ -11,6 +11,7 @@ def _env(monkeypatch, tmp_path):
     monkeypatch.setattr(mouth, "attach", lambda s: None)
     monkeypatch.setattr(app_module, "METRICS_FILE", tmp_path / "none.json")
     monkeypatch.setenv("WORKSPACES", "crusoehacks:s3cret, other:xyz")
+    monkeypatch.setenv("TWIN_DB_PATH", str(tmp_path / "workspace.sqlite3"))
 
 
 def test_check_workspace_rules(monkeypatch):
@@ -19,7 +20,8 @@ def test_check_workspace_rules(monkeypatch):
     t, err = app_module.check_workspace("crusoehacks", "nope")
     assert t is None and "invite code" in err and "workspace" in err
     monkeypatch.setenv("WORKSPACES", "")
-    assert app_module.check_workspace("crusoehacks", "anything") == (None, None)  # not configured: isolated
+    assert app_module.check_workspace("crusoehacks", "anything") == ("crusoehacks", None)
+    assert app_module.check_workspace("crusoehacks", "wrong")[0] is None
 
 
 def test_wrong_code_gets_error_and_valid_code_sets_trusted_workspace():

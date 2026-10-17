@@ -12,6 +12,7 @@ import threading
 import weakref
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 _KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}\Z")
 
@@ -39,6 +40,7 @@ class WorkspaceRegistry:
         self._current: dict[str, Repository] = {}
         self._sessions: dict[str, weakref.WeakSet] = {}
         self._membership: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+        self._restore_started: set[str] = set()
 
     def register(self, session) -> Repository | None:
         key = workspace_key(session)
@@ -69,8 +71,26 @@ class WorkspaceRegistry:
             self._generation[key] = generation
             return generation
 
+    def claim_restore(self, key: str) -> bool:
+        """Only the first attached room starts a saved-repository restore."""
+        if not isinstance(key, str) or not _KEY.fullmatch(key):
+            raise ValueError("invalid workspace key")
+        with self._lock:
+            if key in self._restore_started or key in self._current or key in self._generation:
+                return False
+            self._restore_started.add(key)
+            return True
+
+    def release_failed_restore(self, key: str, generation: object) -> None:
+        """Allow a later join to retry only if this restore is still latest."""
+        with self._lock:
+            if key not in self._current and self._generation.get(key) is generation:
+                self._restore_started.discard(key)
+                self._generation.pop(key, None)
+
     def publish(self, key: str, generation: object, code_map, url: str,
-                code_fact_scope: str, directory: Path) -> bool:
+                code_fact_scope: str, directory: Path,
+                on_publish: Callable[[], None] | None = None) -> bool:
         """Atomically install a current map; stale clones remain unpublished."""
         with self._lock:
             if self._generation.get(key) is not generation:
@@ -83,6 +103,8 @@ class WorkspaceRegistry:
             for session in tuple(self._sessions.get(key, ())):
                 if getattr(session, "workspace", None) == key:
                     self._apply(session, current)
+            if on_publish is not None:
+                on_publish()  # Under generation lock: stale clones cannot persist later.
             return True
 
     def current(self, key: str) -> Repository | None:

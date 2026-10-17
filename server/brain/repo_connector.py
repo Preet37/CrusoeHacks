@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import hashlib
+import logging
 import os
 from pathlib import Path
 import re
@@ -13,6 +14,9 @@ import weakref
 from urllib.parse import urlsplit
 
 from brain.workspace_registry import REGISTRY, workspace_key
+from brain.workspace_store import save_repo
+
+log = logging.getLogger(__name__)
 
 MAX_BYTES = 50 * 1024 * 1024
 MAX_FILES = 6000
@@ -83,7 +87,7 @@ async def _clone(url: str, target: Path) -> None:
         await asyncio.gather(waiter, return_exceptions=True)
 
 
-async def connect_repo(session, url: str) -> None:
+async def connect_repo(session, url: str, *, restore_generation: object | None = None) -> None:
     """Session.repo_connector hook. Publish only a fully built, current code map."""
     from brain.code_map import CodeMap
     from agents.diagrammer import emit_event
@@ -92,7 +96,7 @@ async def connect_repo(session, url: str) -> None:
     workspace = workspace_key(session)
     if workspace is not None:
         REGISTRY.register(session)
-        generation = REGISTRY.claim(workspace)
+        generation = restore_generation if restore_generation is not None else REGISTRY.claim(workspace)
     else:
         generation = object()
         session._repo_connect_generation = generation
@@ -107,8 +111,14 @@ async def connect_repo(session, url: str) -> None:
         code_map = await asyncio.to_thread(lambda: CodeMap(root).build())
         scope = "repo:" + hashlib.sha256(canonical.encode()).hexdigest()[:16] + ":code"
         if workspace is not None:
+            def persist() -> None:
+                try:
+                    save_repo(workspace, canonical)
+                except Exception:
+                    log.exception("Could not persist repository URL for workspace %s", workspace)
+
             if not REGISTRY.publish(workspace, generation, code_map, canonical,
-                                    scope, temporary):
+                                    scope, temporary, on_publish=persist):
                 raise asyncio.CancelledError
         else:
             if session._repo_connect_generation is not generation:
