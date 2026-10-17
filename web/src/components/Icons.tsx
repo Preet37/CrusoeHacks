@@ -83,3 +83,9 @@ export const CloseIcon = () => (
     <path d="M6 6l12 12M18 6 6 18" />
   </I>
 )
+export const ShareIcon = () => (
+  <I>
+    <rect x="3" y="4" width="18" height="13" rx="2" />
+    <path d="M12 14V8M9 10.5 12 7.5l3 3M8 21h8" />
+  </I>
+)
