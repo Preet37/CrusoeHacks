@@ -10,11 +10,13 @@ import './styles/theme.css'
 
 type Route = { page: 'dashboard' } | { page: 'room'; room: string }
 
+/** "/" and "/dashboard" = login -> dashboard (home). Only /room/<id> (or a legacy ?room=) opens a call. */
 function parseRoute(): Route {
-  if (location.pathname.startsWith('/dashboard')) return { page: 'dashboard' }
   const m = location.pathname.match(/^\/room\/([^/]+)/)
   if (m) return { page: 'room', room: decodeURIComponent(m[1]) }
-  return { page: 'room', room: new URLSearchParams(location.search).get('room') || 'demo' }
+  const legacy = new URLSearchParams(location.search).get('room')
+  if (legacy) return { page: 'room', room: legacy }
+  return { page: 'dashboard' }
 }
 
 /** Keep ?mock / ?server across navigation; drop one-shot params. */
@@ -43,8 +45,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (route.page === 'room' && !location.pathname.startsWith('/room/'))
-      history.replaceState(null, '', `/room/${encodeURIComponent(route.room)}${location.search}`)
+    if (route.page === 'room' && !location.pathname.startsWith('/room/')) {
+      const q = new URLSearchParams(location.search)
+      q.delete('room')
+      const qs = q.toString()
+      history.replaceState(null, '', `/room/${encodeURIComponent(route.room)}${qs ? `?${qs}` : ''}`)
+    }
   }, [route])
 
   const openRoom = useCallback((room: string, briefFor?: string) => {
