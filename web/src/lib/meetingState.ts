@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { StatusState } from './protocol'
 import type { AnyServerMessage, ConnState, TwinClient } from './ws'
 import type { Annotation, AnnotateItem, RemoteFrame } from '../components/ScreenStage'
+import type { Contribution } from '../components/TwinTake'
 
 export interface Person {
   name: string
@@ -51,6 +52,8 @@ export interface MeetingState {
   remoteScreen: RemoteFrame | null
   /** Twin's live markup on the shared screen. */
   annotations: Annotation[]
+  /** Latest Twin contribution ("Twin's take") for the active topic. */
+  contribution: Contribution | null
 }
 
 const MAX_LINES = 200
@@ -75,6 +78,7 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
     handRaisedAt: null,
     remoteScreen: null,
     annotations: [],
+    contribution: null,
   }))
 
   useEffect(() => {
@@ -152,6 +156,9 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
           set((p) => ({ ...p, annotations: [...p.annotations.filter((x) => x.id !== a.id), a] }))
           break
         }
+        case 'contribution':
+          set((p) => ({ ...p, contribution: { ...(msg as unknown as Contribution), id: String(msg.id ?? Date.now()) } }))
+          break
         case 'error':
           set((p) => ({ ...p, lastError: String(msg.message ?? 'error') }))
           break

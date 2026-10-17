@@ -11,6 +11,9 @@ import { Whiteboard } from './optional'
 import { HumanTile, TwinTile } from './ParticipantTile'
 import ScreenStage, { startFrameSender } from './ScreenStage'
 import SidePanel, { type SideTab } from './SidePanel'
+import TwinTake from './TwinTake'
+import type { WorkspaceSession } from '../lib/workspace'
+import { serverHttpBase } from '../lib/ws'
 
 const SPEAKING_MS = 1500
 
@@ -20,7 +23,9 @@ export default function MeetingRoom({
   initialCam,
   initialMic,
   onLeave,
+  session,
 }: {
+  session?: WorkspaceSession | null
   client: TwinClient
   user: string
   initialCam: boolean
@@ -78,6 +83,17 @@ export default function MeetingRoom({
     setSpecOpen(false)
     setBoardPinned(true)
   }
+  // Workspace repo (for source links in Twin's take).
+  const [repoUrl, setRepoUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!session) return
+    const q = new URLSearchParams({ workspace: session.workspace, code: session.code })
+    fetch(`${serverHttpBase()}/workspace?${q}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.repo_url && setRepoUrl(d.repo_url))
+      .catch(() => undefined)
+  }, [session])
+  const [takeHidden, setTakeHidden] = useState<string | null>(null)
   const [myScreen, setMyScreen] = useState<MediaStream | null>(null)
   const [stageTab, setStageTab] = useState<'board' | 'screen'>('board')
   const [screenErr, setScreenErr] = useState<string | null>(null)
@@ -321,6 +337,11 @@ export default function MeetingRoom({
             </div>
           )}
           {toast && <div className="toast glass">{toast}</div>}
+          {m.contribution && takeHidden !== m.contribution.id && (
+            <div className={`take-float ${presenting ? 'on-stage' : ''}`}>
+              <TwinTake c={m.contribution} repoUrl={repoUrl} onClose={() => setTakeHidden(m.contribution!.id)} />
+            </div>
+          )}
           {specOpen && (
             <div className="spec glass">
               <div className="dash-title">Paste a spec</div>
@@ -350,6 +371,8 @@ export default function MeetingRoom({
             people={people}
             twinStatus={m.twinStatus}
             client={client}
+            contribution={m.contribution}
+            repoUrl={repoUrl}
           />
       </div>
 
