@@ -1,0 +1,45 @@
+{
+  "id": "12_login_correction_and_plan",
+  "split": "locked_test",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Auth already uses Redis sessions instead of JWT."
+    },
+    {
+      "speaker": "Preet",
+      "text": "We decided to migrate login to Redis sessions; Avery will own it."
+    }
+  ],
+  "ground_truth": {
+    "false_claim_sources": [
+      "demo_project/auth/login.py:18-24"
+    ],
+    "tasks": [
+      {
+        "keywords": [
+          "login",
+          "Redis"
+        ],
+        "owner": "Avery Chen"
+      }
+    ],
+    "impacted_files": [
+      "auth/login.py",
+      "tests/test_auth.py",
+      "web/routes.py"
+    ],
+    "topics": [
+      "Auth login"
+    ],
+    "prediction_topics": [
+      [
+        "JWT"
+      ],
+      [
+        "Redis"
+      ]
+    ]
+  },
+  "meeting": "Login migration decision"
+}

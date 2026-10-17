@@ -1,0 +1,28 @@
+{
+  "id": "05_latency_chart",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Our p95 latency went from 420 to 180 milliseconds after the cache."
+    }
+  ],
+  "ground_truth": {
+    "visual_ops": [
+      "add_chart"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Performance"
+    ],
+    "prediction_topics": [
+      [
+        "latency"
+      ],
+      [
+        "cache"
+      ]
+    ]
+  },
+  "meeting": "Cache performance review"
+}

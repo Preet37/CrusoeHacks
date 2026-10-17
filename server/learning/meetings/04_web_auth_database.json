@@ -1,0 +1,29 @@
+{
+  "id": "04_web_auth_database",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Our web app talks to an auth service, and auth stores users in Postgres."
+    }
+  ],
+  "ground_truth": {
+    "visual_ops": [
+      "add_box",
+      "connect"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "System architecture"
+    ],
+    "prediction_topics": [
+      [
+        "auth"
+      ],
+      [
+        "Postgres"
+      ]
+    ]
+  },
+  "meeting": "System architecture standup"
+}

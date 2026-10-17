@@ -1,0 +1,34 @@
+{
+  "id": "10_login_decision",
+  "split": "validation",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "We decided to migrate login to Redis sessions; Avery will own it."
+    }
+  ],
+  "ground_truth": {
+    "tasks": [
+      {
+        "keywords": [
+          "login",
+          "Redis"
+        ],
+        "owner": "Avery Chen"
+      }
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Auth login"
+    ],
+    "prediction_topics": [
+      [
+        "login"
+      ],
+      [
+        "Redis"
+      ]
+    ]
+  },
+  "meeting": "Authentication migration planning"
+}

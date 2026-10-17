@@ -1,0 +1,200 @@
+{
+  "kind": "prep_only_coach_iteration",
+  "date": "2026-10-17",
+  "method": {
+    "train_cases": 8,
+    "validation_cases": 2,
+    "locked_test_cases": 2,
+    "agent": "Prep",
+    "edit_type": "one appended prompt rule",
+    "selection_rule": "strict validation overall-score improvement without measured quality regression; locked_test evaluated after selection",
+    "notes": "Prep received meeting title and pre-meeting sourced facts/file summaries only. This did not exercise the full Listener–Conductor–Diagrammer pipeline."
+  },
+  "proposal": {
+    "target": "prep",
+    "append": "Prefer predictions grounded in explicit file summaries and sourced facts; do not infer technology switches or replacements from meeting titles or vague questions alone.",
+    "reason": "Examples 07 and 06 scored 0.4 because they predicted JWT replacement and UI discussion from weak titles/questions, while sourced summaries only supported impact and login topics."
+  },
+  "selected_version": "v1",
+  "candidate_status": "rejected",
+  "decision_reason": "validation overall score did not improve",
+  "prompts": {
+    "v1": "You are Twin's pre-meeting Prep agent. Predict up to three topics the named meeting is likely to cover, using only the supplied current facts and file summaries. Mention uncertainty where evidence is thin. Do not treat a previous or proposed migration as already complete. Return ONLY JSON {\"predictions\":[\"...\"]}; each item is one short sentence. Return an empty list if no grounded prediction is possible.\n",
+    "v2_candidate": "You are Twin's pre-meeting Prep agent. Predict up to three topics the named meeting is likely to cover, using only the supplied current facts and file summaries. Mention uncertainty where evidence is thin. Do not treat a previous or proposed migration as already complete. Return ONLY JSON {\"predictions\":[\"...\"]}; each item is one short sentence. Return an empty list if no grounded prediction is possible.\nPrefer predictions grounded in explicit file summaries and sourced facts; do not infer technology switches or replacements from meeting titles or vague questions alone.\n"
+  },
+  "scores": {
+    "validation": {
+      "v1": {
+        "latency_ms": 3395.0,
+        "prediction_score": 0.6000000000000001,
+        "tokens": 643.0,
+        "overall_score": 0.6000000000000001
+      },
+      "v2": {
+        "latency_ms": 3378.5,
+        "prediction_score": 0.4,
+        "tokens": 667.5,
+        "overall_score": 0.4
+      }
+    },
+    "locked_test": {
+      "v1": {
+        "latency_ms": 3515.0,
+        "prediction_score": 0.6000000000000001,
+        "tokens": 619.5,
+        "overall_score": 0.6000000000000001
+      },
+      "v2_candidate": {
+        "latency_ms": 3027.0,
+        "prediction_score": 0.6000000000000001,
+        "tokens": 655.5,
+        "overall_score": 0.6000000000000001
+      }
+    }
+  },
+  "case_scores": {
+    "validation": {
+      "v1": [
+        {
+          "id": "09_notifications_impact",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 3005.0,
+            "tokens": 637.0
+          }
+        },
+        {
+          "id": "10_login_decision",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3785.0,
+            "tokens": 649.0
+          }
+        }
+      ],
+      "v2": [
+        {
+          "id": "09_notifications_impact",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3744.0,
+            "tokens": 655.0
+          }
+        },
+        {
+          "id": "10_login_decision",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3013.0,
+            "tokens": 680.0
+          }
+        }
+      ]
+    },
+    "locked_test": {
+      "v1": [
+        {
+          "id": "11_billing_impact",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3783.0,
+            "tokens": 617.0
+          }
+        },
+        {
+          "id": "12_login_correction_and_plan",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 3247.0,
+            "tokens": 622.0
+          }
+        }
+      ],
+      "v2_candidate": [
+        {
+          "id": "11_billing_impact",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 2245.0,
+            "tokens": 629.0
+          }
+        },
+        {
+          "id": "12_login_correction_and_plan",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 3809.0,
+            "tokens": 682.0
+          }
+        }
+      ]
+    }
+  },
+  "prediction_samples": "Individual prediction strings were not retained by this run; only per-case deterministic scores were saved.",
+  "metric_messages": [
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "latency_ms",
+      "value": 3515.0
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "overall_score",
+      "value": 0.6000000000000001
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "prediction_score",
+      "value": 0.6000000000000001
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "tokens",
+      "value": 619.5
+    },
+    {
+      "type": "metric",
+      "version": "v2",
+      "split": "rejected",
+      "name": "latency_ms",
+      "value": 3027.0,
+      "status": "rejected",
+      "reason": "validation overall score did not improve"
+    },
+    {
+      "type": "metric",
+      "version": "v2",
+      "split": "rejected",
+      "name": "overall_score",
+      "value": 0.6000000000000001,
+      "status": "rejected",
+      "reason": "validation overall score did not improve"
+    },
+    {
+      "type": "metric",
+      "version": "v2",
+      "split": "rejected",
+      "name": "prediction_score",
+      "value": 0.6000000000000001,
+      "status": "rejected",
+      "reason": "validation overall score did not improve"
+    },
+    {
+      "type": "metric",
+      "version": "v2",
+      "split": "rejected",
+      "name": "tokens",
+      "value": 655.5,
+      "status": "rejected",
+      "reason": "validation overall score did not improve"
+    }
+  ]
+}

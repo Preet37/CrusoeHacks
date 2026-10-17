@@ -1,0 +1,33 @@
+{
+  "id": "07_jwt_impact",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Twin, what does changing auth/jwt_tokens.py touch?"
+    }
+  ],
+  "ground_truth": {
+    "impacted_files": [
+      "auth/jwt_tokens.py",
+      "auth/login.py",
+      "auth/permissions.py",
+      "tests/test_auth.py",
+      "billing/invoices.py",
+      "web/routes.py"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "JWT change"
+    ],
+    "prediction_topics": [
+      [
+        "JWT"
+      ],
+      [
+        "auth"
+      ]
+    ]
+  },
+  "meeting": "JWT token change review"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "01_login_impact",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Twin, what does changing login touch?"
+    }
+  ],
+  "ground_truth": {
+    "impacted_files": [
+      "auth/login.py",
+      "tests/test_auth.py",
+      "web/routes.py"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Auth login"
+    ],
+    "prediction_topics": [
+      [
+        "login"
+      ],
+      [
+        "JWT"
+      ]
+    ]
+  },
+  "meeting": "Login impact review"
+}

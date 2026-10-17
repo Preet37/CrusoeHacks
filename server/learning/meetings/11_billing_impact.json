@@ -1,0 +1,30 @@
+{
+  "id": "11_billing_impact",
+  "split": "locked_test",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Twin, what does changing billing touch?"
+    }
+  ],
+  "ground_truth": {
+    "impacted_files": [
+      "billing/__init__.py",
+      "billing/invoices.py",
+      "web/routes.py"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Billing"
+    ],
+    "prediction_topics": [
+      [
+        "billing"
+      ],
+      [
+        "invoices"
+      ]
+    ]
+  },
+  "meeting": "Billing dependency review"
+}

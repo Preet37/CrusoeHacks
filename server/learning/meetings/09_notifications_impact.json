@@ -1,0 +1,31 @@
+{
+  "id": "09_notifications_impact",
+  "split": "validation",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "Twin, what does changing notifications touch?"
+    }
+  ],
+  "ground_truth": {
+    "impacted_files": [
+      "notifications/__init__.py",
+      "notifications/email.py",
+      "billing/invoices.py",
+      "web/routes.py"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Notifications"
+    ],
+    "prediction_topics": [
+      [
+        "notifications"
+      ],
+      [
+        "email"
+      ]
+    ]
+  },
+  "meeting": "Notification service review"
+}

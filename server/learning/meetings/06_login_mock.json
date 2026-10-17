@@ -1,0 +1,28 @@
+{
+  "id": "06_login_mock",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "What would the new login screen look like?"
+    }
+  ],
+  "ground_truth": {
+    "visual_ops": [
+      "add_mock"
+    ],
+    "false_claim_sources": [],
+    "topics": [
+      "Login UI"
+    ],
+    "prediction_topics": [
+      [
+        "login"
+      ],
+      [
+        "screen"
+      ]
+    ]
+  },
+  "meeting": "Login screen design"
+}

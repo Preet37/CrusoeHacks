@@ -1,0 +1,27 @@
+{
+  "id": "08_postgres_false_claim",
+  "split": "train",
+  "lines": [
+    {
+      "speaker": "Preet",
+      "text": "The database now uses SQLite instead of Postgres."
+    }
+  ],
+  "ground_truth": {
+    "false_claim_sources": [
+      "demo_project/db/connection.py:6-10"
+    ],
+    "topics": [
+      "Database"
+    ],
+    "prediction_topics": [
+      [
+        "Postgres"
+      ],
+      [
+        "database"
+      ]
+    ]
+  },
+  "meeting": "Database status meeting"
+}
