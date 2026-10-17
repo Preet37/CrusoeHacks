@@ -365,6 +365,21 @@ class Listener:
                             topic_meta = {"topic_id": known[0][0] if len(known) == 1 else _slug(title),
                                           "title": known[0][1] if len(known) == 1 else title,
                                           "topic_changed": True}
+                    # An additive edit to a component already in the active
+                    # frame is continuity, even if Nano proposes a Redis topic.
+                    if (self._active_topic and isinstance(topic_meta, dict)
+                            and not any(_TOPIC_SWITCH.search(line["text"]) for line in lines)):
+                        text = " ".join(line["text"] for line in lines).casefold()
+                        if re.search(r"\b(?:also|rename|instead|additionally)\b", text):
+                            active_boxes = [box for box in self.session.board.boxes.values()
+                                            if box.get("frame") == self._active_topic]
+                            names = {str(box.get(key, "")).casefold()
+                                     for box in active_boxes for key in ("id", "label")}
+                            if any(len(name) >= 3 and re.search(r"\b" + re.escape(name) + r"\b", text)
+                                   for name in names):
+                                topic_meta = {"topic_id": self._active_topic,
+                                              "title": self._topics.get(self._active_topic, "General"),
+                                              "topic_changed": False}
                     topic_id, title, topic_changed = self._resolve_topic(topic_meta)
                     if topic_id is not None:
                         if topic_changed:

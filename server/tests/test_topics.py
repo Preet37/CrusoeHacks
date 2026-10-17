@@ -42,6 +42,24 @@ def reflex(*, kind="system_fact", kind_confidence=0.95, topic_changed=0.0,
 
 
 class TopicTests(unittest.IsolatedAsyncioTestCase):
+    async def test_additive_existing_component_keeps_active_frame(self):
+        session = FakeSession()
+        session.active_topic = {"topic_id": "t_auth", "title": "Auth"}
+        session.topic_catalog = {"t_auth": "Auth"}
+        session.board.apply({"op": "frame", "id": "t_auth", "title": "Auth", "x": 0, "y": 0})
+        session.board.apply({"op": "add_box", "id": "auth", "label": "Auth", "kind": "service", "x": 100, "y": 100, "frame": "t_auth"})
+        class Recorder:
+            async def handle(self, *args, **kwargs):
+                self.topic = kwargs["topic_id"]
+        recorder = Recorder()
+        async def model(*args, **kwargs):
+            return batch("t_redis", "Redis", "Auth also uses Redis")
+        with patch("agents.listener.llm.chat", model):
+            listener = Listener(session, conductor=recorder, debounce_seconds=0)
+            listener.submit("Preet", "Auth also uses Redis.")
+            await listener.wait_idle()
+        self.assertEqual(recorder.topic, "t_auth")
+
     async def test_conductor_routes_explicit_rich_requests_without_inventing_facts(self):
         session = FakeSession()
 
