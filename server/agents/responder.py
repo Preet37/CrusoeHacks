@@ -181,6 +181,25 @@ async def model_stream(messages: list[dict], stream: Callable[..., AsyncIterator
         raise last_exc
 
 
+def _speak_kwargs(speak, session, timings) -> dict:
+    kw = {"timings": timings}
+    try:
+        import inspect as _inspect
+        if "on_refs" in _inspect.signature(speak).parameters:
+            kw["on_refs"] = lambda refs: _highlight(session, refs)
+    except (TypeError, ValueError):
+        pass
+    return kw
+
+
+def _highlight(session, refs) -> None:
+    try:
+        from mouth import highlight_refs
+        highlight_refs(session, refs)
+    except Exception:  # noqa: BLE001
+        log.exception("highlight failed")
+
+
 def log_latency(row: dict) -> None:
     try:
         LATENCY_LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -241,7 +260,7 @@ async def respond(session, reason: str, *, trigger_ts: int | None = None,
 
     spoken = ""
     try:
-        spoken = await speak(strip_prefix(clean_stream(model_stream(messages, stream))), say_id, emit_after_ack, timings=timings)
+        spoken = await speak(strip_prefix(clean_stream(model_stream(messages, stream))), say_id, emit_after_ack, **_speak_kwargs(speak, session, timings))
         spoken = (spoken or "").strip()
         if ack is not None and session.current_say_id == say_id:
             if not spoken:  # close the turn so the player is not left waiting

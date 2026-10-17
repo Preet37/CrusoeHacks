@@ -169,6 +169,38 @@ def drop_false_draw_claims(session, updates: list[str]) -> list[str]:
     return kept
 
 
+def highlight_refs(session, refs: list[str], hold_s: float = 8.0) -> None:
+    """When Twin mentions a file, light up the board boxes for it (then turn them off)."""
+    try:
+        snap = session.board.snapshot()
+    except Exception:  # noqa: BLE001
+        return
+    want = set()
+    for r in refs:
+        r = r.split(":")[0].strip("`")
+        leaf = r.rsplit("/", 1)[-1].lower()
+        for b in snap.get("boxes", []):
+            label = str(b.get("label", "")).lower()
+            if r.lower() in label or (len(leaf) > 3 and leaf in label):
+                want.add(b["id"])
+    if not want:
+        return
+    ids = sorted(want)[:6]
+
+    async def run() -> None:
+        try:
+            await session.apply_draw({"op": "highlight", "ids": ids, "on": True})
+            await asyncio.sleep(hold_s)
+            await session.apply_draw({"op": "highlight", "ids": ids, "on": False})
+        except Exception:  # noqa: BLE001
+            log.exception("highlight refs failed")
+
+    try:
+        session.spawn(None, run())
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def addressed_without_name(decision: dict, text: str) -> bool:
     """JEV says the line is directed at Twin AND it really is a question. A score alone
     never triggers speech (Nano has scored small talk as addressed)."""
@@ -592,7 +624,7 @@ class Mouth:
 
         spoken = ""
         try:
-            spoken = (await tts.speak_text(text, say_id, emit) or "").strip()
+            spoken = (await tts.speak_text(text, say_id, emit, on_refs=lambda refs: highlight_refs(session, refs)) or "").strip()
             if spoken and s.current_say_id == say_id:
                 await s.add_line(config.TWIN_NAME, spoken)
         finally:

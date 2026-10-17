@@ -22,6 +22,7 @@ from weakref import WeakKeyDictionary
 import httpx
 
 import config
+from voice.speakable import code_refs, speakable
 
 log = logging.getLogger("twin.tts")
 
@@ -285,6 +286,7 @@ async def speak(
     on_first_audio: Callable[[float], None] | None = None,
     concurrency: int = TTS_CONCURRENCY,
     min_words: int = 4,
+    on_refs: Callable[[list[str]], None] | None = None,
 ) -> str:
     """Stream text deltas -> sentences -> TTS -> ordered `audio` messages.
 
@@ -316,6 +318,15 @@ async def speak(
                 return None
 
     def _enqueue(text: str) -> None:
+        # Say code references like a teammate ("the auth0 route file"); the exact paths go to on_refs
+        # so the caller can highlight those files on the board.
+        refs = code_refs(text)
+        if refs and on_refs:
+            try:
+                on_refs(refs)
+            except Exception:
+                log.exception("on_refs callback failed")
+        text = speakable(text)
         seq = len(spoken)
         spoken.append(text)
         if seq == 0:
