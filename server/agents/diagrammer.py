@@ -12,11 +12,44 @@ from uuid import uuid4
 
 import config
 import llm
-from agents.draw_tools import DRAW_TOOLS
+from agents.draw_tools import DRAW_TOOLS, SIMPLE_DRAW_TOOLS
 
 log = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "diagrammer.md"
 MAX_OPS = 8
+FAST_MAX_TOKENS = 850
+_RICH_SHAPES = {"add_mermaid", "add_chart", "add_mock", "add_table", "add_code", "add_3d", "sketch"}
+_RICH_CUES = re.compile(
+    r"\b(?:sequence|step|then|first|chart|graph|plot|table|screen|mockup|wireframe|"
+    r"3d|robot|timeline|latency|milliseconds?|measurements?|metrics?|percent|flow|p\d+)\b", re.I)
+_SIMPLE_PROMPT = ("Maintain a component architecture diagram. Return ONLY one JSON object "
+                  "{\"ops\":[...]}, at most 8 ops. Use add_box for each new component and "
+                  "connect for EACH stated relationship, including follow-up facts. "
+                  "Web app is kind client; services are service; Redis/Postgres are datastore. "
+                  "Use rename/remove for explicit corrections. Existing boxes are global "
+                  "across topic frames: never add_box an existing ID, even if its label differs. "
+                  "Reuse those IDs; never invent components or relationships. "
+                  "Place boxes on the 0..1000 board grid, connect only existing or earlier-added IDs. "
+                  "The server adds the topic frame; omit frame. Do not return an empty batch for a new fact. No prose.")
+
+
+def _relation_count(moments, source_lines):
+    text = " ".join(str(item.get("text", "")) for item in (source_lines or moments)).lower()
+    if re.search(r"\b(?:no longer|does not|doesn't|stop|remove)\b", text):
+        return 0
+    return len(re.findall(r"\b(?:talks?\s+to|calls?|uses?|connects?\s+to|"
+                          r"stores?\s+.{0,35}?\s+in)\b", text))
+
+
+def _fast_component_burst(board, moments, source_lines, topic_id, required_visual):
+    if required_visual or not moments or any(moment.get("type") != "system_fact" for moment in moments):
+        return False
+    text = " ".join(str(item.get("text", "")) for item in (source_lines or moments))
+    if _RICH_CUES.search(text):
+        return False
+    return not any(shape.get("op") in _RICH_SHAPES
+                   and (topic_id is None or shape.get("frame") == topic_id)
+                   for shape in board.shapes.values())
 
 
 def _required_visual(moments, source_lines):
@@ -112,12 +145,16 @@ class Diagrammer:
     async def handle(self, session, moments: list[dict], parent_id: str | None = None,
                      *, topic_id: str | None = None, title: str | None = None,
                      topic_changed: bool = False, source_lines: list[dict] | None = None) -> list[dict]:
+        required_visual = _required_visual(moments, source_lines)
+        simple = _fast_component_burst(session.board, moments, source_lines, topic_id,
+                                       required_visual)
+        selected_model = config.MODEL_FAST if simple else config.MODEL_SMART
         detail = f"draw {len(moments)} system fact(s)"
         if topic_id:
             detail += f" topic={topic_id}"
         if source_lines:
             detail += " lines=" + ",".join(str(line.get("line_id", "")) for line in source_lines[-4:])
-        event_id = await emit_event(session, "Diagrammer", config.MODEL_SMART, "started",
+        event_id = await emit_event(session, "Diagrammer", selected_model, "started",
                                     detail[:200], parent_id=parent_id)
         try:
             # A Session owns one board. Serialize diagram jobs for that board.
@@ -127,28 +164,30 @@ class Diagrammer:
                 session._diagrammer_lock = lock
             async with lock:
                 draws = await self._draw(session, moments, topic_id=topic_id, title=title,
-                                         topic_changed=topic_changed, source_lines=source_lines)
-            await emit_event(session, "Diagrammer", config.MODEL_SMART, "done",
+                                         topic_changed=topic_changed, source_lines=source_lines,
+                                         simple=simple, required_visual=required_visual)
+            await emit_event(session, "Diagrammer", selected_model, "done",
                              f"{len(draws)} draw operation(s)", event_id=event_id,
                              parent_id=parent_id)
             return draws
         except StaleBoardError:
-            await emit_event(session, "Diagrammer", config.MODEL_SMART, "cancelled",
+            await emit_event(session, "Diagrammer", selected_model, "cancelled",
                              "board changed during drawing", event_id=event_id,
                              parent_id=parent_id)
             raise
         except asyncio.CancelledError:
-            await emit_event(session, "Diagrammer", config.MODEL_SMART, "cancelled",
+            await emit_event(session, "Diagrammer", selected_model, "cancelled",
                              "cancelled", event_id=event_id, parent_id=parent_id)
             raise
         except Exception as exc:
             log.exception("Diagrammer failed")
-            await emit_event(session, "Diagrammer", config.MODEL_SMART, "failed",
+            await emit_event(session, "Diagrammer", selected_model, "failed",
                              str(exc)[:160], event_id=event_id, parent_id=parent_id)
             raise
 
     async def _draw(self, session, moments: list[dict], *, topic_id=None, title=None,
-                    topic_changed=False, source_lines=None) -> list[dict]:
+                    topic_changed=False, source_lines=None, simple=False,
+                    required_visual=None) -> list[dict]:
         board = session.board
         expected_revision = board.revision
         draws: list[dict] = []
@@ -214,8 +253,8 @@ class Diagrammer:
 
             handlers[name] = handler
 
-        required_visual = _required_visual(moments, source_lines)
         factual_burst = any(moment.get("type") == "system_fact" for moment in moments)
+        relations_needed = _relation_count(moments, source_lines) if simple else 0
 
         def validate_plan(operations):
             # A new fact cannot be completed by an empty response or by topic
@@ -224,6 +263,8 @@ class Diagrammer:
             if factual_burst and not any(operation["op"] not in {"frame", "focus"}
                                          for operation in operations):
                 raise ValueError("A system fact needs at least one content draw operation.")
+            if relations_needed and sum(operation["op"] == "connect" for operation in operations) < relations_needed:
+                raise ValueError(f"The latest fact states {relations_needed} connection(s); include each connect operation.")
             if required_visual and not any(
                 operation["op"] == required_visual or
                 (operation["op"] in {"update", "focus"} and
@@ -247,15 +288,57 @@ class Diagrammer:
                                                       "required_visual": required_visual,
                                                       "max_draw_calls": MAX_OPS})},
         ]
-        try:
-            # Super emits an ordered JSON batch in one request. The shared LLM
-            # client validates schemas before any handler runs, and handlers
-            # still enforce BoardState revision, op budget, and wire updates.
+        fast_messages = [
+            {"role": "system", "content": _SIMPLE_PROMPT},
+            {"role": "user", "content": json.dumps({
+                # Board IDs are global. Include other-frame components too so
+                # a topic slip cannot make Nano recreate an existing box.
+                "boxes": sorted(board.boxes.values(),
+                                key=lambda box: box.get("frame") != topic_id)[:40],
+                "edges": sorted(board.edges.values(),
+                                key=lambda edge: edge.get("frame") != topic_id)[:60],
+                "facts": moments,
+                "source_lines": (source_lines or [])[-6:],
+                "topic_id": topic_id,
+            }, separators=(",", ":"))},
+        ]
+
+        async def json_plan(model, plan_messages, tools, max_tokens):
+            started = time.monotonic()
             try:
-                await llm.run_json_ops(config.MODEL_SMART, messages, DRAW_TOOLS,
-                                       handlers, max_ops=MAX_OPS, max_tokens=1800,
-                                       plan_validator=validate_plan,
-                                       extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+                result = await llm.run_json_ops(
+                    model, plan_messages, tools, handlers, max_ops=MAX_OPS,
+                    max_tokens=max_tokens, plan_validator=validate_plan,
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+            except Exception:
+                log.info("diagrammer_plan model=%s elapsed_ms=%d ok=false",
+                         model, round((time.monotonic() - started) * 1000))
+                raise
+            log.info("diagrammer_plan model=%s elapsed_ms=%d ok=true",
+                     model, round((time.monotonic() - started) * 1000))
+            return result
+
+        try:
+            # Try the compact Nano planner only for component facts. All JSON
+            # plans are schema-checked and staged on a cloned BoardState before
+            # any model operation reaches the authoritative board.
+            if simple:
+                try:
+                    await json_plan(config.MODEL_FAST, fast_messages,
+                                    SIMPLE_DRAW_TOOLS, FAST_MAX_TOKENS)
+                except ValueError:
+                    if attempts:
+                        raise  # A handler may have had side effects; never replay.
+                    log.info("diagrammer_plan fallback fast_to_smart")
+                else:
+                    if factual_burst and content_applied == 0:
+                        raise ValueError("Diagrammer produced no content operation for a system fact")
+                    return draws
+
+            # Rich work and invalid fast plans use Super. Its native tool loop
+            # remains the last resort only before any operation has run.
+            try:
+                await json_plan(config.MODEL_SMART, messages, DRAW_TOOLS, 1800)
             except ValueError:
                 # The native loop can repair a malformed plan, but replaying
                 # after any attempted operation could duplicate side effects.

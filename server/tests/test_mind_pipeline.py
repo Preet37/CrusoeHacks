@@ -123,7 +123,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("agents.diagrammer.llm.run_json_ops", invalid_json), \
                 patch("agents.diagrammer.llm.run_tools", native):
             await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
-        self.assertEqual(calls, ["json", "native"])
+        self.assertEqual(calls, ["json", "json", "native"])
         self.assertEqual(set(session.board.boxes), {"auth"})
 
     async def test_json_error_after_an_attempt_does_not_replay_or_retry_native(self):

@@ -1,6 +1,7 @@
 """The v2/v2.1 drawing vocabulary shared by JSON planning and native tools."""
 
 import math
+import copy
 
 S = {"type": "string"}
 ID = {"type": "string", "description": "Stable lowercase slug; reuse existing ids"}
@@ -76,3 +77,14 @@ for definition in DRAW_TOOLS:
         editable.update(definition["function"]["parameters"]["properties"])
 editable["color"] = S
 DRAW_TOOLS.append(tool("update", editable, ["id"]))
+
+# Nano's component planner only needs these four compact schemas. Topic frames
+# are managed by Diagrammer itself; rich shapes and their large update schema
+# stay on Super so the fast request does not carry the whole drawing vocabulary.
+_SIMPLE_NAMES = {"add_box", "connect", "rename", "remove", "highlight"}
+SIMPLE_DRAW_TOOLS = [copy.deepcopy(definition) for definition in DRAW_TOOLS
+                     if definition["function"]["name"] in _SIMPLE_NAMES]
+for definition in SIMPLE_DRAW_TOOLS:
+    # The server attaches the active topic frame. Omitting this optional field
+    # saves prompt tokens and prevents Nano confusing a box kind with a frame ID.
+    definition["function"]["parameters"]["properties"].pop("frame", None)

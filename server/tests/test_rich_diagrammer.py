@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+import config
 import llm
 from agents.diagrammer import Diagrammer, StaleBoardError, repair_draw
 from board import BoardState
@@ -94,7 +95,8 @@ async def test_clear_during_mermaid_repair_prevents_stale_update(monkeypatch):
 async def test_invalid_mock_plan_repaired_before_any_semantic_draw(monkeypatch):
     session = Session()
     calls = []
-    async def chat(*args, **kwargs):
+    async def chat(model, *args, **kwargs):
+        assert model == config.MODEL_SMART
         calls.append(kwargs)
         # The earlier valid box must not leak out before the unsafe mock is fixed.
         assert not session.board.boxes
@@ -114,7 +116,8 @@ async def test_invalid_mock_plan_repaired_before_any_semantic_draw(monkeypatch):
 @pytest.mark.asyncio
 async def test_measurement_cannot_silently_complete_with_empty_plan(monkeypatch):
     calls = []
-    async def chat(*args, **kwargs):
+    async def chat(model, *args, **kwargs):
+        assert model == config.MODEL_SMART
         calls.append(1)
         if len(calls) == 1:
             return '{"ops":[]}'
@@ -147,8 +150,12 @@ async def test_plain_system_fact_repairs_empty_or_topic_only_plan_before_content
         return json.dumps({'ops': [{'op': 'add_box', 'id': 'redis', 'label': 'Redis',
                                    'x': 200, 'y': 300, 'kind': 'datastore'}]})
 
+    async def unexpected_native(*args, **kwargs):
+        raise AssertionError('the repaired JSON plan should not need native fallback')
+
     monkeypatch.setattr(llm, 'chat', chat)
-    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Auth uses Redis'}],
+    monkeypatch.setattr(llm, 'run_tools', unexpected_native)
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Redis exists'}],
                                topic_id='t_auth', title='Auth', topic_changed=True)
     assert len(calls) == 2
     assert session.board.boxes['redis']['label'] == 'Redis'
@@ -174,7 +181,78 @@ async def test_fact_with_two_empty_json_plans_and_empty_native_fallback_fails_vi
     monkeypatch.setattr(llm, 'run_tools', native)
     with pytest.raises(ValueError, match='no content operation'):
         await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Auth uses Redis'}])
-    assert calls == ['json', 'json', 'native']
+    # Nano gets one bounded JSON repair, then Super gets its own bounded repair
+    # before native fallback; none applies a partial board operation.
+    assert calls == ['json', 'json', 'json', 'json', 'native']
     assert session.board.boxes == {}
     assert any(m.get('agent') == 'Diagrammer' and m.get('state') == 'failed'
                for m in session.sent)
+
+
+@pytest.mark.asyncio
+async def test_simple_component_burst_uses_nano_with_compact_tools(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def plan(model, messages, tools, handlers, **kwargs):
+        calls.append((model, {tool['function']['name'] for tool in tools}, kwargs))
+        assert 'board' not in json.loads(messages[-1]['content'])
+        await handlers['add_box'](id='web', label='Web app', x=80, y=200, kind='client')
+        await handlers['add_box'](id='auth', label='Auth', x=350, y=200, kind='service')
+        await handlers['connect'](id='web_auth', from_id='web', to_id='auth', label='login')
+
+    monkeypatch.setattr(llm, 'run_json_ops', plan)
+    await Diagrammer().handle(session, [{'type': 'system_fact',
+                                         'text': 'Web app calls Auth'}],
+                               source_lines=[{'text': 'The web app calls Auth.'}])
+    assert len(calls) == 1
+    assert calls[0][0] == config.MODEL_FAST
+    assert calls[0][1] == {'add_box', 'connect', 'rename', 'remove', 'highlight'}
+    assert calls[0][2]['max_tokens'] == 850
+    assert set(session.board.boxes) == {'web', 'auth'}
+    assert set(session.board.edges) == {'web_auth'}
+
+
+@pytest.mark.asyncio
+async def test_fast_followup_repairs_missing_connection_before_adding_box(monkeypatch):
+    session = Session()
+    session.board.apply({'op': 'add_box', 'id': 'auth', 'label': 'Auth',
+                         'x': 200, 'y': 200, 'kind': 'service'})
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        assert model == config.MODEL_FAST
+        calls.append(1)
+        assert 'redis' not in session.board.boxes
+        ops = [{'op': 'add_box', 'id': 'redis', 'label': 'Redis',
+                'x': 500, 'y': 200, 'kind': 'datastore'}]
+        if len(calls) == 2:
+            ops.append({'op': 'connect', 'id': 'auth_redis', 'from_id': 'auth',
+                        'to_id': 'redis', 'label': 'sessions'})
+        return json.dumps({'ops': ops})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    text = 'Auth also uses Redis for sessions.'
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': text}],
+                               source_lines=[{'text': text}])
+    assert len(calls) == 2
+    assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'connect']
+    assert session.board.edges['auth_redis']['to_id'] == 'redis'
+
+
+@pytest.mark.asyncio
+async def test_invalid_nano_plan_falls_back_to_super_before_side_effects(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def plan(model, messages, tools, handlers, **kwargs):
+        calls.append(model)
+        if model == config.MODEL_FAST:
+            assert not session.board.boxes
+            raise ValueError('invalid fast plan')
+        await handlers['add_box'](id='auth', label='Auth', x=300, y=300, kind='service')
+
+    monkeypatch.setattr(llm, 'run_json_ops', plan)
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Auth exists'}])
+    assert calls == [config.MODEL_FAST, config.MODEL_SMART]
+    assert set(session.board.boxes) == {'auth'}
