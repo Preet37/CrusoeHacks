@@ -1,0 +1,51 @@
+AGENT_CHAT.txt
+==============
+Shared chat log for every coding agent on this project. Humans may post too.
+
+WHO IS HERE
+  PREET-CLAUDE  (Preet's Claude Code)  server core: websocket, session, the mouth, voice
+  PREET-CODEX   (Preet's Codex)        the mind: Crusoe client, agents, brain, learning
+  PARSH-CLAUDE  (Parsh's Claude Code)  meeting page, look, mic, speech, audio
+  PARSH-CODEX   (Parsh's Codex)        whiteboard, protocol types, mock server, agent tree, scoreboard
+  PREET / PARSH (humans)
+
+RULES
+  1. Read this whole file, ARCHITECTURE.md, PROTOCOL.md and TASKS.md before you start ANY task.
+  2. APPEND ONLY. Add new lines at the very bottom. Never edit or delete anyone else's lines.
+  3. Before appending: git pull --rebase. After appending: commit and push right away
+     (commit message: "[YOUR-ID] chat: <short>"). If a merge conflict happens in this file,
+     keep BOTH sides' lines, in time order, then continue.
+  4. One message = one block in the exact format below.
+  5. Post when you: START a task, FINISH a task, get BLOCKED, CHANGE anything shared
+     (protocol, env vars, dependencies, folder layout), or need something from another agent.
+  6. Address agents with @ID. If a message is addressed to you, reply in your next block.
+  7. Never paste API keys, tokens, or .env contents here. This repo is public.
+  8. Keep messages short and concrete: what changed, which files, how to run/test it.
+  9. Protocol changes: propose here, wait for "AGREE" from PREET-CLAUDE and PARSH-CODEX,
+     then the proposer updates PROTOCOL.md and bumps PROTOCOL_VERSION.
+
+MESSAGE FORMAT
+  [HH:MM] FROM -> TO | TYPE | task-id
+  body (1 to 6 lines)
+  ---
+
+  FROM  = your agent id
+  TO    = ALL or one/more agent ids
+  TYPE  = START | DONE | BLOCKED | QUESTION | ANSWER | CHANGE | PROPOSE | AGREE | INFO
+  task-id = from TASKS.md, or - if none
+
+EXAMPLE
+  [12:58] PREET-CODEX -> ALL | DONE | PX-2
+  board.py is in. BoardState.apply(op) validates and applies draw ops; summary() gives
+  a compact text board for prompts. Tests: pytest server/tests/test_board.py (8 pass).
+  ---
+
+LOG STARTS BELOW
+================
+
+[12:50] PREET -> ALL | INFO | -
+Kickoff. Read ARCHITECTURE.md (sections 0, 1A, 1B, 1C, 2, 6, 9 first), PROTOCOL.md, TASKS.md.
+First goal is M1: Twin talks live and draws on the whiteboard. Target 2:15 PM.
+Parsh is setting up Crusoe + NVIDIA keys; they go only in server/.env, never in git.
+Start with your first todo task in TASKS.md and post START here.
+---
