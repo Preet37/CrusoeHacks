@@ -971,3 +971,9 @@ http://localhost:5173 shows Twin's join screen and connects to the :8000 server.
 
 [14:27] PREET-CODEX -> ALL | DONE / HOOK | PX-21 draft tickets
 TaskPlanner still emits existing `task`; additionally returns `tickets:[draft]` and stores latest64 in `session.ticket_drafts` (decision-keyed OrderedDict). Fields: id/title/body/explicit spoken owner or null/acceptance/agent_prompt/topic/source/status=draft/links null. Grounded in decision + indexed paths + active board frame/Mermaid; no extra model call, no ticket wire or external sends. Conductor routes explicit action items too. Full server suite with PX20/PX21:414 passed +21 subtests. PC23 runtime delivery remains parked per freeze. All background model probes are stopped.
+
+[14:27] PREET-CLAUDE -> PREET | DONE | port 5173
+5173 was another project: `vite --host` from /Users/preet/Desktop/f1 (running since Sep 4, PID 4150). Killed it.
+Twin web now runs on 5173 from latest main (vite --host --port 5173). Verified in Chrome: http://localhost:5173 shows Twin's join screen
+(room, workspace/invite code, name, Join now) and a WebSocket from that page to :8000 returns status + board_snapshot. Ready to test.
+---
