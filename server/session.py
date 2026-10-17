@@ -641,9 +641,16 @@ class Session:
                 if socks and all(w in self.mic_muted_ws for w in socks):
                     self.mic_muted.add(name)
                     self.last_heard.pop(name, None)
+                    # Muting ends that person's turn: only people still unmuted keep the floor "busy".
+                    live = [t for n, t in self.last_heard.items() if n not in self.mic_muted]
+                    self.last_human_speech_ts = max(live) if live else 0
                 else:
                     self.mic_muted.discard(name)
                 await self.broadcast_participants(force=True)
+                if msg.action == "mic_off" and name in self.mic_muted:
+                    hook = getattr(getattr(self, "mouth", None), "on_floor_handoff", None)
+                    if hook is not None:
+                        self.spawn("floor_handoff", hook(name))
             elif msg.action == "set_mode" and msg.mode:
                 self.twin_mode = msg.mode  # off | on_request | proactive (honored by mouth turn-taking)
                 self.muted = msg.mode == "off"

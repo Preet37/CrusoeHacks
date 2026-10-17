@@ -28,7 +28,8 @@ SKETCH_ACK = "Got it, sketching that now."
 UNNAMED_PAUSE_MS = 1200      # answer an unnamed question after this much silence
 MID_SENTENCE_GAP_MS = 600    # a human counts as mid-sentence until this gap
 QUIET_AFTER_HOLD_MS = 2000   # after "not now", a held update may come out once quiet this long
-_QUESTION_START = ("what", "how", "why", "should", "could", "can", "do ", "does", "is ", "are ", "would", "which", "who", "any thoughts")
+_QUESTION_START = ("what", "how", "why", "should", "could", "can", "do ", "does", "is ", "are ", "would", "which", "who", "any thoughts",
+                   "explain", "show", "walk", "tell", "describe", "draw", "sketch", "give", "help", "make", "build", "design", "compare", "review")
 
 
 # Step 1 of a visual turn (15:17): say WHAT is coming, instantly (pre-synthesized at startup).
@@ -212,10 +213,12 @@ def addressed_without_name(decision: dict, text: str) -> bool:
     if not isinstance(score, (int, float)) or score < 0.75:
         return False
     k = decision.get("kind") or {}
-    is_q_kind = isinstance(k, dict) and k.get("choice") == "question" and (k.get("confidence") or 0) >= 0.6
+    is_q_kind = isinstance(k, dict) and k.get("choice") in ("question", "task") and (k.get("confidence") or 0) >= 0.6
     t = (text or "").strip().lower()
-    looks_q = t.endswith("?") or t.startswith(_QUESTION_START)
-    return bool(looks_q and (is_q_kind or t.endswith("?")) and len(t.split()) >= 3)
+    looks_q = t.endswith("?") or t.startswith(_QUESTION_START) or any(f" {w} " in f" {t} " for w in ("explain", "walk me", "show me", "tell me", "can you", "could you"))
+    imperative = t.startswith(("explain", "show", "walk", "tell", "describe", "draw", "sketch", "give", "help", "design", "compare", "review")) \
+        or any(f" {w} " in f" {t} " for w in ("explain", "walk me", "show me", "tell me", "can you", "could you"))
+    return bool(looks_q and (is_q_kind or t.endswith("?") or imperative) and len(t.split()) >= 3)
 
 # PC-20 ghost card: broadcast-only placeholder while the Diagrammer works.
 GHOST_TIMEOUT_S = 15.0
@@ -364,6 +367,29 @@ class Mouth:
                 listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
         if decision is not None and addressed_without_name(decision, line.get("text", "")):
             session.spawn("addressed_wait", self._answer_unnamed(session, line))
+
+    async def on_floor_handoff(self, name: str) -> None:
+        """Someone muted right after speaking: in a noisy room that means "your turn, Twin".
+        Answer their last unanswered request (honors mode: never in off; on_request only if it was a request)."""
+        s = self.session
+        mode = getattr(s, "twin_mode", "proactive")
+        if mode == "off" or s.muted or _now_ms() < self.state.hold_until_ms or self._turn_running():
+            return
+        last = None
+        for h in reversed(list(s.history)):
+            if h.get("speaker") == config.TWIN_NAME:
+                return  # Twin already answered after their last line
+            if h.get("speaker") == name:
+                last = h
+                break
+        if last is None or _now_ms() - int(last.get("ts") or 0) > 90_000:
+            return
+        text = str(last.get("text", ""))
+        if mode == "on_request" and not (turn_taking.mentions_name(text) or text.strip().lower().startswith(_QUESTION_START) or "?" in text):
+            return
+        log.info("[%s] floor handoff from %s: answering %r", s.room, name, text[:80])
+        self.speak("they finished and muted their mic for you to answer their last request; answer it directly",
+                   trigger_ts=_now_ms(), updates=s.pop_updates())
 
     async def _answer_unnamed(self, session, line: dict) -> None:
         """PC-19: "what do you think about Redis here?" gets an answer after a natural pause."""

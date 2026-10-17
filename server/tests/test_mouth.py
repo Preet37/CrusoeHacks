@@ -225,3 +225,31 @@ async def test_repository_legend_is_not_narrated_as_component(monkeypatch):
     m._collect_label({'op': 'add_box', 'id': 'repo_file', 'label': 'lib/geometryAudit.ts', 'x': 40})
     assert m.narration_labels() == ['lib/geometryAudit.ts']
     await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_mute_after_speaking_hands_twin_the_floor(monkeypatch):
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: None)
+    calls = []
+
+    async def fake_respond(session, reason, *, trigger_ts=None, updates=None):
+        calls.append(reason)
+
+    monkeypatch.setattr(mouth.responder, "respond", fake_respond)
+    s = Session("handoff")
+    s.twin_mode = "proactive"
+    m = mouth.attach(s)
+    s.history.append({"speaker": "Preet", "text": "explain to me the architecture of this system", "ts": mouth._now_ms()})
+    await m.on_floor_handoff("Preet")
+    await asyncio.sleep(0.05)
+    assert calls and "muted their mic" in calls[0]
+    s.history.append({"speaker": "Twin", "text": "Sure.", "ts": mouth._now_ms()})
+    calls.clear()
+    await m.on_floor_handoff("Preet")
+    assert calls == []  # already answered
+    await mouth.detach(s)
+
+
+def test_imperative_requests_count_as_asked():
+    d = {"addressed": {"noul": 0.9}, "kind": {"choice": "task", "confidence": 0.8}}
+    assert mouth.addressed_without_name(d, "explain to me the actual real architecture of this entire system")
