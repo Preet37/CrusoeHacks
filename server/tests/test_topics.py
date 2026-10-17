@@ -42,6 +42,185 @@ def reflex(*, kind="system_fact", kind_confidence=0.95, topic_changed=0.0,
 
 
 class TopicTests(unittest.IsolatedAsyncioTestCase):
+    async def test_conductor_routes_explicit_rich_requests_without_inventing_facts(self):
+        session = FakeSession()
+
+        class RecordingDiagrammer:
+            def __init__(self):
+                self.calls = []
+
+            async def handle(self, session, moments, parent_id=None, **kw):
+                self.calls.append((moments, kw.get("source_lines", [])))
+
+        diagrammer = RecordingDiagrammer()
+        conductor = Conductor(diagrammer)
+        requests = [
+            ("Our measured login p95 latency was 420 milliseconds in v1 and 180 milliseconds in v2. Draw a chart of these measurements.",
+             "claim"),
+            ("Our p95 latency went from 420 to 180 milliseconds after the cache.", "claim"),
+            ("What would the new login screen look like?", "question"),
+            ("Walk me through the login sequence", "question"),
+            ("Mock up a login screen", "task"),
+            ("Put the p95 comparison in a table", "task"),
+        ]
+        for text, kind in requests:
+            with self.subTest(text=text):
+                moment = {"type": kind, "text": text, "entities": []}
+                await conductor.handle(session, [moment], topic_id="t_auth", title="Auth",
+                                       source_lines=[{"line_id": "ln_1", "speaker": "Preet",
+                                                      "text": text}])
+                routed, lines = diagrammer.calls[-1]
+                self.assertEqual(routed, [moment])
+                self.assertEqual(lines[0]["text"], text)
+                self.assertFalse(any(m["type"] == "system_fact" for m in routed))
+
+        await conductor.handle(session, [{"type": "question", "text": "What time is it?"}],
+                               topic_id="t_auth", title="Auth",
+                               source_lines=[{"text": "What time is it?"}])
+        self.assertEqual(len(diagrammer.calls), len(requests))
+
+    async def test_m1_implicit_chart_and_screen_request_draw_real_board_shapes(self):
+        session = FakeSession()
+        latency = "Our p95 latency went from 420 to 180 milliseconds after the cache."
+        screen = "What would the new login screen look like?"
+        model_inputs = []
+
+        async def chat(model, messages, **kw):
+            line = json.loads(messages[-1]["content"])["new_lines"][0]["text"]
+            return json.dumps({"topic_id": "t_login", "title": "Login",
+                               "topic_changed": line == latency,
+                               "moments": [{"type": "claim" if line == latency else "question",
+                                            "text": line, "entities": []}]})
+
+        async def json_ops(model, messages, definitions, handlers, max_ops, **kw):
+            payload = json.loads(messages[-1]["content"])
+            model_inputs.append(payload)
+            line = payload["source_lines"][0]["text"]
+            if line == latency:
+                await handlers["add_chart"](id="login_p95", chart="bar",
+                                            title="Login p95 latency", labels=["Before cache", "After cache"],
+                                            series=[{"name": "p95 (ms)", "values": [420, 180]}],
+                                            x=100, y=150)
+            elif line == screen:
+                await handlers["add_mock"](id="login_screen", title="Login screen",
+                                           html="<div><h1>Sign in</h1><input placeholder='Email'><button>Continue</button></div>",
+                                           x=100, y=450)
+
+        with patch("agents.listener.llm.chat", chat), \
+                patch("agents.diagrammer.llm.run_json_ops", json_ops):
+            listener = Listener(session, debounce_seconds=0)
+            for line in (latency, screen):
+                listener.submit("Preet", line)
+                await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual([payload["source_lines"][0]["text"] for payload in model_inputs],
+                         [latency, screen])
+        self.assertEqual([payload["facts"][0]["type"] for payload in model_inputs],
+                         ["claim", "question"])
+        self.assertEqual(session.board.shapes["login_p95"]["series"][0]["values"], [420, 180])
+        self.assertEqual(session.board.shapes["login_screen"]["op"], "add_mock")
+        self.assertEqual([m["op"] for m in session.messages if m["type"] == "draw"],
+                         ["frame", "focus", "add_chart", "add_mock"])
+
+    async def test_one_latency_number_does_not_force_a_chart(self):
+        session = FakeSession()
+        calls = []
+
+        class RecordingDiagrammer:
+            async def handle(self, session, moments, parent_id=None, **kw):
+                calls.append(moments)
+
+        await Conductor(RecordingDiagrammer()).handle(
+            session, [{"type": "claim", "text": "p95 latency was 420 milliseconds.",
+                       "entities": []}],
+            topic_id="t_login", title="Login",
+            source_lines=[{"text": "p95 latency was 420 milliseconds."}])
+        self.assertEqual(calls, [])
+
+    async def test_visual_hint_routes_empty_extraction_but_plain_small_talk_does_not(self):
+        session = FakeSession()
+        calls = []
+
+        class RecordingDiagrammer:
+            async def handle(self, session, moments, parent_id=None, **kw):
+                calls.append((moments, kw))
+
+        conductor = Conductor(RecordingDiagrammer())
+        await conductor.handle(session, [], topic_id="t_auth", title="Auth",
+                               source_lines=[{"text": "Could you display this?",
+                                              "wants_visual": "chart"}])
+        self.assertEqual(calls[0][0][0]["type"], "task")
+        self.assertFalse(any(m["type"] == "system_fact" for m in calls[0][0]))
+        await conductor.handle(session, [], topic_id="t_auth", title="Auth",
+                               source_lines=[{"text": "Okay, cool."}])
+        self.assertEqual(len(calls), 1)
+
+    async def test_visual_request_reaches_real_diagrammer_with_source_measurements(self):
+        session = FakeSession()
+        text = ("Our measured login p95 latency was 420 milliseconds in v1 and "
+                "180 milliseconds in v2. Draw a chart of these measurements.")
+        captured = []
+
+        async def chat(*args, **kw):
+            return json.dumps({"topic_id": "t_login", "title": "Login latency",
+                               "topic_changed": True,
+                               "moments": [{"type": "claim", "text": text,
+                                            "entities": ["v1", "v2"]}]})
+
+        async def json_ops(model, messages, definitions, handlers, max_ops, **kw):
+            payload = json.loads(messages[-1]["content"])
+            captured.append(payload)
+            await handlers["add_chart"](id="login_latency", chart="bar",
+                                        title="Login p95 latency", labels=["v1", "v2"],
+                                        series=[{"name": "p95 (ms)", "values": [420, 180]}],
+                                        x=150, y=200)
+
+        with patch("agents.listener.llm.chat", chat), \
+                patch("agents.diagrammer.llm.run_json_ops", json_ops):
+            listener = Listener(session, debounce_seconds=0)
+            listener.submit("Preet", text)
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(captured[0]["facts"][0]["type"], "claim")
+        self.assertEqual(captured[0]["source_lines"][0]["text"], text)
+        self.assertEqual(session.board.shapes["login_latency"]["series"][0]["values"],
+                         [420, 180])
+        self.assertEqual([m["op"] for m in session.messages if m["type"] == "draw"],
+                         ["frame", "focus", "add_chart"])
+
+    async def test_unchanged_topic_visual_request_survives_empty_extraction(self):
+        session = FakeSession()
+        session.active_topic = {"topic_id": "t_auth", "title": "Auth"}
+        session.topic_catalog = {"t_auth": "Auth"}
+        session.board.apply({"op": "frame", "id": "t_auth", "title": "Auth",
+                             "x": 0, "y": 0, "w": 1000, "h": 1000})
+        session.board.apply({"op": "focus", "id": "t_auth"})
+        captured = []
+
+        async def chat(*args, **kw):
+            return json.dumps({"topic_id": "t_auth", "title": "Auth",
+                               "topic_changed": False, "moments": []})
+
+        async def json_ops(model, messages, definitions, handlers, max_ops, **kw):
+            captured.append(json.loads(messages[-1]["content"]))
+            await handlers["add_mermaid"](id="login_flow",
+                                           code="sequenceDiagram\n Browser->>Auth: login",
+                                           x=100, y=150)
+
+        with patch("agents.listener.llm.chat", chat), \
+                patch("agents.diagrammer.llm.run_json_ops", json_ops):
+            listener = Listener(session, debounce_seconds=0)
+            listener.submit("Preet", "Walk me through the login sequence")
+            await asyncio.wait_for(listener.wait_idle(), 1)
+            listener.submit("Preet", "Okay, cool.")
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["facts"][0]["type"], "task")
+        self.assertEqual(captured[0]["source_lines"][0]["text"],
+                         "Walk me through the login sequence")
+        self.assertEqual(session.board.shapes["login_flow"]["op"], "add_mermaid")
+
     async def test_reflex_skips_confident_small_talk_but_fails_open_on_uncertainty(self):
         session = FakeSession()
         seen = []
@@ -532,3 +711,38 @@ class TopicTests(unittest.IsolatedAsyncioTestCase):
                      and m["state"] == "cancelled"]
         self.assertEqual({m["agent"] for m in cancelled},
                          {"Listener", "Conductor", "Diagrammer"})
+
+
+class ExplicitSourceRescueTests(unittest.IsolatedAsyncioTestCase):
+    async def test_topic_switch_and_return_survive_empty_legacy_reply(self):
+        session = FakeSession()
+        class ConductorSpy:
+            def __init__(self): self.calls = []
+            async def handle(self, *args, **kwargs): self.calls.append(kwargs)
+        conductor = ConductorSpy()
+        listener = Listener(session, conductor, debounce_seconds=0)
+        async def empty(*args, **kwargs): return '[]'
+        with patch("agents.listener.llm.chat", empty):
+            listener.submit("Preet", "OK, different topic: let us talk about billing.")
+            await listener.wait_idle()
+            self.assertEqual(session.active_topic["topic_id"], "t_billing")
+            listener.submit("Preet", "Switching to auth.")
+            await listener.wait_idle()
+            listener.submit("Preet", "Back to billing.")
+            await listener.wait_idle()
+        self.assertEqual([c["topic_id"] for c in conductor.calls], ["t_billing", "t_auth", "t_billing"])
+        await listener.close()
+
+    async def test_explicit_decision_survives_zero_moments(self):
+        session = FakeSession()
+        recorded = []
+        class ConductorSpy:
+            async def handle(self, session, moments, **kwargs): recorded.extend(moments)
+        listener = Listener(session, ConductorSpy(), debounce_seconds=0)
+        async def empty(*args, **kwargs): return '[]'
+        text = "We decided to migrate login to Redis sessions; Avery will own it."
+        with patch("agents.listener.llm.chat", empty):
+            listener.submit("Preet", text)
+            await listener.wait_idle()
+        self.assertEqual(recorded, [{"type": "decision", "text": text, "entities": []}])
+        await listener.close()

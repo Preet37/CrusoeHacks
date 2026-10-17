@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import config
 import llm
-from agents.conductor import Conductor
+from agents.conductor import Conductor, _wants_visual
 from agents.diagrammer import StaleBoardError, emit_event
 
 log = logging.getLogger(__name__)
@@ -21,7 +21,9 @@ MOMENT_TYPES = {"system_fact", "decision", "question", "claim", "task"}
 _RENAME = re.compile(r"\brename\s+([a-z][a-z0-9_-]*)\s+to\s+(.+?)[.!?]?\s*$", re.I)
 _TOPIC_ID = re.compile(r"t_[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
 _CONTRADICTION = re.compile(r"\b(actually|instead|scratch that|not that|change (?:it|that) to|replace (?:it|that) with)\b", re.I)
-_VISUAL_HINTS = {"architecture", "sequence", "chart", "mockup", "table", "code"}
+_TOPIC_SWITCH = re.compile(r"(?:different topic\s*[:,]?\s*(?:let(?: us|['’]s) talk about\s+)?|switching to\s+|back to\s+)([^.!?;:]{1,60})", re.I)
+_DECISION = re.compile(r"\b(?:we (?:have )?decided|we agreed|decision is|let['’]s (?:move|migrate|switch|use|adopt)|will own (?:it|this))\b", re.I)
+_VISUAL_HINTS = {"architecture", "sequence", "chart", "mockup", "table", "code", "3d"}
 
 
 def _parse_moments(raw: str) -> list[dict]:
@@ -163,7 +165,7 @@ class Listener:
             line["wants_visual"] = visual_hint
         self._pending.append(line)
         self._recent.append(line)
-        if topic_switch or _CONTRADICTION.search(text):
+        if topic_switch or _TOPIC_SWITCH.search(text) or _CONTRADICTION.search(text):
             self._cancel_jobs(contradiction=True)
         self._pending_changed.set()
         if self._worker is None or self._worker.done():
@@ -301,7 +303,8 @@ class Listener:
                                              for topic_id, title in self._topics.items()],
                         })},
                     ]
-                    raw = await llm.chat(config.MODEL_FAST, messages, max_tokens=1600)
+                    raw = await llm.chat(config.MODEL_FAST, messages, max_tokens=1600,
+                                         extra_body={"chat_template_kwargs": {"enable_thinking": False}})
                     try:
                         moments, topic_meta = _parse_batch(raw)
                     except (ValueError, json.JSONDecodeError):
@@ -325,8 +328,25 @@ class Listener:
                             moments.append({"type": "system_fact",
                                             "text": f"Rename {source} to {target}",
                                             "entities": [source]})
+                    # Explicit human decisions must survive a zero-moment or
+                    # misclassified Nano reply. Preserve the exact source text.
+                    if not any(m["type"] == "decision" for m in moments):
+                        for line in lines:
+                            if _DECISION.search(line["text"]):
+                                moments.append({"type": "decision", "text": line["text"][:500],
+                                                "entities": []})
                     seen = {(m["type"], m["text"].casefold()) for m in self._previous}
                     moments = [m for m in moments if (m["type"], m["text"].casefold()) not in seen]
+                    for line in lines:
+                        switch = _TOPIC_SWITCH.search(line["text"])
+                        if switch:
+                            title = switch.group(1).strip(" ,")
+                            known = [(key, value) for key, value in self._topics.items()
+                                     if title.casefold() == value.casefold()
+                                     or re.search(r"\b" + re.escape(title.casefold()) + r"\b", value.casefold())]
+                            topic_meta = {"topic_id": known[0][0] if len(known) == 1 else _slug(title),
+                                          "title": known[0][1] if len(known) == 1 else title,
+                                          "topic_changed": True}
                     topic_id, title, topic_changed = self._resolve_topic(topic_meta)
                     if topic_id is not None:
                         if topic_changed:
@@ -342,7 +362,7 @@ class Listener:
                                 "type": "topic", "topic_id": topic_id, "title": title,
                                 "active": True, "changed": topic_changed,
                             })
-                    if moments or (topic_id is not None and topic_changed):
+                    if moments or (topic_id is not None and topic_changed) or _wants_visual(moments, lines):
                         job = asyncio.create_task(self.conductor.handle(
                             self.session, moments, parent_id=event_id,
                             topic_id=topic_id, title=title,

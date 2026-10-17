@@ -88,3 +88,93 @@ async def test_clear_during_mermaid_repair_prevents_stale_update(monkeypatch):
         await repair_draw(session, {"id": "flow", "error": "syntax"})
     assert session.board.shapes == {}
     assert not any(m["type"] == "draw" for m in session.sent)
+
+
+@pytest.mark.asyncio
+async def test_invalid_mock_plan_repaired_before_any_semantic_draw(monkeypatch):
+    session = Session()
+    calls = []
+    async def chat(*args, **kwargs):
+        calls.append(kwargs)
+        # The earlier valid box must not leak out before the unsafe mock is fixed.
+        assert not session.board.boxes
+        html = '<form><input></form>' if len(calls) == 1 else '<div><input></div>'
+        return json.dumps({'ops': [
+            {'op': 'add_box', 'id': 'auth', 'label': 'Auth', 'x': 10, 'y': 10, 'kind': 'service'},
+            {'op': 'add_mock', 'id': 'screen', 'title': 'Login', 'html': html, 'x': 200, 'y': 200},
+        ]})
+    monkeypatch.setattr(llm, 'chat', chat)
+    await Diagrammer().handle(session, [{'type': 'task', 'text': 'Show login screen'}])
+    assert len(calls) == 2
+    assert session.board.shapes['screen']['html'] == '<div><input></div>'
+    assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'add_mock']
+    assert len(session.updates) == 1
+
+
+@pytest.mark.asyncio
+async def test_measurement_cannot_silently_complete_with_empty_plan(monkeypatch):
+    calls = []
+    async def chat(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            return '{"ops":[]}'
+        return json.dumps({'ops': [{'op': 'add_chart', 'id': 'latency', 'chart': 'bar',
+                                   'title': 'p95 latency (ms)', 'labels': ['before', 'after'],
+                                   'series': [{'name': 'p95', 'values': [420, 180]}], 'x': 0, 'y': 0}]})
+    monkeypatch.setattr(llm, 'chat', chat)
+    session = Session()
+    text = 'Our p95 latency went from 420 to 180 milliseconds after the cache.'
+    await Diagrammer().handle(session, [{'type': 'claim', 'text': text}], source_lines=[{'text': text}])
+    assert len(calls) == 2
+    assert session.board.shapes['latency']['series'][0]['values'] == [420, 180]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('first_plan', ['{"ops":[]}',
+                                         '{"ops":[{"op":"focus","id":"t_auth"}]}'])
+async def test_plain_system_fact_repairs_empty_or_topic_only_plan_before_content(monkeypatch,
+                                                                                 first_plan):
+    session = Session()
+    calls = []
+
+    async def chat(*args, **kwargs):
+        calls.append(1)
+        # Topic frame/focus may already exist, but no factual box may be
+        # applied before the complete replacement plan is validated.
+        assert session.board.boxes == {}
+        if len(calls) == 1:
+            return first_plan
+        return json.dumps({'ops': [{'op': 'add_box', 'id': 'redis', 'label': 'Redis',
+                                   'x': 200, 'y': 300, 'kind': 'datastore'}]})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Auth uses Redis'}],
+                               topic_id='t_auth', title='Auth', topic_changed=True)
+    assert len(calls) == 2
+    assert session.board.boxes['redis']['label'] == 'Redis'
+    assert [m['op'] for m in session.sent if m['type'] == 'draw'] == [
+        'frame', 'focus', 'add_box']
+    assert len(session.updates) == 1
+
+
+@pytest.mark.asyncio
+async def test_fact_with_two_empty_json_plans_and_empty_native_fallback_fails_visibly(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def chat(*args, **kwargs):
+        calls.append('json')
+        return '{"ops":[]}'
+
+    async def native(*args, **kwargs):
+        calls.append('native')
+        return None
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    monkeypatch.setattr(llm, 'run_tools', native)
+    with pytest.raises(ValueError, match='no content operation'):
+        await Diagrammer().handle(session, [{'type': 'system_fact', 'text': 'Auth uses Redis'}])
+    assert calls == ['json', 'json', 'native']
+    assert session.board.boxes == {}
+    assert any(m.get('agent') == 'Diagrammer' and m.get('state') == 'failed'
+               for m in session.sent)

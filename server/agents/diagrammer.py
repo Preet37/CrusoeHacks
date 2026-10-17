@@ -1,9 +1,11 @@
 """Bounded Nemotron drawing agent over the authoritative BoardState."""
 
 import asyncio
+import copy
 import inspect
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -15,6 +17,21 @@ from agents.draw_tools import DRAW_TOOLS
 log = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "diagrammer.md"
 MAX_OPS = 8
+
+
+def _required_visual(moments, source_lines):
+    text = " ".join(str(item.get("text", "")) for item in (source_lines or moments)).lower()
+    hints = {item.get("wants_visual") for item in (source_lines or [])}
+    numbers = re.findall(r"\b\d+(?:\.\d+)?\b", re.sub(r"\b(?:p\d+|v\d+)\b", "", text))
+    if "3d" in hints or re.search(r"\b(?:show|draw|render|visualize|create)\b.{0,60}\b(?:3d|robot|rack|device|room layout)\b", text):
+        return "add_3d"
+    if "chart" in hints or (len(numbers) >= 2 and re.search(r"\b(latency|milliseconds?|throughput|percent|chart|plot)\b", text)):
+        return "add_chart"
+    if "mockup" in hints or re.search(r"\b(mockup|wireframe)\b|(?:screen|interface).{0,50}look|look.{0,50}(?:screen|interface)", text):
+        return "add_mock"
+    if "sequence" in hints or re.search(r"\bsequence\b|walk me through.{0,40}(?:login|flow|process)", text):
+        return "add_mermaid"
+    return None
 
 
 class StaleBoardError(RuntimeError):
@@ -49,6 +66,8 @@ def _describe_changes(draws: list[dict]) -> str:
                 return "I sketched the flow on the board."
             case "add_chart":
                 return f"I charted {draw['title']} on the board."
+            case "add_3d":
+                return f"I added a 3D view of {draw['title']}."
             case "add_mock":
                 return f"I added a mockup of {draw['title']}."
             case "add_table":
@@ -135,22 +154,26 @@ class Diagrammer:
         draws: list[dict] = []
         changed_draws: list[dict] = []
         attempts = 0
+        content_applied = 0
 
         async def apply(op: dict) -> dict:
-            nonlocal attempts, expected_revision
+            nonlocal attempts, content_applied, expected_revision
             if session.board is not board or board.revision != expected_revision:
                 raise StaleBoardError("board changed during drawing")
             if attempts >= MAX_OPS:
                 return {"ok": False, "error": f"limit of {MAX_OPS} draw calls reached"}
             attempts += 1
             if topic_id and op["op"] in {"add_box", "connect", "add_sticky", "add_text", "add_mermaid",
-                                            "add_chart", "add_table", "add_code", "add_mock", "sketch"}:
+                                            "add_chart", "add_table", "add_code", "add_mock", "add_3d", "sketch"}:
                 op.setdefault("frame", topic_id)
             before = (board.snapshot(), set(board.highlighted))
             try:
                 draw = board.apply(op)
-            except ValueError as exc:
-                return {"ok": False, "error": str(exc)}
+            except ValueError:
+                # A rejected operation must not be reported as successful work.
+                raise
+            if op["op"] not in {"frame", "focus"}:
+                content_applied += 1
             expected_revision = board.revision
             changed = (board.snapshot(), set(board.highlighted)) != before
             if changed or draw["op"] == "clear":
@@ -191,11 +214,37 @@ class Diagrammer:
 
             handlers[name] = handler
 
+        required_visual = _required_visual(moments, source_lines)
+        factual_burst = any(moment.get("type") == "system_fact" for moment in moments)
+
+        def validate_plan(operations):
+            # A new fact cannot be completed by an empty response or by topic
+            # bookkeeping alone. run_json_ops repairs this before any model
+            # operation is applied to the authoritative board.
+            if factual_burst and not any(operation["op"] not in {"frame", "focus"}
+                                         for operation in operations):
+                raise ValueError("A system fact needs at least one content draw operation.")
+            if required_visual and not any(
+                operation["op"] == required_visual or
+                (operation["op"] in {"update", "focus"} and
+                 board.shapes.get(operation.get("id"), {}).get("op") == required_visual)
+                for operation in operations
+            ):
+                raise ValueError(f"The latest request requires {required_visual}; add or update that visual.")
+            staged = copy.deepcopy(board)
+            for operation in operations:
+                operation = dict(operation)
+                if topic_id and operation["op"] in {"add_box", "connect", "add_sticky", "add_text", "add_mermaid",
+                                                      "add_chart", "add_table", "add_code", "add_mock", "add_3d", "sketch"}:
+                    operation.setdefault("frame", topic_id)
+                staged.apply(operation)
+
         messages = [
             {"role": "system", "content": PROMPT.read_text()},
             {"role": "user", "content": json.dumps({"board": board.snapshot(),
                                                       "facts": moments, "topic_id": topic_id,
                                                       "source_lines": (source_lines or [])[-8:],
+                                                      "required_visual": required_visual,
                                                       "max_draw_calls": MAX_OPS})},
         ]
         try:
@@ -205,6 +254,7 @@ class Diagrammer:
             try:
                 await llm.run_json_ops(config.MODEL_SMART, messages, DRAW_TOOLS,
                                        handlers, max_ops=MAX_OPS, max_tokens=1800,
+                                       plan_validator=validate_plan,
                                        extra_body={"chat_template_kwargs": {"enable_thinking": False}})
             except ValueError:
                 # The native loop can repair a malformed plan, but replaying
@@ -214,6 +264,10 @@ class Diagrammer:
                 await llm.run_tools(config.MODEL_SMART, messages, DRAW_TOOLS,
                                     handlers, max_steps=MAX_OPS, max_tokens=1800,
                                     extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+            # Native fallback can return prose/no calls. Do not report a fact
+            # as drawn if no content operation was accepted by the board.
+            if factual_burst and content_applied == 0:
+                raise ValueError("Diagrammer produced no content operation for a system fact")
         finally:
             # Native tools may have changed the board before a later model step
             # fails or gets cancelled. The update still needs to be spoken once.

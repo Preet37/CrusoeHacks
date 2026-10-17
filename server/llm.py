@@ -285,6 +285,7 @@ async def run_json_ops(
     handlers: Mapping[str, Callable[..., Any]],
     max_ops: int = 8,
     validator: Callable[[dict[str, Any]], Any] | None = None,
+    plan_validator: Callable[[list[dict[str, Any]]], Any] | None = None,
     **kw: Any,
 ) -> str:
     """Ask for JSON ops, validate them, then call allowed handlers.
@@ -311,6 +312,10 @@ async def run_json_ops(
         try:
             ops = _parse_ops(raw)
             normalized = _normalize_ops(ops, tools, handlers, max_ops)
+            if plan_validator is not None:
+                checked = plan_validator([{"op": name, **args} for name, args in normalized])
+                if inspect.isawaitable(checked):
+                    await checked
         except (ValueError, json.JSONDecodeError) as exc:
             if attempt:
                 raise ValueError(f"Model returned invalid JSON ops: {str(exc)[:_MAX_LOG_CHARS]}") from exc

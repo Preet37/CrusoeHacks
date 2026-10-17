@@ -57,6 +57,7 @@ async def test_real_mind_pipeline_uses_json_batch_and_preserves_wire_contract(mo
     await listener.wait_idle()
 
     assert create.await_count == 2  # listener chat + one Diagrammer JSON batch
+    assert create.await_args_list[0].kwargs["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
     request = create.await_args_list[1].kwargs
     assert request["response_format"] == {"type": "json_object"}
     assert session.board.snapshot() == {

@@ -92,8 +92,8 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         async def tools(model, messages, definitions, handlers, max_ops, **kw):
             self.assertEqual(max_ops, 8)
-            rejected = await handlers["add_box"](id="bad", label="Bad", x=1001, y=0, kind="service")
-            self.assertFalse(rejected["ok"])
+            with self.assertRaises(ValueError):
+                await handlers["add_box"](id="bad", label="Bad", x=1001, y=0, kind="service")
             for index in range(12):
                 await handlers["add_box"](id=f"box{index}", label=f"Box {index}",
                                           x=index * 20, y=100, kind="service")

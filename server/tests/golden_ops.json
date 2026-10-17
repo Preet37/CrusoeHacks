@@ -1,0 +1,625 @@
+{
+  "fixture_version": "v2.1",
+  "operations": [
+    {
+      "type": "draw",
+      "op": "clear"
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "t_auth",
+      "title": "Auth redesign",
+      "x": 0,
+      "y": 0,
+      "w": 960,
+      "h": 900
+    },
+    {
+      "type": "draw",
+      "op": "focus",
+      "id": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "browser",
+      "label": "Browser",
+      "x": 80,
+      "y": 140,
+      "kind": "client",
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "auth",
+      "label": "Auth",
+      "x": 360,
+      "y": 140,
+      "kind": "service",
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "e_browser_auth",
+      "from_id": "browser",
+      "to_id": "auth",
+      "label": "login",
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_sticky",
+      "id": "s_risk",
+      "text": "Track migration risk",
+      "color": "yellow",
+      "x": 700,
+      "y": 80,
+      "w": 200,
+      "h": 100,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_sticky",
+      "id": "s_temp",
+      "text": "Remove after review",
+      "color": "pink",
+      "x": 700,
+      "y": 220,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_text",
+      "id": "x_title",
+      "text": "Login flow",
+      "x": 60,
+      "y": 40,
+      "size": "l",
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_mermaid",
+      "id": "m_login",
+      "code": "sequenceDiagram\nBrowser->>Auth: login",
+      "x": 80,
+      "y": 320,
+      "w": 500,
+      "h": 250,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_chart",
+      "id": "c_latency",
+      "chart": "bar",
+      "title": "p95 latency (ms)",
+      "labels": [
+        "v1",
+        "v2"
+      ],
+      "series": [
+        {
+          "name": "p95",
+          "values": [
+            420,
+            180
+          ]
+        }
+      ],
+      "x": 590,
+      "y": 320,
+      "w": 300,
+      "h": 250,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_table",
+      "id": "tb_options",
+      "columns": [
+        "Option",
+        "Cost"
+      ],
+      "rows": [
+        [
+          "JWT",
+          "low"
+        ],
+        [
+          "Sessions",
+          42
+        ]
+      ],
+      "x": 80,
+      "y": 600,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_code",
+      "id": "k_login",
+      "language": "python",
+      "code": "def login(user):\n    return token(user)",
+      "x": 420,
+      "y": 600,
+      "w": 400,
+      "h": 160,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_mock",
+      "id": "u_login",
+      "title": "Login screen",
+      "html": "<div><input placeholder=\"Email\"><button>Continue</button></div>",
+      "x": 40,
+      "y": 780,
+      "w": 300,
+      "h": 110,
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "sketch",
+      "id": "sk_path",
+      "strokes": [
+        [
+          [
+            80,
+            140
+          ],
+          [
+            220.5,
+            140
+          ],
+          [
+            360,
+            140
+          ]
+        ]
+      ],
+      "color": "blue",
+      "frame": "t_auth"
+    },
+    {
+      "type": "draw",
+      "op": "add_3d",
+      "id": "r_shapes",
+      "title": "Six 3D primitives",
+      "x": 600,
+      "y": 770,
+      "w": 350,
+      "h": 220,
+      "frame": "t_auth",
+      "scene": {
+        "autoRotate": true,
+        "objects": [
+          {
+            "id": "cube",
+            "shape": "box",
+            "pos": [
+              -2,
+              0,
+              0
+            ],
+            "rot": [
+              0,
+              0.3,
+              0
+            ],
+            "scale": [
+              0.8,
+              0.8,
+              0.8
+            ],
+            "color": "#4f8cff",
+            "label": "Box"
+          },
+          {
+            "id": "column",
+            "shape": "cylinder",
+            "pos": [
+              -1,
+              0,
+              0
+            ],
+            "scale": [
+              0.5,
+              1,
+              0.5
+            ],
+            "color": "#8a8f98"
+          },
+          {
+            "id": "ball",
+            "shape": "sphere",
+            "pos": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "color": "#ffb020"
+          },
+          {
+            "id": "peak",
+            "shape": "cone",
+            "pos": [
+              1,
+              0,
+              0
+            ],
+            "scale": [
+              0.5,
+              1,
+              0.5
+            ],
+            "color": "#f472b6"
+          },
+          {
+            "id": "ring",
+            "shape": "torus",
+            "pos": [
+              2,
+              0,
+              0
+            ],
+            "scale": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "color": "#22c55e"
+          },
+          {
+            "id": "floor",
+            "shape": "plane",
+            "pos": [
+              0,
+              -1,
+              0
+            ],
+            "rot": [
+              -1.57,
+              0,
+              0
+            ],
+            "scale": [
+              5,
+              2,
+              0.1
+            ],
+            "color": "#dddddd"
+          }
+        ]
+      }
+    },
+    {
+      "type": "draw",
+      "op": "update",
+      "id": "m_login",
+      "code": "sequenceDiagram\nBrowser->>Auth: login\nAuth-->>Browser: token"
+    },
+    {
+      "type": "draw",
+      "op": "rename",
+      "id": "auth",
+      "label": "Auth sessions"
+    },
+    {
+      "type": "draw",
+      "op": "highlight",
+      "ids": [
+        "auth",
+        "m_login"
+      ],
+      "on": true
+    },
+    {
+      "type": "draw",
+      "op": "remove",
+      "id": "s_temp"
+    }
+  ],
+  "expected_snapshot": {
+    "type": "board_snapshot",
+    "boxes": [
+      {
+        "id": "auth",
+        "label": "Auth sessions",
+        "x": 360,
+        "y": 140,
+        "kind": "service",
+        "frame": "t_auth"
+      },
+      {
+        "id": "browser",
+        "label": "Browser",
+        "x": 80,
+        "y": 140,
+        "kind": "client",
+        "frame": "t_auth"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_browser_auth",
+        "from_id": "browser",
+        "to_id": "auth",
+        "label": "login",
+        "frame": "t_auth"
+      }
+    ],
+    "shapes": [
+      {
+        "type": "draw",
+        "op": "add_chart",
+        "id": "c_latency",
+        "frame": "t_auth",
+        "x": 590,
+        "y": 320,
+        "w": 300,
+        "h": 250,
+        "chart": "bar",
+        "title": "p95 latency (ms)",
+        "labels": [
+          "v1",
+          "v2"
+        ],
+        "series": [
+          {
+            "name": "p95",
+            "values": [
+              420,
+              180
+            ]
+          }
+        ]
+      },
+      {
+        "type": "draw",
+        "op": "add_code",
+        "id": "k_login",
+        "frame": "t_auth",
+        "x": 420,
+        "y": 600,
+        "w": 400,
+        "h": 160,
+        "language": "python",
+        "code": "def login(user):\n    return token(user)"
+      },
+      {
+        "type": "draw",
+        "op": "add_mermaid",
+        "id": "m_login",
+        "frame": "t_auth",
+        "x": 80,
+        "y": 320,
+        "w": 500,
+        "h": 250,
+        "code": "sequenceDiagram\nBrowser->>Auth: login\nAuth-->>Browser: token"
+      },
+      {
+        "type": "draw",
+        "op": "add_3d",
+        "id": "r_shapes",
+        "frame": "t_auth",
+        "x": 600,
+        "y": 770,
+        "w": 350,
+        "h": 220,
+        "title": "Six 3D primitives",
+        "scene": {
+          "autoRotate": true,
+          "objects": [
+            {
+              "id": "cube",
+              "shape": "box",
+              "pos": [
+                -2,
+                0,
+                0
+              ],
+              "scale": [
+                0.8,
+                0.8,
+                0.8
+              ],
+              "color": "#4f8cff",
+              "rot": [
+                0,
+                0.3,
+                0
+              ],
+              "label": "Box"
+            },
+            {
+              "id": "column",
+              "shape": "cylinder",
+              "pos": [
+                -1,
+                0,
+                0
+              ],
+              "scale": [
+                0.5,
+                1,
+                0.5
+              ],
+              "color": "#8a8f98"
+            },
+            {
+              "id": "ball",
+              "shape": "sphere",
+              "pos": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "color": "#ffb020"
+            },
+            {
+              "id": "peak",
+              "shape": "cone",
+              "pos": [
+                1,
+                0,
+                0
+              ],
+              "scale": [
+                0.5,
+                1,
+                0.5
+              ],
+              "color": "#f472b6"
+            },
+            {
+              "id": "ring",
+              "shape": "torus",
+              "pos": [
+                2,
+                0,
+                0
+              ],
+              "scale": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "color": "#22c55e"
+            },
+            {
+              "id": "floor",
+              "shape": "plane",
+              "pos": [
+                0,
+                -1,
+                0
+              ],
+              "scale": [
+                5,
+                2,
+                0.1
+              ],
+              "color": "#dddddd",
+              "rot": [
+                -1.57,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "draw",
+        "op": "add_sticky",
+        "id": "s_risk",
+        "frame": "t_auth",
+        "x": 700,
+        "y": 80,
+        "w": 200,
+        "h": 100,
+        "text": "Track migration risk",
+        "color": "yellow"
+      },
+      {
+        "type": "draw",
+        "op": "sketch",
+        "id": "sk_path",
+        "frame": "t_auth",
+        "color": "blue",
+        "strokes": [
+          [
+            [
+              80,
+              140
+            ],
+            [
+              220.5,
+              140
+            ],
+            [
+              360,
+              140
+            ]
+          ]
+        ]
+      },
+      {
+        "type": "draw",
+        "op": "frame",
+        "id": "t_auth",
+        "x": 0,
+        "y": 0,
+        "w": 960,
+        "h": 900,
+        "title": "Auth redesign"
+      },
+      {
+        "type": "draw",
+        "op": "add_table",
+        "id": "tb_options",
+        "frame": "t_auth",
+        "x": 80,
+        "y": 600,
+        "columns": [
+          "Option",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "JWT",
+            "low"
+          ],
+          [
+            "Sessions",
+            42
+          ]
+        ]
+      },
+      {
+        "type": "draw",
+        "op": "add_mock",
+        "id": "u_login",
+        "frame": "t_auth",
+        "x": 40,
+        "y": 780,
+        "w": 300,
+        "h": 110,
+        "title": "Login screen",
+        "html": "<div><input placeholder=\"Email\"><button>Continue</button></div>"
+      },
+      {
+        "type": "draw",
+        "op": "add_text",
+        "id": "x_title",
+        "frame": "t_auth",
+        "x": 60,
+        "y": 40,
+        "text": "Login flow",
+        "size": "l"
+      }
+    ],
+    "active_frame": "t_auth"
+  },
+  "expected_highlighted": [
+    "auth",
+    "m_login"
+  ],
+  "expected_revision": 20
+}

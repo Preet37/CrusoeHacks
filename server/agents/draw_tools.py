@@ -1,4 +1,6 @@
-"""The v2 drawing vocabulary shared by JSON planning and native-tool fallback."""
+"""The v2/v2.1 drawing vocabulary shared by JSON planning and native tools."""
+
+import math
 
 S = {"type": "string"}
 ID = {"type": "string", "description": "Stable lowercase slug; reuse existing ids"}
@@ -12,6 +14,21 @@ SERIES = {"type": "array", "items": {"type": "object", "properties": {
     ]}},
 }, "required": ["name", "values"], "additionalProperties": False}}
 POSITION = {"x": N, "y": N, "w": DIM, "h": DIM, "frame": ID}
+POS3 = {"type": "array", "items": {"type": "number", "minimum": -100, "maximum": 100}, "minItems": 3, "maxItems": 3}
+ROT3 = {"type": "array", "items": {"type": "number", "minimum": -8 * math.pi, "maximum": 8 * math.pi}, "minItems": 3, "maxItems": 3}
+SCALE3 = {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 100}, "minItems": 3, "maxItems": 3}
+PRIMITIVE3D = {"type": "object", "properties": {
+    "id": ID,
+    "shape": {"type": "string", "enum": ["box", "cylinder", "sphere", "cone", "torus", "plane"]},
+    "pos": POS3, "rot": ROT3, "scale": SCALE3,
+    "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+    "label": {"type": "string", "maxLength": 100},
+}, "required": ["id", "shape", "pos", "scale", "color"], "additionalProperties": False}
+SCENE3D = {"type": "object", "properties": {
+    "autoRotate": {"type": "boolean"},
+    "objects": {"type": "array", "items": PRIMITIVE3D, "minItems": 1, "maxItems": 60},
+    "gltf": {"type": "string", "pattern": "^https://", "maxLength": 2048},
+}, "anyOf": [{"required": ["objects"]}, {"required": ["gltf"]}], "additionalProperties": False}
 
 
 def tool(name, properties, required):
@@ -47,6 +64,7 @@ DRAW_TOOLS = [
         "type": "array", "items": {"type": ["string", "number", "boolean"]}}}}, ["columns", "rows"]),
     shape("add_code", {"language": S, "code": S}, ["language", "code"]),
     shape("add_mock", {"title": S, "html": {"type": "string", "maxLength": 4096}}, ["title", "html"]),
+    shape("add_3d", {"title": S, "scene": SCENE3D}, ["title", "scene"]),
     tool("sketch", {"id": ID, "frame": ID, "strokes": {"type": "array", "items": {"type": "array", "items": POINT}},
                     "color": {"type": "string", "enum": ["black", "red", "blue", "green", "orange", "violet"]}}, ["id", "strokes", "color"]),
 ]

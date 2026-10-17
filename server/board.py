@@ -1,4 +1,4 @@
-"""Authoritative state and validation for PROTOCOL v1/v2 whiteboard operations."""
+"""Authoritative state and validation for PROTOCOL v1/v2/v2.1 whiteboard operations."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import math
 import re
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 
 _ID = re.compile(r"[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*\Z")
@@ -15,6 +16,8 @@ _STICKY_COLORS = frozenset({"yellow", "blue", "green", "pink", "orange"})
 _SKETCH_COLORS = frozenset({"black", "red", "blue", "green", "orange", "violet"})
 _TEXT_SIZES = frozenset({"s", "m", "l"})
 _CHART_KINDS = frozenset({"bar", "line", "pie", "scatter"})
+_THREE_SHAPES = frozenset({"box", "cylinder", "sphere", "cone", "torus", "plane"})
+_HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}\Z")
 _UNSAFE_HTML = re.compile(
     r"<\s*/?\s*(?:script|iframe|object|embed|link|meta|form|base)\b"
     r"|\bon[a-z]+\s*=|\b(?:src|href|action|srcdoc)\s*="
@@ -37,16 +40,17 @@ _FIELDS = {
     "add_table": (frozenset({"id", "columns", "rows", "x", "y"}), frozenset({"w", "h", "frame"})),
     "add_code": (frozenset({"id", "language", "code", "x", "y"}), frozenset({"w", "h", "frame"})),
     "add_mock": (frozenset({"id", "title", "html", "x", "y"}), frozenset({"w", "h", "frame"})),
+    "add_3d": (frozenset({"id", "title", "scene", "x", "y"}), frozenset({"w", "h", "frame"})),
     "sketch": (frozenset({"id", "strokes", "color"}), frozenset({"frame"})),
     "update": (frozenset({"id"}), frozenset()),  # Dynamic editable fields of the target shape.
 }
 _RICH_CREATE = frozenset({
     "frame", "add_sticky", "add_text", "add_mermaid", "add_chart",
-    "add_table", "add_code", "add_mock", "sketch",
+    "add_table", "add_code", "add_mock", "add_3d", "sketch",
 })
 _RENAME_FIELD = {
     "frame": "title", "add_sticky": "text", "add_text": "text",
-    "add_chart": "title", "add_mock": "title",
+    "add_chart": "title", "add_mock": "title", "add_3d": "title",
 }
 
 
@@ -107,6 +111,69 @@ def _table_cell(value: Any) -> str | int | float | bool:
     if isinstance(value, bool):
         return value
     return _finite_number(value, "table cell")
+
+
+def _three_vector(value: Any, name: str, *, limit: float, positive: bool = False) -> list[int | float]:
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        raise ValueError(f"{name} must be a three-number vector")
+    checked = [_finite_number(component, name) for component in value]
+    if any(not (0 < component <= limit if positive else -limit <= component <= limit)
+           for component in checked):
+        raise ValueError(f"{name} is outside its allowed range")
+    return checked
+
+
+def _three_scene(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or not set(value) <= {"autoRotate", "objects", "gltf"}:
+        raise ValueError("scene must contain only autoRotate, objects, or gltf")
+    if "objects" not in value and "gltf" not in value:
+        raise ValueError("scene needs objects or gltf")
+    scene: dict[str, Any] = {}
+    if "autoRotate" in value:
+        if not isinstance(value["autoRotate"], bool):
+            raise ValueError("autoRotate must be boolean")
+        scene["autoRotate"] = value["autoRotate"]
+    if "objects" in value:
+        objects = value["objects"]
+        if not isinstance(objects, list) or not 1 <= len(objects) <= 60:
+            raise ValueError("scene objects must contain 1 to 60 primitives")
+        checked_objects = []
+        used_ids: set[str] = set()
+        for obj in objects:
+            required = {"id", "shape", "pos", "scale", "color"}
+            if not isinstance(obj, dict) or not required <= set(obj) or not set(obj) <= required | {"rot", "label"}:
+                raise ValueError("scene primitive has missing or unknown fields")
+            obj_id = _valid_id(obj["id"])
+            if obj_id in used_ids:
+                raise ValueError(f"duplicate scene object id: {obj_id}")
+            used_ids.add(obj_id)
+            shape = _choice(obj["shape"], "3D shape", _THREE_SHAPES)
+            color = obj["color"]
+            if not isinstance(color, str) or _HEX_COLOR.fullmatch(color) is None:
+                raise ValueError("3D color must be #RRGGBB")
+            checked = {
+                "id": obj_id,
+                "shape": shape,
+                "pos": _three_vector(obj["pos"], "pos", limit=100),
+                "scale": _three_vector(obj["scale"], "scale", limit=100, positive=True),
+                "color": color,
+            }
+            if "rot" in obj:
+                checked["rot"] = _three_vector(obj["rot"], "rot", limit=8 * math.pi)
+            if "label" in obj:
+                checked["label"] = _bounded_text(obj["label"], "3D label", 100)
+            checked_objects.append(checked)
+        scene["objects"] = checked_objects
+    if "gltf" in value:
+        url = value["gltf"]
+        if not isinstance(url, str) or not 1 <= len(url) <= 2048 or any(ord(char) < 33 for char in url):
+            raise ValueError("gltf must be an HTTPS URL")
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("gltf must be an HTTPS URL without credentials")
+        _ = parsed.port  # Reject malformed ports before sending the URL to a browser.
+        scene["gltf"] = url
+    return scene
 
 
 class BoardState:
@@ -232,6 +299,9 @@ class BoardState:
             if _UNSAFE_HTML.search(html):
                 raise ValueError("html contains active or external content")
             shape["html"] = html
+        elif name == "add_3d":
+            shape["title"] = _bounded_text(source["title"], "title", 200)
+            shape["scene"] = _three_scene(source["scene"])
         elif name == "sketch":
             shape["color"] = _choice(source["color"], "color", _SKETCH_COLORS)
             strokes = source["strokes"]

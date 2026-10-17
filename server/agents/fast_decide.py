@@ -44,7 +44,7 @@ TURN_QUESTIONS: dict[str, dict[str, Any]] = {
         "small_talk": "Social talk with no project information",
         "none": "No actionable content",
     }},
-    "topic_changed": {"type": "noul", "instructions": "Did the latest human sentence switch away from the current topic title?"},
+    "topic_changed": {"type": "noul", "instructions": "Did the latest human sentence introduce a different substantive work topic from the current topic? Greetings, small talk, acknowledgments, and questions about the same work topic are not topic changes. A clear switch such as 'different topic: billing' is a topic change."},
     "wants_visual": {"type": "choice", "instructions": "Which visual, if any, best fits the latest sentence?", "criteria": {
         "none": "No drawing needed",
         "architecture": "Components and connections",
@@ -53,6 +53,7 @@ TURN_QUESTIONS: dict[str, dict[str, Any]] = {
         "mockup": "A screen or interface design",
         "table": "A comparison",
         "code": "A specific function or code snippet",
+        "3d": "A physical object, robot, device, rack or room layout, or an explicit 3D view",
     }},
     "is_echo": {"type": "noul", "instructions": "Is the latest human sentence just Twin's recent speech picked up by the microphone?"},
 }
