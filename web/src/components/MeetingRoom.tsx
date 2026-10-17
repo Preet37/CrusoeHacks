@@ -339,7 +339,13 @@ export default function MeetingRoom({
           {toast && <div className="toast glass">{toast}</div>}
           {m.contribution && takeHidden !== m.contribution.id && (
             <div className={`take-float ${presenting ? 'on-stage' : ''}`}>
-              <TwinTake c={m.contribution} repoUrl={repoUrl} onClose={() => setTakeHidden(m.contribution!.id)} />
+              <TwinTake
+                key={m.contribution.id}
+                c={m.contribution}
+                repoUrl={repoUrl}
+                startCollapsed={presenting}
+                onClose={() => setTakeHidden(m.contribution!.id)}
+              />
             </div>
           )}
           {specOpen && (

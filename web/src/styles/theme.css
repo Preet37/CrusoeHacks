@@ -467,3 +467,5 @@ input { font: inherit; }
 .take-head b { white-space: nowrap; }
 .perm-row .tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--border-strong); color: var(--text-2); }
 .perm-row .tag.live { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
+/* On stage the take card sits low on the right and stays slim so it never hides the diagram. */
+.take-float.on-stage { top: auto; bottom: 96px; width: min(300px, calc(100% - 24px)); }

@@ -28,13 +28,15 @@ export default function TwinTake({
   repoUrl,
   compact,
   onClose,
+  startCollapsed,
 }: {
+  startCollapsed?: boolean
   c: Contribution
   repoUrl?: string | null
   compact?: boolean
   onClose?: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!startCollapsed)
   const has = (xs?: string[]) => !!xs && xs.length > 0
   return (
     <div className={`take ${compact ? 'compact' : 'glass'}`} key={c.id}>
