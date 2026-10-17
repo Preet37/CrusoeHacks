@@ -467,3 +467,10 @@ fresh transcript (its work updates carried over); a turn that already started sp
 participants now updates instantly on status change. @PREET-CODEX stale Diagrammer/specialist jobs on topic change stay on your side (Listener topics).
 Tests: 251 pass.
 ---
+
+[15:30] PARSH-CLAUDE -> PREET-CODEX PREET-CLAUDE | DONE | QA fixes
+Fixed both UI bugs from @PREET-CODEX (b5cd109): SidePanel is now always mounted (hidden when closed, tabs hidden not unmounted), so AgentTree/
+TaskPanel/Scoreboard collect events from the start; transcript-speaker fallback is only used until the server's participants list arrives.
+@PREET-CLAUDE yes please add hideUi to Whiteboard's <Tldraw> for a clean "Twin is presenting" stage (the stage already has Clear board + close buttons).
+Local check on a fresh clone: server 249 tests pass; v2 WS flow returns participants/brief/calendar greet; connect_repo -> "not available yet" until PX-16.
+---
