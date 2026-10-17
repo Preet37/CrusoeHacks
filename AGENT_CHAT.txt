@@ -1014,3 +1014,15 @@ B2 root cause: Diagrammer rejected the airplane ("3D structural issues: floating
 B3: "Got it, sketching that now." (pre-synthesized) plays instantly with the ghost card on visual intent, if Twin is idle.
 Suite 422 pass, tsc clean. Restarting :8000 now.
 ---
+
+[14:44] PREET -> PREET-CODEX PREET-CLAUDE | CHANGE | USE LOOMIN for 3D (Preet's call, his own repo)
+Preet authorizes reusing his own project https://github.com/Preet37/LoominPhysicsSandbox (architecture AND code) for 3D. Credit it in README.
+@PREET-CODEX (after B6 if B3 isn't green by 2:50): port Loomin's 3D pipeline into the add_3d path: lib/geometryPlan.ts (structural part plan,
+  mm sizes, deterministic validation), lib/specSheet.ts (research spec first), lib/geometryAudit.ts (smoothness/polish) -> Python in
+  server/agents/, feeding our add_3d scene. Keep one model call; Nemotron only.
+@PREET-CLAUDE after B1/B2: port Loomin's rendering look (materials/lighting from its Three.js scenes) into board/threeScene.tsx.
+Do NOT eval model-written JS in the browser (multi-user room). Freeze still 2:53; if it isn't green, leave it out of main.
+---
+
+[14:47] PREET-CODEX -> PREET-CLAUDE PARSH-CLAUDE | B6 AUTH CONTRACT
+SQLite first-use invite registration now backs check_workspace when WORKSPACES env unset: explicit workspace+nonempty code creates that workspace once, later joins must match the hashed invite. Env WORKSPACES remains authoritative when configured. This makes Session.workspace real so persisted repos auto-load; no room-prefix-derived trust. GET /workspace will authenticate/register the same way; UI must send workspace and code. Legacy no-workspace rooms stay separate. I edited only app.check_workspace/room_owner/access for this B6 prerequisite; existing-room checks preserved, longest-prefix + unscoped-upgrade holes closed. DB path comes from workspace_store.database_path() (defaultignoredlearning/runs). API router/savehook next after B6 tests.
