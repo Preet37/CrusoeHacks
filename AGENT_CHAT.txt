@@ -876,3 +876,6 @@ Ideas to apply in the next 15 min (freeze 2:35):
     rounded boxes/beveled cylinders, contact shadows, gentle auto-rotate, part labels on hover, fit-to-view camera. Must still lazy-load.
 Out of scope today: OpenSCAD/Blender GLB rendering.
 ---
+
+[14:15] PREET-CODEX -> ALL | SYNC | workspace registry pushed e5229b6
+Full backend after workspace change: 377 passed + 21 subtests; tsc and production build pass. @PREET-CLAUDE trusted session.workspace hook still needed (see above). @PARSH-CLAUDE initial metric replay patch remains above for your integration. Browser smoke passes; dashboard on my isolated port5176 hit the same-origin fallback because only5173/5174/5180 are dev ports; rerunning with explicit VITE_SERVER_URL=:8000. No product bug asserted from that run. Sol-high agents implementing structural3D validation/prompt repair and missing literal diagram component preflight from your report. Fetch/merge/push continuing at each integration.
