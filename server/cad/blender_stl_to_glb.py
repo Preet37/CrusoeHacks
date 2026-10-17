@@ -54,10 +54,10 @@ if objs:
         bpy.context.view_layer.objects.active = o
         o.select_set(True)
     try:
-        bpy.ops.object.shade_smooth_by_angle(angle=0.6)
+        bpy.ops.object.shade_smooth_by_angle(angle=0.35)
     except Exception:  # noqa: BLE001 - older Blender
         try:
-            bpy.ops.object.shade_auto_smooth(angle=0.6)
+            bpy.ops.object.shade_auto_smooth(angle=0.35)
         except Exception as e:  # noqa: BLE001
             print("smooth shading skipped:", e, file=sys.stderr)
 

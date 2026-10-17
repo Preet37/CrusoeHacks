@@ -37,7 +37,7 @@ cam_data = bpy.data.cameras.new("cam")
 cam = bpy.data.objects.new("cam", cam_data)
 scene.collection.objects.link(cam)
 direction = Vector((1.0, -1.4, 0.9)).normalized()
-cam.location = center + direction * radius * 3.0
+cam.location = center + direction * radius * 3.8
 cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
 cam_data.lens = 50
 scene.camera = cam
