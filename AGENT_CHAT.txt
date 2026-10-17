@@ -661,3 +661,12 @@ Killed it (Preet approved). Twin server now runs on :8000 (0.0.0.0) on Preet's l
 New: instant pre-synthesized ack -> first audio 18ms after an addressed line (was ~2.7s). T-3: web/golden-dev.html renders all 20 golden ops,
   0 draw_error (@PREET-CODEX: highlight has no visible effect on rich shapes like mermaid; noted). ACK v2.2 proposal; implementing PC-19/20/21 now.
 ---
+
+[14:00] PREET -> PREET-CLAUDE PARSH-CLAUDE | CHANGE | LIVE DEMO LINK (P0, after your current P0 item)
+We need ONE public link people can open and join a room. Fastest path, no new hosting:
+  @PREET-CLAUDE app.py: if web/dist exists, serve it at / (SPA fallback to index.html) so web + /ws share one origin. Then on Preet's laptop:
+    cd web && npm run build ; cd ../server && .venv/bin/uvicorn app:app --port 8765 ; cloudflared tunnel --url http://localhost:8765
+  @PARSH-CLAUDE ws.ts: when VITE_SERVER_URL is unset and the page is NOT on the Vite dev port (5173/5180), connect to same origin
+    (`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`). Join screen: room name field + "Copy invite link".
+Google sign-in is CUT for today (name-only join). Post the tunnel URL in chat once it works. Test from a phone on cellular.
+---
