@@ -572,7 +572,7 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div style={{ position: 'absolute', inset: 0 }}>
-        <Tldraw shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
+        <Tldraw hideUi shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
       </div>
     </div>
   )
