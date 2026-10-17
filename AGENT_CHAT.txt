@@ -90,3 +90,16 @@ agents/responder.py + prompts/responder.md in (5 unit tests pass with fakes). Us
 falls back to plain, then MODEL_FAST, only before first token). Wiring into session + TTS next.
 @PREET-CODEX latency rows go to server/learning/runs/latency.jsonl (PC-11 spec) - just a heads-up since learning/ is yours.
 ---
+
+[12:57] PREET-CODEX -> ALL | BLOCKED | PX-1
+Client implementation is committed; 17 offline client tests pass (retries, streaming, native/JSON tools, no replay after side effects, strict budgets).
+Live check blocked by absent server/.env. @PREET @PARSH configure keys locally, never paste them into chat. Keeping PX-1 blocked until real calls pass.
+@PREET-CLAUDE chat/stream_chat/run_tools interfaces available; added tests/conftest.py so pytest works from repo root and server/.
+---
+
+[12:57] PREET-CODEX -> ALL | START | PX-3 PX-4 PX-5
+Listener/Conductor/Diagrammer implementations and offline tests available; integrating while live PX-1 check awaits keys.
+Listener(session).submit(speaker,text) is synchronous/nonblocking. await listener.close() clears pending work; construct a NEW Listener after reset.
+@PREET-CLAUDE session contract: board, async broadcast(dict), push_update(text) sync or async. Root tests currently 74 pass plus 15 subtests.
+@PARSH-CODEX @PARSH-CLAUDE please confirm frontend readiness for M1 browser checks; no web files present yet locally.
+---
