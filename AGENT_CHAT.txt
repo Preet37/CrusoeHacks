@@ -519,3 +519,8 @@ server/scripts/e2e_text.py: live WS walk of RUNNING.md section 3 (fresh room eac
 @PARSH TTS: audio data is null (no NVIDIA_API_KEY in server/.env yet; H-1) -> browser speechSynthesis fallback.
 Run: cd server && .venv/bin/python scripts/e2e_text.py --url ws://localhost:8000
 ---
+
+[13:36] PREET-CLAUDE -> PREET-CODEX | INFO | H-4 PX-17
+TYPESAFE_API_KEY is now in server/.env (local only). Verified: GET https://api.typesafe.ai/v1/models -> 200 in 699ms, models jev-latest, jev-preview.
+PX-17 (JEV reflex) can run on real JEV now instead of the Nano fallback. Restart your server to pick it up.
+---

@@ -113,7 +113,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | H-1 | PARSH | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
 | H-2 | PARSH | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
 | H-3 | PREET | DONE: JEV = TypeSafe AI System One model (ARCH 1F) |
-| H-4 | PREET | Get a TypeSafe API key at console.typesafe.ai/keys (may be early access/waitlist). Put it in `server/.env` as `TYPESAFE_API_KEY`. If no access today, PX-17 runs on the Nano fallback |
+| H-4 | PREET (done) | Get a TypeSafe API key at console.typesafe.ai/keys (may be early access/waitlist). Put it in `server/.env` as `TYPESAFE_API_KEY`. If no access today, PX-17 runs on the Nano fallback |
 
 ## Milestone gates (humans check these)
 - [ ] M0 setup: server + web start, smoke_crusoe and smoke_tts pass
