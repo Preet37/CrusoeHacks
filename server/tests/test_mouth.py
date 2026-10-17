@@ -128,3 +128,53 @@ async def test_mind_gets_one_decision_in_order_and_fails_open(monkeypatch):
     assert submitted[0][1]["kind"]["choice"] == "system_fact"
     assert submitted[1][1] is None
     await mouth.detach(s)
+
+
+def test_addressed_without_name_rules():
+    yes = {"addressed": {"noul": 0.9}, "kind": {"choice": "question", "confidence": 0.8}}
+    assert mouth.addressed_without_name(yes, "what do you think about Redis here?")
+    assert not mouth.addressed_without_name(yes, "Twin, what do you think?")  # lexical path handles it
+    assert not mouth.addressed_without_name({"addressed": {"noul": 0.95}, "kind": {"choice": "small_talk", "confidence": 0.9}}, "haha nice weekend")
+    assert not mouth.addressed_without_name({"addressed": {"noul": 0.4}}, "what do you think about Redis here?")
+
+
+@pytest.mark.asyncio
+async def test_unnamed_question_answered_after_pause(monkeypatch):
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: None)
+    monkeypatch.setattr(mouth, "UNNAMED_PAUSE_MS", 50)
+    calls = []
+
+    async def fake_respond(session, reason, *, trigger_ts=None, updates=None):
+        calls.append(reason)
+
+    monkeypatch.setattr(mouth.responder, "respond", fake_respond)
+    s = Session("unnamed")
+    m = mouth.attach(s)
+    line = {"speaker": "Preet", "text": "what do you think about Redis here?", "ts": mouth._now_ms()}
+    s.history.append(line)
+    await m._answer_unnamed(s, line)
+    await asyncio.sleep(0.05)
+    assert calls and "without saying your name" in calls[0]
+    await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_waits_while_human_mid_sentence(monkeypatch):
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: None)
+    monkeypatch.setattr(mouth, "MID_SENTENCE_GAP_MS", 150)
+    started = []
+
+    async def fake_respond(session, reason, *, trigger_ts=None, updates=None):
+        started.append(mouth._now_ms())
+
+    monkeypatch.setattr(mouth.responder, "respond", fake_respond)
+    s = Session("mid")
+    m = mouth.attach(s)
+    t0 = mouth._now_ms()
+    s.last_human_speech_ts = t0 + 100  # an interim arrived after the triggering final
+    m.speak("name", trigger_ts=t0, updates=[])
+    await asyncio.sleep(0.05)
+    assert not started  # still waiting for the human to finish
+    await asyncio.sleep(0.4)
+    assert started
+    await mouth.detach(s)

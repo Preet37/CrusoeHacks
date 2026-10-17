@@ -58,6 +58,21 @@ export interface ConnectRepo {
   url: string
 }
 
+/** v2.2: one JPEG frame of a shared screen (browser -> server -> other browsers). */
+export interface ScreenFrame {
+  type: 'screen_frame'
+  user?: string
+  jpeg: string // base64
+  w?: number
+  h?: number
+  ts?: number
+}
+/** v2.2: sharer stopped sharing. */
+export interface ScreenStop {
+  type: 'screen_stop'
+  user?: string
+}
+
 export type ClientMessage =
   | Hello
   | UserText
@@ -67,6 +82,9 @@ export type ClientMessage =
   | DrawError
   | CalendarJoin
   | ConnectRepo
+  | Draw
+  | ScreenFrame
+  | ScreenStop
 
 // ---------------------------------------------------------------- server -> browser
 
@@ -305,7 +323,8 @@ export type DrawOp =
   | Add3dOp
   | SketchOp
   | UpdateOp
-export type Draw = { type: 'draw' } & DrawOp
+/** v2.2: `by` is who drew it ("Twin" or a human name); humans send the same ops. */
+export type Draw = { type: 'draw'; by?: string } & DrawOp
 
 export interface Box {
   id: string
@@ -409,6 +428,8 @@ export type ServerMessage =
   | Task
   | Metric
   | ErrorMsg
+  | ScreenFrame
+  | ScreenStop
 
 export type ServerMessageType = ServerMessage['type']
 export type ServerMessageOf<T extends ServerMessageType> = Extract<ServerMessage, { type: T }>
@@ -416,6 +437,7 @@ export type ServerMessageOf<T extends ServerMessageType> = Extract<ServerMessage
 const SERVER_TYPES: ReadonlySet<string> = new Set<ServerMessageType>([
   'status', 'transcript', 'audio', 'stop_audio', 'draw', 'board_snapshot',
   'agent_event', 'task', 'metric', 'error', 'topic', 'participants', 'brief',
+  'screen_frame', 'screen_stop',
 ])
 
 /** Parse one wire frame. Returns null for anything that isn't a known server message. */

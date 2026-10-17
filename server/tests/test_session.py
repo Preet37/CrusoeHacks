@@ -10,6 +10,13 @@ from app import app
 from session import Session, get_session
 
 
+@pytest.fixture(autouse=True)
+def _no_metrics_feed(monkeypatch, tmp_path):
+    """Coach metrics (M3) are sent on join when the file exists; keep these sequences exact."""
+    import app as _app
+    monkeypatch.setattr(_app, "METRICS_FILE", tmp_path / "none.json")
+
+
 def _room() -> str:
     return f"t_{uuid.uuid4().hex[:8]}"
 

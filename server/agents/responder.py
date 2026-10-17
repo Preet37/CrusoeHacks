@@ -28,7 +28,7 @@ _think_flag_ok: bool | None = None
 
 # Instant acknowledgment (ARCH 1E.5 rule 5): pre-synthesized at startup, played the
 # moment Twin is addressed so the call never sits in silence while TTS works.
-ACKS = ["Yeah, one sec.", "Mm-hm, good question.", "Sure, let me check."]
+ACKS = ["Yeah, one sec.", "Mm-hm, let me think.", "Sure, let me check."]
 ACK_REASONS = {"name", "push_to_talk"}
 _ack_i = 0
 

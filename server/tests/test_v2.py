@@ -14,6 +14,13 @@ from app import app
 from session import TWIN_SPEAKER, Session, get_session, is_echo
 
 
+@pytest.fixture(autouse=True)
+def _no_metrics_feed(monkeypatch, tmp_path):
+    """Coach metrics (M3) are sent on join when the file exists; keep these sequences exact."""
+    import app as _app
+    monkeypatch.setattr(_app, "METRICS_FILE", tmp_path / "none.json")
+
+
 class FakeWS:
     def __init__(self):
         self.sent = []

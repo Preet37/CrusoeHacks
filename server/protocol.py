@@ -168,6 +168,8 @@ class Draw(Msg):
     strokes: Optional[list[Any]] = None
     # v2.1: add_3d scene {"autoRotate"?, "objects"?: [...], "gltf"?: url}
     scene: Optional[dict[str, Any]] = None
+    # v2.2: who drew it ("Twin" or a human name). Browsers may send it; server overwrites.
+    by: Optional[str] = None
 
 
 class Box(BaseModel):
@@ -262,6 +264,29 @@ class Brief(Msg):
     ts: Optional[int] = None
 
 
+# ---------------------------------------------------------------- v2.2 screen share (both directions)
+
+class ScreenFrame(Msg):
+    """v2.2: one JPEG frame of a shared screen. Browser -> server -> other browsers."""
+    type: Literal["screen_frame"] = "screen_frame"
+    user: Optional[str] = None
+    jpeg: str
+    w: Optional[int] = None
+    h: Optional[int] = None
+    ts: Optional[int] = None
+
+
+class ScreenStop(Msg):
+    """v2.2: sharer stopped sharing."""
+    type: Literal["screen_stop"] = "screen_stop"
+    user: Optional[str] = None
+
+
+# v2.2 messages are parsed, but kept out of ALL_MESSAGES until PROTOCOL.md's
+# `json-proposed` fences are flipped to `json` (test_protocol checks the two match).
+V22_MESSAGES = (ScreenFrame, ScreenStop)
+
+
 # ---------------------------------------------------------------- parse / dump / send
 
 ALL_MESSAGES = (
@@ -275,6 +300,7 @@ AnyMessage = Annotated[
         Hello, UserText, BargeIn, PushToTalk, Control, DrawError, CalendarJoin, ConnectRepo,
         Status, Transcript, Audio, StopAudio, Draw, BoardSnapshot, AgentEvent, Task, Metric, Error,
         Topic, Participants, Brief,
+        ScreenFrame, ScreenStop,
     ],
     Field(discriminator="type"),
 ]

@@ -34,6 +34,7 @@ log = logging.getLogger("twin.session")
 SPEAKING_WINDOW_MS = 1500          # human counts as speaking this long after a user_text
 ECHO_KEEP = 6                      # last ~3 Twin sentences + whole turns, for the echo guard
 ECHO_RATIO = 0.75
+SCREEN_MAX_B64 = 300_000           # v2.2: cap on one screen_frame's base64 JPEG
 DEMO_CALENDAR = Path(__file__).resolve().parent / "demo_calendar.json"
 GENERIC_PREDICTIONS = [
     "Status updates on current work",
@@ -188,6 +189,8 @@ class Session:
 
         # v2 hooks (set by the mind / PREET-CODEX agents)
         self._draw_error_hooks: list[DrawErrorHook] = []
+        # sync cb(data) for every broadcast dict (PC-20: mouth removes the ghost card on the first real draw)
+        self._broadcast_observers: list[Callable[[dict], Any]] = []
         # async brief_provider(session, meeting) -> list[str]
         self.brief_provider: Callable[["Session", str], Awaitable[list[str]]] | None = None
         # async repo_connector(session, url) -> Any
@@ -201,6 +204,8 @@ class Session:
         self.active_topic: dict | None = None       # {"topic_id", "title"}
         self._last_topic_sent: str | None = None
         self.brief: dict | None = None
+        # v2.2: latest shared-screen frame (wire dict) for late joiners and Twin's vision
+        self.screen: dict | None = None
 
     # ------------------------------------------------------------ say ids / updates
 
@@ -296,9 +301,21 @@ class Session:
         data = protocol.dump(msg)
         if isinstance(data, dict) and data.get("type") == "topic" and data.get("topic_id"):
             self._last_topic_sent = data["topic_id"]  # dedupes set_topic vs direct broadcasts
+        for cb in list(getattr(self, "_broadcast_observers", ())):
+            try:
+                cb(data)
+            except Exception:  # noqa: BLE001 - an observer must never break a broadcast
+                log.exception("broadcast observer failed")
         if not self.sockets:
             return
         await asyncio.gather(*(self.send_to(ws, data) for ws in list(self.sockets)))
+
+    async def broadcast_except(self, sender, msg) -> None:
+        """v2.2: send to every socket in the room except `sender`."""
+        data = protocol.dump(msg)
+        targets = [ws for ws in list(self.sockets) if ws is not sender]
+        if targets:
+            await asyncio.gather(*(self.send_to(ws, data) for ws in targets))
 
     async def set_status(self, state: str) -> None:
         if state == self.status:
@@ -333,6 +350,40 @@ class Session:
         if msg.op == "clear":
             await self.broadcast(self.snapshot_message())
         return True
+
+    async def apply_human_draw(self, ws, user: str, msg) -> bool:
+        """v2.2: a browser drew something. Validate + apply to the board, relay to everyone
+        except the sender (who already has it locally). `by` is forced to the socket's user.
+        On rejection the sender gets a recoverable error."""
+        op = {k: v for k, v in protocol.dump(msg).items() if k not in ("type", "by")}
+        try:
+            result = self.board.apply(op)
+            out = Draw.model_validate(result if isinstance(result, dict) else op)
+        except ValueError as e:
+            log.info("[%s] rejected human draw from %s %s: %s", self.room, user, op, e)
+            await self.send_to(ws, Error(message=f"draw rejected: {e}"[:500], recoverable=True))
+            return False
+        out.by = user or "guest"
+        await self.broadcast_except(ws, out)
+        if out.op == "clear":
+            await self.broadcast(self.snapshot_message())
+        return True
+
+    async def screen_frame(self, ws, user: str, msg) -> None:
+        """v2.2: keep the latest frame per room and relay it to the other sockets."""
+        if len(msg.jpeg or "") > SCREEN_MAX_B64:
+            await self.send_to(ws, Error(message=f"screen_frame too large (max {SCREEN_MAX_B64} base64 chars)",
+                                         recoverable=True))
+            return
+        data = protocol.dump(msg)
+        data["user"] = user or data.get("user") or "guest"
+        data.setdefault("ts", now_ms())
+        self.screen = data
+        await self.broadcast_except(ws, data)
+
+    async def screen_stop(self, ws, user: str) -> None:
+        self.screen = None
+        await self.broadcast_except(ws, {"type": "screen_stop", "user": user or "guest"})
 
     # ------------------------------------------------------------ hooks
 
@@ -422,6 +473,8 @@ class Session:
         topic = self.topic_message()
         if topic is not None:
             await self.send_to(ws, topic)
+        if self.screen is not None:
+            await self.send_to(ws, self.screen)
 
     # ------------------------------------------------------------ draw_error / calendar / repo (PC-17)
 
@@ -559,6 +612,12 @@ class Session:
             await self.calendar_join(msg.meeting, msg.scheduled)
         elif t == "connect_repo":
             await self.connect_repo(ws, msg.url)
+        elif t == "draw":  # v2.2: humans draw too
+            await self.apply_human_draw(ws, user, msg)
+        elif t == "screen_frame":
+            await self.screen_frame(ws, user, msg)
+        elif t == "screen_stop":
+            await self.screen_stop(ws, user)
         else:
             await self.send_to(ws, Error(message=f"unexpected message type {t!r}", recoverable=True))
 

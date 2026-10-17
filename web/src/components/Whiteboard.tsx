@@ -7,6 +7,8 @@ import {
   createShapeId,
   toRichText,
   type Editor,
+  type TLRecord,
+  type TLShape,
   type TLAnyShapeUtilConstructor,
   type TLShapeId,
   type TLShapePartial,
@@ -14,6 +16,7 @@ import {
 import 'tldraw/tldraw.css'
 import type { BoxKind } from '../lib/protocol'
 import type { AnyServerMessage, TwinClient } from '../lib/ws'
+import Board3D from './Board3D'
 
 // Same shape as RichCtx in ./board/types.ts (kept local so a missing board/ never breaks the build).
 export interface RichCtx {
@@ -48,6 +51,17 @@ const APPEAR_MS = 260
 const OP_GAP_MS = 120
 const FIT_DEBOUNCE_MS = 300
 const USER_IDLE_MS = 5000
+/** v2.2: debounce for human edits (create settles, label typing) before sending ops. */
+const HUMAN_DEBOUNCE_MS = 500
+const HUMAN_TYPES = new Set(['geo', 'note', 'text', 'arrow'])
+const STICKY_COLORS = new Set(['yellow', 'blue', 'green', 'pink', 'orange'])
+
+/** Plain text of a tldraw richText doc. */
+function plainText(n: unknown): string {
+  if (!n || typeof n !== 'object') return ''
+  const o = n as { text?: string; content?: unknown[] }
+  return (o.text ?? '') + (o.content ?? []).map(plainText).join(' ')
+}
 
 interface KindStyle {
   geo: string
@@ -102,15 +116,29 @@ class BoardController {
   private send: (m: { type: string; [k: string]: unknown }) => void
   private onContent: (has: boolean) => void
   private disposed = false
+  // v2.2 human drawing
+  private user: string
+  private humanSeq = 0
+  /** protocol id -> last label we know the server has (so remote renames don't echo). */
+  private labels = new Map<string, string>()
+  /** User-made shapes not yet sent to the server. */
+  private humanShapes = new Set<TLShapeId>()
+  private createTimers = new Map<TLShapeId, number>()
+  private renameTimers = new Map<string, number>()
+  private richInFlight = 0
+  private offStore: () => void
 
   constructor(
     editor: Editor,
     send: (m: { type: string; [k: string]: unknown }) => void,
     onContent: (has: boolean) => void,
+    user = 'guest',
   ) {
     this.editor = editor
     this.send = send
     this.onContent = onContent
+    this.user = user
+    this.offStore = editor.store.listen((entry) => this.onUserChanges(entry.changes), { source: 'user', scope: 'document' })
     const onEvent = (info: { type: string; name: string }) => {
       if (info.type === 'wheel' || info.type === 'pinch' || (info.type === 'pointer' && info.name === 'pointer_down'))
         this.lastUserInput = Date.now()
@@ -241,11 +269,15 @@ class BoardController {
       console.info('[whiteboard] no board/ module yet, skipping op', op.op)
       return
     }
+    this.richInFlight++
     try {
       const handled = await renderRichOp(this.editor, op, this.ctx())
       if (!handled) console.info('[whiteboard] unhandled op', op.op)
     } catch (e) {
       this.send({ type: 'draw_error', id: String(op.id ?? ''), op: op.op, error: String(e).slice(0, 300) })
+    } finally {
+      // store listeners flush on the next frame; keep ignoring unknown creates until then
+      window.setTimeout(() => this.richInFlight--, 150)
     }
   }
 
@@ -255,8 +287,10 @@ class BoardController {
     const ed = this.editor
     const id = String(op.id)
     const kind = (typeof op.kind === "string" && op.kind in KIND_STYLE ? op.kind : "service") as BoxKind
-    const style = KIND_STYLE[kind]
+    const byHuman = typeof op.by === 'string' && op.by !== 'Twin'
+    const style = byHuman ? { ...KIND_STYLE[kind], color: 'orange' } : KIND_STYLE[kind]
     const label = String(op.label ?? id)
+    this.labels.set(id, label)
     const frame = typeof op.frame === 'string' ? op.frame : undefined
     const p = this.gridToPage(num(op.x, 500), num(op.y, 500), frame)
     const props = {
@@ -343,6 +377,7 @@ class BoardController {
 
   private rename(id: string, label: string) {
     const ed = this.editor
+    this.labels.set(id, label)
     const fr = this.frames.get(id)
     if (fr) return void ed.updateShape({ id: fr.shapeId, type: 'frame', props: { name: label } } as TLShapePartial)
     const sid = this.ids.get(id)
@@ -461,8 +496,168 @@ class BoardController {
     this.edges.clear()
     this.frames.clear()
     this.ids.clear()
+    this.labels.clear()
+    this.humanShapes.clear()
     this.activeFrame = undefined
     this.focusTarget = undefined
+  }
+
+  // ------------------------------------------------------------- v2.2: human edits -> draw ops
+
+  private protoIdOf(shapeId: TLShapeId): string | undefined {
+    for (const [id, sid] of this.ids) if (sid === shapeId) return id
+    return undefined
+  }
+
+  private newHumanId() {
+    const slug = this.user.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 16) || 'guest'
+    return `h_${slug}_${Date.now().toString(36)}${++this.humanSeq}`
+  }
+
+  /** Inverse of gridToPage: page point -> 0..1000 grid, inside a frame when it lands in one. */
+  private pageToGrid(px: number, py: number): { x: number; y: number; frame?: string } {
+    const r = (v: number) => Math.round(clampGrid(v))
+    const inside = (f: FrameRec) => px >= f.x && px <= f.x + f.w && py >= f.y && py <= f.y + f.h
+    let frameId: string | undefined
+    const active = this.activeFrame ? this.frames.get(this.activeFrame) : undefined
+    if (active && inside(active)) frameId = this.activeFrame
+    else for (const [fid, f] of this.frames) if (inside(f)) (frameId = fid)
+    // gridToPage() without a frame uses the active frame, so stay in it (clamped) when outside every frame.
+    frameId = frameId ?? (active ? this.activeFrame : undefined)
+    const f = frameId ? this.frames.get(frameId) : undefined
+    if (f && frameId) return { x: r(((px - f.x) / f.w) * 1000), y: r(((py - f.y) / f.h) * 1000), frame: frameId }
+    return { x: r((px / PAGE_W) * 1000), y: r((py / PAGE_H) * 1000) }
+  }
+
+  private sendHuman(op: Op) {
+    this.send({ type: 'draw', ...op, by: this.user })
+  }
+
+  private onUserChanges(changes: {
+    added: Record<string, TLRecord>
+    updated: Record<string, [TLRecord, TLRecord]>
+    removed: Record<string, TLRecord>
+  }) {
+    if (this.disposed) return
+    for (const rec of Object.values(changes.added)) {
+      if (rec.typeName !== 'shape') continue
+      const shape = rec as TLShape
+      if (!HUMAN_TYPES.has(shape.type) || this.protoIdOf(shape.id) || this.richInFlight > 0) continue
+      this.humanShapes.add(shape.id)
+      this.scheduleCreate(shape.id)
+    }
+    for (const [from, to] of Object.values(changes.updated)) {
+      if (to.typeName !== 'shape') continue
+      const shape = to as TLShape
+      if (this.humanShapes.has(shape.id)) {
+        this.scheduleCreate(shape.id)
+        continue
+      }
+      const before = (from as TLShape).props as { richText?: unknown }
+      const after = shape.props as { richText?: unknown }
+      if (shape.type === 'arrow' || !('richText' in after)) continue
+      if (JSON.stringify(before.richText) === JSON.stringify(after.richText)) continue
+      const id = this.protoIdOf(shape.id)
+      if (id) this.scheduleRename(id, shape.id)
+    }
+    for (const rec of Object.values(changes.removed)) {
+      if (rec.typeName !== 'shape') continue
+      const sid = rec.id as TLShapeId
+      if (this.humanShapes.delete(sid)) {
+        window.clearTimeout(this.createTimers.get(sid))
+        this.createTimers.delete(sid)
+        continue
+      }
+      const id = this.protoIdOf(sid)
+      if (!id) continue
+      this.sendHuman({ op: 'remove', id })
+      this.forget(id)
+    }
+  }
+
+  /** Drop a protocol id (and its incident edges) from the maps without touching the canvas. */
+  private forget(id: string) {
+    if (this.boxes.has(id)) {
+      for (const [eid, e] of this.edges) {
+        if (e.from === id || e.to === id) {
+          this.edges.delete(eid)
+          this.ids.delete(eid)
+        }
+      }
+    }
+    this.boxes.delete(id)
+    this.edges.delete(id)
+    if (this.frames.delete(id) && this.activeFrame === id) this.activeFrame = undefined
+    if (this.focusTarget === id) this.focusTarget = undefined
+    this.ids.delete(id)
+    this.labels.delete(id)
+    window.clearTimeout(this.renameTimers.get(id))
+    this.renameTimers.delete(id)
+  }
+
+  private scheduleCreate(sid: TLShapeId) {
+    window.clearTimeout(this.createTimers.get(sid))
+    this.createTimers.set(sid, window.setTimeout(() => this.fireCreate(sid), HUMAN_DEBOUNCE_MS))
+  }
+
+  private scheduleRename(id: string, sid: TLShapeId) {
+    window.clearTimeout(this.renameTimers.get(id))
+    this.renameTimers.set(
+      id,
+      window.setTimeout(() => {
+        this.renameTimers.delete(id)
+        const shape = this.editor.getShape(sid)
+        if (!shape || this.ids.get(id) !== sid) return
+        if (this.editor.getEditingShapeId() === sid) return this.scheduleRename(id, sid)
+        const label = plainText((shape.props as { richText?: unknown }).richText).trim()
+        if (!label || label === this.labels.get(id)) return
+        this.labels.set(id, label)
+        this.sendHuman({ op: 'rename', id, label })
+      }, HUMAN_DEBOUNCE_MS),
+    )
+  }
+
+  private fireCreate(sid: TLShapeId) {
+    this.createTimers.delete(sid)
+    const ed = this.editor
+    if (this.disposed || !this.humanShapes.has(sid)) return
+    const shape = ed.getShape(sid)
+    if (!shape) return void this.humanShapes.delete(sid)
+    if (ed.getEditingShapeId() === sid) return this.scheduleCreate(sid)
+    const props = shape.props as { richText?: unknown; color?: string }
+    const text = plainText(props.richText).trim()
+    const b = ed.getShapePageBounds(sid)
+    if (!b) return
+    const pos = this.pageToGrid(b.minX, b.minY)
+    const where = { x: pos.x, y: pos.y, ...(pos.frame ? { frame: pos.frame } : {}) }
+    const id = this.newHumanId()
+    if (shape.type === 'geo') {
+      const label = text || 'Box'
+      this.sendHuman({ op: 'add_box', id, label, kind: 'service', ...where })
+      this.boxes.set(id, { shapeId: sid, kind: 'service' })
+      this.labels.set(id, label)
+    } else if (shape.type === 'note' || shape.type === 'text') {
+      if (!text) return // wait until it has text (a later edit reschedules)
+      if (shape.type === 'note') {
+        const color = props.color && STICKY_COLORS.has(props.color) ? props.color : 'yellow'
+        this.sendHuman({ op: 'add_sticky', id, text, color, ...where })
+      } else this.sendHuman({ op: 'add_text', id, text, ...where })
+      this.labels.set(id, text)
+    } else if (shape.type === 'arrow') {
+      const binds = ed.getBindingsFromShape(sid, 'arrow') as { toId: TLShapeId; props: { terminal: string } }[]
+      const end = (t: string) => {
+        const target = binds.find((x) => x.props.terminal === t)?.toId
+        const pid = target ? this.protoIdOf(target) : undefined
+        return pid && this.boxes.has(pid) ? pid : undefined
+      }
+      const from = end('start')
+      const to = end('end')
+      if (!from || !to || from === to) return // not between two known boxes: stays local
+      this.sendHuman({ op: 'connect', id, from_id: from, to_id: to })
+      this.edges.set(id, { shapeId: sid, from, to })
+    } else return
+    this.humanShapes.delete(sid)
+    this.ids.set(id, sid)
   }
 
   // ------------------------------------------------------------- after-change: content flag + fit (RX-4)
@@ -511,6 +706,9 @@ class BoardController {
     this.disposed = true
     window.clearTimeout(this.fitTimer)
     window.clearTimeout(this.drainTimer)
+    for (const t of this.createTimers.values()) window.clearTimeout(t)
+    for (const t of this.renameTimers.values()) window.clearTimeout(t)
+    this.offStore()
     this.offEvent()
   }
 }
@@ -524,8 +722,33 @@ function bind(arrow: TLShapeId, target: TLShapeId, terminal: 'start' | 'end') {
   }
 }
 
+/** Current boxes/edges (for the 3D view to seed from). */
+export function currentArchitecture() {
+  const board = (window as unknown as { twinBoard?: BoardController }).twinBoard
+  const boxes: { id: string; label: string; kind: BoxKind; x: number; highlighted: boolean }[] = []
+  const edges: { id: string; from: string; to: string; highlighted: boolean }[] = []
+  if (!board) return { boxes, edges }
+  const ed = (board as unknown as { editor: Editor }).editor
+  const text = (n: unknown): string => {
+    if (!n || typeof n !== 'object') return ''
+    const o = n as { text?: string; content?: unknown[] }
+    return (o.text ?? '') + (o.content ?? []).map(text).join(' ')
+  }
+  for (const [id, b] of board.boxes) {
+    const sh = ed.getShape(b.shapeId)
+    const props = (sh?.props ?? {}) as { richText?: unknown; color?: string }
+    boxes.push({ id, label: text(props.richText).trim() || id, kind: b.kind, x: sh ? sh.x / 2 : 500, highlighted: props.color === 'red' })
+  }
+  for (const [id, e] of board.edges) {
+    const sh = ed.getShape(e.shapeId)
+    edges.push({ id, from: e.from, to: e.to, highlighted: (sh?.props as { color?: string } | undefined)?.color === 'red' })
+  }
+  return { boxes, edges }
+}
+
 export default function Whiteboard({ client, onHasContent }: { client: TwinClient; onHasContent?: (has: boolean) => void }) {
   const [editor, setEditor] = useState<Editor | null>(null)
+  const [view3d, setView3d] = useState(() => new URLSearchParams(location.search).get('view') === '3d')
   const onContentRef = useRef(onHasContent)
   useEffect(() => {
     onContentRef.current = onHasContent
@@ -552,7 +775,7 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
 
   useEffect(() => {
     if (!editor) return
-    const board = new BoardController(editor, (m) => client.send(m), (has) => onContentRef.current?.(has))
+    const board = new BoardController(editor, (m) => client.send(m), (has) => onContentRef.current?.(has), client.user)
     boardRef.current = board
     const pending = pendingRef.current.splice(0)
     // Only the latest snapshot matters; replay draws that came after it.
@@ -571,9 +794,26 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div style={{ position: 'absolute', inset: 0 }}>
+      <div style={{ position: 'absolute', inset: 0, visibility: view3d ? 'hidden' : 'visible' }}>
         <Tldraw hideUi shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
       </div>
+      {view3d && <Board3D client={client} onClose={() => setView3d(false)} />}
+      <button
+        data-testid="board-3d-toggle"
+        onClick={() => setView3d((v) => !v)}
+        title={view3d ? 'Back to 2D board' : '3D view of the architecture'}
+        style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 400, height: 28, padding: '0 14px', borderRadius: 999,
+          border: '1px solid ' + (view3d ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.1)'),
+          background: view3d ? 'rgba(40,41,48,0.6)' : 'rgba(255,255,255,0.7)',
+          color: view3d ? '#f5f5f7' : '#1d1d1f',
+          backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+          font: '600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif', letterSpacing: 0.2, cursor: 'pointer',
+        }}
+      >
+        {view3d ? '2D' : '3D'}
+      </button>
     </div>
   )
 }
