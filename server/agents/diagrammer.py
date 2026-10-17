@@ -29,6 +29,8 @@ _SIMPLE_PROMPT = ("Maintain a component architecture diagram. Return ONLY one JS
                   "Format example only: {\"ops\":[{\"op\":\"add_box\",\"arguments\":{\"id\":\"new_id\",\"label\":\"New component\",\"x\":600,\"y\":300,\"kind\":\"service\"}},"
                   "{\"op\":\"connect\",\"arguments\":{\"id\":\"existing_new\",\"from_id\":\"existing_id\",\"to_id\":\"new_id\"}}]}. "
                   "Web app is kind client; services are service; Redis/Postgres are datastore. "
+                  "Every named component needs its own box: 'web app talks to auth and auth stores in Postgres' "
+                  "needs Web app, Auth, and Postgres boxes plus both connections. "
                   "Use rename/remove for explicit corrections. Existing boxes are global "
                   "across topic frames: never add_box an existing ID, even if its label differs. "
                   "For connect endpoints copy the exact id of an existing box or one added earlier in ops; "
@@ -72,6 +74,27 @@ def _literal_relation(source_lines, moments, boxes, added_ids):
     if not source or not target or source == target or target not in added_ids:
         return None
     return source, target
+
+
+def _missing_literal_components(source_lines, moments, boxes):
+    """Catch dropped named nodes in ordinary component-relationship facts."""
+    text = " ".join(str(item.get("text", "")) for item in (source_lines or moments))
+    if re.search(r"\b(?:remove|replace|instead|no longer|doesn't|don't|stop)\b", text, re.I):
+        return []
+    names = {
+        "web app": (r"\bweb\s+app\b", r"\b(?:web(?:[_ -]?app)?|frontend)\b"),
+        "auth": (r"\bauth(?:entication)?(?:\s+service)?\b", r"\bauth(?:entication)?(?:[_ -]service)?\b"),
+        "Postgres": (r"\bpostgres(?:ql)?\b", r"\b(?:postgres(?:ql)?|pg)\b"),
+        "Redis": (r"\bredis\b", r"\bredis\b"),
+    }
+    missing = []
+    for name, (mentioned, present) in names.items():
+        if re.search(mentioned, text, re.I) and not any(
+            re.search(present, f"{box_id} {box.get('label', '')}", re.I)
+            for box_id, box in boxes.items()
+        ):
+            missing.append(name)
+    return missing
 
 
 def _fast_component_burst(board, moments, source_lines, topic_id, required_visual):
@@ -214,6 +237,10 @@ class Diagrammer:
             raise
         except Exception as exc:
             log.exception("Diagrammer failed")
+            if required_visual == "add_3d":
+                update = session.push_update("I couldn't validate the 3D model, so I didn't add it to the board.")
+                if inspect.isawaitable(update):
+                    await update
             await emit_event(session, "Diagrammer", selected_model, "failed",
                              str(exc)[:160], event_id=event_id, parent_id=parent_id)
             raise
@@ -290,8 +317,14 @@ class Diagrammer:
         relations_needed = _relation_count(moments, source_lines) if simple else 0
         supplemental_ops: list[dict] = []
         fast_preflight = False
+        saw_3d = False
+        # A correction in the latest line supersedes earlier numeric details
+        # (e.g. change a three-joint arm to two joints).
+        latest_request = (source_lines or moments)[-1]
+        request_text = str(latest_request.get("text", ""))
 
         def validate_plan(operations):
+            nonlocal saw_3d
             supplemental_ops.clear()
             # A new fact cannot be completed by an empty response or by topic
             # bookkeeping alone. run_json_ops repairs this before any model
@@ -309,6 +342,11 @@ class Diagrammer:
             staged = copy.deepcopy(board)
             for operation in operations:
                 operation = dict(operation)
+                if operation["op"] == "add_3d" or (operation["op"] == "update" and "scene" in operation):
+                    from board import validate_3d_structure
+                    saw_3d = True
+                    title = (operation.get("title") or staged.shapes.get(operation.get("id"), {}).get("title") or "")
+                    validate_3d_structure(operation["scene"], request_text, title=title)
                 if topic_id and operation["op"] in {"add_box", "connect", "add_sticky", "add_text", "add_mermaid",
                                                       "add_chart", "add_table", "add_code", "add_mock", "add_3d", "sketch"}:
                     operation.setdefault("frame", topic_id)
@@ -319,6 +357,10 @@ class Diagrammer:
                         valid = ", ".join(sorted(staged.boxes)[:40]) or "none"
                         raise ValueError(f"connect endpoint {missing[0]!r} is not a box ID; existing and earlier-added box IDs: {valid}")
                 staged.apply(operation)
+            if simple and relations_needed:
+                missing_boxes = _missing_literal_components(source_lines, moments, staged.boxes)
+                if missing_boxes:
+                    raise ValueError("Missing requested component box(es): " + ", ".join(missing_boxes))
             missing_relations = relations_needed - sum(op["op"] == "connect" for op in operations)
             if missing_relations > 0:
                 added_ids = {op["id"] for op in operations if op["op"] == "add_box"}
@@ -405,6 +447,8 @@ class Diagrammer:
             try:
                 await json_plan(config.MODEL_SMART, messages, DRAW_TOOLS, 1800)
             except ValueError:
+                if required_visual == "add_3d" or saw_3d:
+                    raise  # One JSON repair was tried; do not run unvalidated native calls.
                 # The native loop can repair a malformed plan, but replaying
                 # after any attempted operation could duplicate side effects.
                 if attempts:

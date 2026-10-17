@@ -18,6 +18,20 @@ _TEXT_SIZES = frozenset({"s", "m", "l"})
 _CHART_KINDS = frozenset({"bar", "line", "pie", "scatter"})
 _THREE_SHAPES = frozenset({"box", "cylinder", "sphere", "cone", "torus", "plane"})
 _HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}\Z")
+_PHYSICAL_3D = re.compile(
+    r"\b(?:robot(?:ic)?|arm|rack|device|machine|vehicle|car|truck|drone|"
+    r"chair|table|lamp|engine|motor|pump|mechanism|apparatus|room|building|"
+    r"phone|camera|bicycle|bike|aircraft|airplane|boat|ship|bridge|house|"
+    r"computer|server|fan|door|person|human|animal)\b", re.I,
+)
+_JOINT_COUNT = re.compile(
+    r"\b(?P<count>\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)"
+    r"\s*[- ]\s*joints?\b|\bjoints\s*[:=]\s*"
+    r"(?P<after>\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b", re.I,
+)
+_COUNT_WORDS = {word: number for number, word in enumerate(
+    ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+)}
 _UNSAFE_HTML = re.compile(
     r"<\s*/?\s*(?:script|iframe|object|embed|link|meta|form|base)\b"
     r"|\bon[a-z]+\s*=|\b(?:src|href|action|srcdoc)\s*="
@@ -174,6 +188,92 @@ def _three_scene(value: Any) -> dict[str, Any]:
         _ = parsed.port  # Reject malformed ports before sending the URL to a browser.
         scene["gltf"] = url
     return scene
+
+
+def _three_aabb(obj: Mapping[str, Any]) -> tuple[list[float], list[float]]:
+    """Approximate the rendered primitive's bounds after its XYZ Euler rotation."""
+    shape = obj["shape"]
+    depth = 0.025 if shape == "plane" else (0.12 if shape == "torus" else 0.5)
+    radius = 0.52 if shape == "torus" else 0.5
+    half = [obj["scale"][0] * radius, obj["scale"][1] * radius,
+            obj["scale"][2] * depth]
+    x, y, z = obj.get("rot", (0, 0, 0))
+    cx, sx = math.cos(x), math.sin(x)
+    cy, sy = math.cos(y), math.sin(y)
+    cz, sz = math.cos(z), math.sin(z)
+    # Three.js uses intrinsic XYZ Euler angles; |R| * half gives an AABB.
+    rotation = (
+        (cy * cz, -cy * sz, sy),
+        (cx * sz + sx * sy * cz, cx * cz - sx * sy * sz, -sx * cy),
+        (sx * sz - cx * sy * cz, sx * cz + cx * sy * sz, cx * cy),
+    )
+    extent = [sum(abs(row[i]) * half[i] for i in range(3)) for row in rotation]
+    return [float(v) for v in obj["pos"]], extent
+
+
+def _three_touching(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
+    center_a, half_a = _three_aabb(a)
+    center_b, half_b = _three_aabb(b)
+    # Small rounding gaps are common in model output. Cap tolerance so a
+    # distant part cannot be accepted merely because another part is large.
+    smaller = min(max(half_a), max(half_b))
+    tolerance = min(0.2, 0.06 + 0.1 * smaller)
+    return all(abs(center_a[axis] - center_b[axis]) <=
+               half_a[axis] + half_b[axis] + tolerance for axis in range(3))
+
+
+def validate_3d_structure(scene: Any, request: str, *, title: str = "") -> None:
+    """Reject disconnected or under-specified physical assemblies before draw.
+
+    This quality gate needs the user's request: the wire protocol intentionally
+    permits a single primitive, a primitives showcase, and glTF-only scenes.
+    Raises one actionable ValueError so the Diagrammer can attempt one repair.
+    """
+    if not isinstance(request, str) or not isinstance(title, str):
+        raise ValueError("3D request and title must be strings")
+    checked = _three_scene(scene)
+    objects = checked.get("objects")
+    if not objects:  # An external glTF cannot be inspected by this validator.
+        return
+    context = f"{request} {title}"
+    physical = _PHYSICAL_3D.search(context) is not None
+    requested = _JOINT_COUNT.search(context)
+    if not physical and requested is None:
+        return
+    issues: list[str] = []
+    if physical and len(objects) < 4:
+        issues.append(f"physical object needs at least 4 named parts; got {len(objects)}")
+    if physical and all(obj["shape"] == "sphere" for obj in objects):
+        issues.append("physical object cannot use only spheres; add structural links/base")
+    if requested is not None:
+        raw_count = requested.group("count") or requested.group("after")
+        expected = int(raw_count) if raw_count.isdigit() else _COUNT_WORDS[raw_count.casefold()]
+        actual = sum(re.search(r"\bjoint(?:[_ -]?\d+)?\b",
+                               f"{obj['id']} {obj.get('label', '')}", re.I) is not None
+                     for obj in objects)
+        if actual != expected:
+            issues.append(f"requested {expected} joints; found {actual} joint-named parts")
+    if len(objects) > 1:
+        neighbors = {index: set() for index in range(len(objects))}
+        for left in range(len(objects)):
+            for right in range(left + 1, len(objects)):
+                if _three_touching(objects[left], objects[right]):
+                    neighbors[left].add(right)
+                    neighbors[right].add(left)
+        detached = [objects[index]["id"] for index, connected in neighbors.items() if not connected]
+        if detached:
+            issues.append("floating parts do not touch another part: " + ", ".join(detached[:8]))
+        seen = {0}
+        frontier = [0]
+        while frontier:
+            current = frontier.pop()
+            for neighbor in neighbors[current] - seen:
+                seen.add(neighbor)
+                frontier.append(neighbor)
+        if len(seen) != len(objects) and not detached:
+            issues.append("parts form disconnected groups; connect all parts to one assembly")
+    if issues:
+        raise ValueError("3D structural issues: " + "; ".join(issues))
 
 
 class BoardState:

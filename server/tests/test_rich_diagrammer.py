@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+import board as board_module
 import config
 import llm
 from agents.diagrammer import Diagrammer, StaleBoardError, _literal_relation, repair_draw
@@ -290,6 +291,125 @@ async def test_fast_literal_relation_completes_missing_edge_after_atomic_preflig
     assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'connect']
     edge = next(iter(session.board.edges.values()))
     assert (edge['from_id'], edge['to_id']) == ('auth', 'redis')
+
+
+@pytest.mark.asyncio
+async def test_fast_initial_fact_repairs_missing_web_box_before_any_content_draw(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        assert model == config.MODEL_FAST
+        calls.append(messages)
+        assert not session.board.boxes
+        ops = [
+            {'op': 'add_box', 'id': 'auth', 'label': 'Auth', 'x': 300, 'y': 200, 'kind': 'service'},
+            {'op': 'add_box', 'id': 'postgres', 'label': 'Postgres', 'x': 600, 'y': 200, 'kind': 'datastore'},
+        ]
+        if len(calls) == 1:
+            ops += [
+                {'op': 'connect', 'id': 'a_pg1', 'from_id': 'auth', 'to_id': 'postgres'},
+                {'op': 'connect', 'id': 'a_pg2', 'from_id': 'auth', 'to_id': 'postgres'},
+            ]
+        else:
+            assert 'Missing requested component box(es): web app' in messages[-1]['content']
+            ops.insert(0, {'op': 'add_box', 'id': 'web', 'label': 'Web app',
+                           'x': 50, 'y': 200, 'kind': 'client'})
+            ops += [
+                {'op': 'connect', 'id': 'web_auth', 'from_id': 'web', 'to_id': 'auth'},
+                {'op': 'connect', 'id': 'auth_pg', 'from_id': 'auth', 'to_id': 'postgres'},
+            ]
+        return json.dumps({'ops': ops})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    text = 'So our web app talks to an auth service, and auth stores users in Postgres.'
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': text}],
+                               source_lines=[{'text': text}])
+    assert len(calls) == 2
+    assert set(session.board.boxes) == {'web', 'auth', 'postgres'}
+    assert len(session.board.edges) == 2
+
+
+def _robot_scene(valid=True):
+    def part(id, shape, y, sy, label):
+        return {'id': id, 'shape': shape, 'pos': [0, y, 0],
+                'scale': [0.6, sy, 0.6], 'color': '#4488cc', 'label': label}
+    parts = [part('base', 'cylinder', 0, 0.4, 'Base'),
+             part('link1', 'box', 0.9, 1.6, 'Link 1'),
+             part('joint1', 'sphere', 1.7, 0.4, 'Joint 1'),
+             part('link2', 'box', 2.5, 1.4, 'Link 2'),
+             part('joint2', 'sphere', 3.3, 0.4, 'Joint 2'),
+             part('link3', 'box', 4.1, 1.4, 'Link 3'),
+             part('joint3', 'sphere', 4.9, 0.4, 'Joint 3')]
+    return {'objects': parts if valid else [part('blob', 'sphere', 0, 1, 'Blob')]}
+
+
+@pytest.mark.asyncio
+async def test_invalid_3d_structure_gets_one_repair_before_draw(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        assert model == config.MODEL_SMART
+        calls.append(messages)
+        assert 'arm' not in session.board.shapes
+        if len(calls) == 2:
+            assert '3D structural issues:' in messages[-1]['content']
+        return json.dumps({'ops': [{'op': 'add_3d', 'id': 'arm', 'title': 'Robot arm',
+                                    'x': 100, 'y': 100,
+                                    'scene': _robot_scene(valid=len(calls) == 2)}]})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    text = 'Show me a three-joint robot arm in 3D.'
+    await Diagrammer().handle(session, [{'type': 'task', 'text': text}],
+                               source_lines=[{'text': text}])
+    assert len(calls) == 2
+    assert session.board.shapes['arm']['op'] == 'add_3d'
+    assert len(session.board.shapes['arm']['scene']['objects']) == 7
+
+
+@pytest.mark.asyncio
+async def test_twice_invalid_3d_structure_fails_without_native_or_draw(monkeypatch):
+    session = Session()
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        calls.append(model)
+        return json.dumps({'ops': [{'op': 'add_3d', 'id': 'arm', 'title': 'Robot arm',
+                                    'x': 100, 'y': 100, 'scene': _robot_scene(valid=False)}]})
+
+    async def native(*args, **kwargs):
+        raise AssertionError('invalid 3D plan must not reach native tools')
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    monkeypatch.setattr(llm, 'run_tools', native)
+    text = 'Show me a three-joint robot arm in 3D.'
+    with pytest.raises(ValueError, match='3D structural issues:'):
+        await Diagrammer().handle(session, [{'type': 'task', 'text': text}],
+                                   source_lines=[{'text': text}])
+    assert calls == [config.MODEL_SMART, config.MODEL_SMART]
+    assert 'arm' not in session.board.shapes
+    assert any("didn't add it" in update for update in session.updates)
+
+
+@pytest.mark.asyncio
+async def test_3d_preflight_uses_latest_joint_correction(monkeypatch):
+    seen = []
+
+    def validate(scene, request, *, title=''):
+        seen.append(request)
+
+    async def chat(model, messages, **kwargs):
+        return json.dumps({'ops': [{'op': 'add_3d', 'id': 'arm', 'title': 'Robot arm',
+                                    'x': 100, 'y': 100, 'scene': _robot_scene()}]})
+
+    monkeypatch.setattr(board_module, 'validate_3d_structure', validate)
+    monkeypatch.setattr(llm, 'chat', chat)
+    session = Session()
+    await Diagrammer().handle(session, [{'type': 'task', 'text': 'Make the arm two joints'}],
+                               source_lines=[{'text': 'Show a robot arm with three joints.'},
+                                             {'text': 'Actually, make it two joints.'}])
+    assert seen == ['Actually, make it two joints.']
 
 
 def test_literal_relation_rejects_ambiguous_or_negated_entities():
