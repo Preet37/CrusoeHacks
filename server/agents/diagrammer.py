@@ -25,10 +25,14 @@ _RICH_CUES = re.compile(
 _SIMPLE_PROMPT = ("Maintain a component architecture diagram. Return ONLY one JSON object "
                   "{\"ops\":[...]}, at most 8 ops. Use add_box for each new component and "
                   "connect for EACH stated relationship, including follow-up facts. "
+                  "Every ops entry must be an object, never a string or array. "
+                  "Format example only: {\"ops\":[{\"op\":\"add_box\",\"arguments\":{\"id\":\"new_id\",\"label\":\"New component\",\"x\":600,\"y\":300,\"kind\":\"service\"}},"
+                  "{\"op\":\"connect\",\"arguments\":{\"id\":\"existing_new\",\"from_id\":\"existing_id\",\"to_id\":\"new_id\"}}]}. "
                   "Web app is kind client; services are service; Redis/Postgres are datastore. "
                   "Use rename/remove for explicit corrections. Existing boxes are global "
                   "across topic frames: never add_box an existing ID, even if its label differs. "
-                  "Reuse those IDs; never invent components or relationships. "
+                  "For connect endpoints copy the exact id of an existing box or one added earlier in ops; "
+                  "do not derive an ID from its label. Never invent components or relationships. "
                   "Place boxes on the 0..1000 board grid, connect only existing or earlier-added IDs. "
                   "The server adds the topic frame; omit frame. Do not return an empty batch for a new fact. No prose.")
 
@@ -39,6 +43,35 @@ def _relation_count(moments, source_lines):
         return 0
     return len(re.findall(r"\b(?:talks?\s+to|calls?|uses?|connects?\s+to|"
                           r"stores?\s+.{0,35}?\s+in)\b", text))
+
+
+def _literal_relation(source_lines, moments, boxes, added_ids):
+    """Resolve one stated edge only when both names identify unique exact boxes."""
+    lines = source_lines or moments
+    if len(lines) != 1 or not added_ids:
+        return None
+    text = str(lines[0].get("text", "")).strip()
+    if re.search(r"\b(?:not|never|no longer|doesn't|don't|stop)\b", text, re.I):
+        return None
+    match = re.fullmatch(
+        r"(?:actually\s+)?(?P<source>[A-Za-z][A-Za-z0-9 _-]{0,40}?)\s+"
+        r"(?:also\s+)?(?:uses?|calls?|talks?\s+to|connects?\s+to)\s+"
+        r"(?P<target>[A-Za-z][A-Za-z0-9 _-]{0,40}?)"
+        r"(?:\s+for\s+[A-Za-z0-9 _-]{1,60})?[.!?]?", text, re.I)
+    if not match:
+        return None
+
+    def exact_box(phrase):
+        name = phrase.casefold().strip()
+        matches = [box_id for box_id, box in boxes.items()
+                   if name in {box_id.casefold(), str(box.get("label", "")).casefold().strip()}]
+        return matches[0] if len(matches) == 1 else None
+
+    source = exact_box(match["source"])
+    target = exact_box(match["target"])
+    if not source or not target or source == target or target not in added_ids:
+        return None
+    return source, target
 
 
 def _fast_component_burst(board, moments, source_lines, topic_id, required_visual):
@@ -255,16 +288,17 @@ class Diagrammer:
 
         factual_burst = any(moment.get("type") == "system_fact" for moment in moments)
         relations_needed = _relation_count(moments, source_lines) if simple else 0
+        supplemental_ops: list[dict] = []
+        fast_preflight = False
 
         def validate_plan(operations):
+            supplemental_ops.clear()
             # A new fact cannot be completed by an empty response or by topic
             # bookkeeping alone. run_json_ops repairs this before any model
             # operation is applied to the authoritative board.
             if factual_burst and not any(operation["op"] not in {"frame", "focus"}
                                          for operation in operations):
                 raise ValueError("A system fact needs at least one content draw operation.")
-            if relations_needed and sum(operation["op"] == "connect" for operation in operations) < relations_needed:
-                raise ValueError(f"The latest fact states {relations_needed} connection(s); include each connect operation.")
             if required_visual and not any(
                 operation["op"] == required_visual or
                 (operation["op"] in {"update", "focus"} and
@@ -278,7 +312,29 @@ class Diagrammer:
                 if topic_id and operation["op"] in {"add_box", "connect", "add_sticky", "add_text", "add_mermaid",
                                                       "add_chart", "add_table", "add_code", "add_mock", "add_3d", "sketch"}:
                     operation.setdefault("frame", topic_id)
+                if operation["op"] == "connect":
+                    missing = [operation[key] for key in ("from_id", "to_id")
+                               if operation[key] not in staged.boxes]
+                    if missing:
+                        valid = ", ".join(sorted(staged.boxes)[:40]) or "none"
+                        raise ValueError(f"connect endpoint {missing[0]!r} is not a box ID; existing and earlier-added box IDs: {valid}")
                 staged.apply(operation)
+            missing_relations = relations_needed - sum(op["op"] == "connect" for op in operations)
+            if missing_relations > 0:
+                added_ids = {op["id"] for op in operations if op["op"] == "add_box"}
+                pair = (_literal_relation(source_lines, moments, staged.boxes, added_ids)
+                        if fast_preflight and missing_relations == 1 and len(operations) < MAX_OPS
+                        else None)
+                if pair and not any(edge["from_id"] == pair[0] and edge["to_id"] == pair[1]
+                                    for edge in staged.edges.values()):
+                    edge = {"op": "connect", "id": f"e_{pair[0]}_{pair[1]}",
+                            "from_id": pair[0], "to_id": pair[1]}
+                    if topic_id:
+                        edge["frame"] = topic_id
+                    staged.apply(edge)
+                    supplemental_ops.append(edge)
+                else:
+                    raise ValueError(f"The latest fact states {relations_needed} connection(s); include each connect operation.")
 
         messages = [
             {"role": "system", "content": PROMPT.read_text()},
@@ -310,9 +366,13 @@ class Diagrammer:
                     model, plan_messages, tools, handlers, max_ops=MAX_OPS,
                     max_tokens=max_tokens, plan_validator=validate_plan,
                     extra_body={"chat_template_kwargs": {"enable_thinking": False}})
-            except Exception:
-                log.info("diagrammer_plan model=%s elapsed_ms=%d ok=false",
-                         model, round((time.monotonic() - started) * 1000))
+            except Exception as exc:
+                # Validation errors are already bounded by run_json_ops. Log the
+                # reason, never the model response or full planning context.
+                reason = re.sub(r"\s+", " ", str(exc))[:180]
+                log.info("diagrammer_plan model=%s elapsed_ms=%d ok=false error=%s reason=%r",
+                         model, round((time.monotonic() - started) * 1000),
+                         type(exc).__name__, reason)
                 raise
             log.info("diagrammer_plan model=%s elapsed_ms=%d ok=true",
                      model, round((time.monotonic() - started) * 1000))
@@ -324,6 +384,7 @@ class Diagrammer:
             # any model operation reaches the authoritative board.
             if simple:
                 try:
+                    fast_preflight = True
                     await json_plan(config.MODEL_FAST, fast_messages,
                                     SIMPLE_DRAW_TOOLS, FAST_MAX_TOKENS)
                 except ValueError:
@@ -331,9 +392,13 @@ class Diagrammer:
                         raise  # A handler may have had side effects; never replay.
                     log.info("diagrammer_plan fallback fast_to_smart")
                 else:
+                    for operation in supplemental_ops:
+                        await apply(operation)
                     if factual_burst and content_applied == 0:
                         raise ValueError("Diagrammer produced no content operation for a system fact")
                     return draws
+                finally:
+                    fast_preflight = False
 
             # Rich work and invalid fast plans use Super. Its native tool loop
             # remains the last resort only before any operation has run.

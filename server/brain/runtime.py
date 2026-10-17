@@ -47,6 +47,9 @@ def demo_map() -> CodeMap:
 def attach(session) -> None:
     """Idempotent hook for mouth.attach; no model call and no network request."""
     session.repo_connector = connect_repo
+    if getattr(session, "brief_provider", None) is None:
+        from learning.prep import brief_provider
+        session.brief_provider = brief_provider
     if getattr(session, '_mind_runtime_ready', False):
         return
     try:

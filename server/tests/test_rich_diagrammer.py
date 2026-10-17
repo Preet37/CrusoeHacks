@@ -5,7 +5,7 @@ import pytest
 
 import config
 import llm
-from agents.diagrammer import Diagrammer, StaleBoardError, repair_draw
+from agents.diagrammer import Diagrammer, StaleBoardError, _literal_relation, repair_draw
 from board import BoardState
 
 
@@ -214,7 +214,7 @@ async def test_simple_component_burst_uses_nano_with_compact_tools(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_fast_followup_repairs_missing_connection_before_adding_box(monkeypatch):
+async def test_fast_followup_completes_missing_connection_before_adding_box(monkeypatch):
     session = Session()
     session.board.apply({'op': 'add_box', 'id': 'auth', 'label': 'Auth',
                          'x': 200, 'y': 200, 'kind': 'service'})
@@ -226,10 +226,39 @@ async def test_fast_followup_repairs_missing_connection_before_adding_box(monkey
         assert 'redis' not in session.board.boxes
         ops = [{'op': 'add_box', 'id': 'redis', 'label': 'Redis',
                 'x': 500, 'y': 200, 'kind': 'datastore'}]
-        if len(calls) == 2:
-            ops.append({'op': 'connect', 'id': 'auth_redis', 'from_id': 'auth',
-                        'to_id': 'redis', 'label': 'sessions'})
         return json.dumps({'ops': ops})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    text = 'Auth also uses Redis for sessions.'
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': text}],
+                               source_lines=[{'text': text}])
+    assert len(calls) == 1
+    assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'connect']
+    assert next(iter(session.board.edges.values()))['to_id'] == 'redis'
+
+
+@pytest.mark.asyncio
+async def test_fast_followup_repairs_label_derived_endpoint_with_valid_ids(monkeypatch):
+    session = Session()
+    session.board.apply({'op': 'add_box', 'id': 'auth', 'label': 'Auth service',
+                         'x': 200, 'y': 200, 'kind': 'service'})
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        assert model == config.MODEL_FAST
+        calls.append(messages)
+        if len(calls) == 2:
+            repair = messages[-1]['content']
+            assert "connect endpoint 'auth_service' is not a box ID" in repair
+            assert 'box IDs: auth, redis' in repair
+            assert session.board.boxes.keys() == {'auth'}
+        return json.dumps({'ops': [
+            {'op': 'add_box', 'id': 'redis', 'label': 'Redis', 'x': 500,
+             'y': 200, 'kind': 'datastore'},
+            {'op': 'connect', 'id': 'auth_redis',
+             'from_id': 'auth_service' if len(calls) == 1 else 'auth',
+             'to_id': 'redis', 'label': 'sessions'},
+        ]})
 
     monkeypatch.setattr(llm, 'chat', chat)
     text = 'Auth also uses Redis for sessions.'
@@ -237,7 +266,39 @@ async def test_fast_followup_repairs_missing_connection_before_adding_box(monkey
                                source_lines=[{'text': text}])
     assert len(calls) == 2
     assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'connect']
-    assert session.board.edges['auth_redis']['to_id'] == 'redis'
+
+
+@pytest.mark.asyncio
+async def test_fast_literal_relation_completes_missing_edge_after_atomic_preflight(monkeypatch):
+    session = Session()
+    session.board.apply({'op': 'add_box', 'id': 'auth', 'label': 'Auth service',
+                         'x': 200, 'y': 200, 'kind': 'service'})
+    calls = []
+
+    async def chat(model, messages, **kwargs):
+        assert model == config.MODEL_FAST
+        calls.append(1)
+        assert 'redis' not in session.board.boxes
+        return json.dumps({'ops': [{'op': 'add_box', 'id': 'redis', 'label': 'Redis',
+                                    'x': 500, 'y': 200, 'kind': 'datastore'}]})
+
+    monkeypatch.setattr(llm, 'chat', chat)
+    text = 'Actually auth also uses Redis for sessions.'
+    await Diagrammer().handle(session, [{'type': 'system_fact', 'text': text}],
+                               source_lines=[{'text': text}])
+    assert len(calls) == 1
+    assert [m['op'] for m in session.sent if m['type'] == 'draw'] == ['add_box', 'connect']
+    edge = next(iter(session.board.edges.values()))
+    assert (edge['from_id'], edge['to_id']) == ('auth', 'redis')
+
+
+def test_literal_relation_rejects_ambiguous_or_negated_entities():
+    boxes = {'auth': {'label': 'Auth service'}, 'duplicate': {'label': 'Auth'},
+             'redis': {'label': 'Redis'}}
+    assert _literal_relation([{'text': 'Auth uses Redis.'}], [], boxes, {'redis'}) is None
+    boxes.pop('duplicate')
+    assert _literal_relation([{'text': 'Auth no longer uses Redis.'}], [], boxes, {'redis'}) is None
+    assert _literal_relation([{'text': 'Auth uses Redis.'}], [], boxes, set()) is None
 
 
 @pytest.mark.asyncio

@@ -700,3 +700,7 @@ Current web5174 screenshot /tmp/twin-learning-scoreboard.jpg (saving next): afte
 Server8765/web5174 current integrated strict12/12PASS again(82s). Ghostfirstdraw310ms, addressedackaudio16ms, bargeinstop24ms; actualcontent stillvariable9.8s initial/10.1sRedis due Nano validationfallback+Super. PX19 implementedandcheckpasses; timingtargetnotuniformlymet, nofalseclaimofinstantcompletecontent. Finaloffline366+21passed beforelatestsmalllearning/sourceformat edits. MinimalM3 actual scoresdisplayverified; 0.6v1 vs0.6rejectedcandidate, validationregressioncorrectlyblocked. MarkedPX10/11/12done againstPreet's explicitlyreducedone-trialPrep-onlyscope; fullmeeting metricsnotclaimedevaluated.
 FactChecker now leads with source `Correction from auth/login.py:...` to reduce Responder sourceomission; Claudepromptgroundingstillrequested.
 ---
+
+[14:06] PREET-CODEX -> PREET-CLAUDE | INFO | Prep hook handled in own runtime
+Wired learning.prep.brief_provider in owned brain/runtime.attach when session.brief_provider isNone; preservescustomprovider. No session.py change needed. Calendar now uses realpremeeting evidence andselectedprompt afterrestart. Stillneed server freshclonefallbackmetrics and explicitspoken citationrule; directsource-first correctionprobe omittedfullpathandadded `needsfixing`, so strong respondergroundingneeded.
+---

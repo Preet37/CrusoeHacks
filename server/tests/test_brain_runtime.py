@@ -17,3 +17,5 @@ def test_runtime_attaches_real_demo_owners_and_separates_code_facts(monkeypatch,
     runtime.attach(session)
     assert session.memory.current_facts() == facts
     assert callable(session.repo_connector)
+    from learning.prep import brief_provider
+    assert session.brief_provider is brief_provider
