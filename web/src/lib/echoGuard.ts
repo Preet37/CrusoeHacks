@@ -3,14 +3,16 @@
 // text that mostly matches it, so Twin doesn't interrupt itself or pollute the transcript.
 
 const WINDOW_MS = 3500
-const MATCH_RATIO = 0.6
+const MATCH_RATIO = 0.8
+// Filler words never count as a match (a follow-up question shares them with anything Twin said).
+const STOP = new Set(['the','to','me','of','and','a','an','is','it','this','that','what','how','in','on','for','you','we','i','so','do','can','be','are','with','about','our','my','your','like','just','but','or','if','at','as','from','there','then','okay','ok','yeah','um','uh','its',"it's","i'm",'was','were','will','would','should','could'])
 
 function words(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9' ]+/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 1)
+    .filter((w) => w.length > 1 && !STOP.has(w))
 }
 
 export class EchoGuard {

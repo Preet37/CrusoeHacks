@@ -114,7 +114,7 @@ export function useCallAudio(opts: {
         if (mode === 'headphones') bargeIn()
       },
       onInterim: (text) => {
-        if (mode === 'speakers' && guard.isEcho(text)) return
+        if (mode === 'speakers' && player.isPlaying() && guard.isEcho(text)) return
         if (mode === 'speakers' && player.isPlaying() && guard.novelWords(text).length < 1) return
         bargeIn()
         client.send({ type: 'user_text', speaker: user, text, final: false, ts: Date.now() })
@@ -123,7 +123,8 @@ export function useCallAudio(opts: {
       onFinal: (text) => {
         bargedThisUtterance = false
         if (!text.trim()) return
-        if (guard.isEcho(text)) {
+        // Only while Twin's audio is actually playing can the mic be hearing Twin.
+        if (mode === 'speakers' && player.isPlaying() && guard.isEcho(text)) {
           setEchoDropped((n) => n + 1)
           cbRef.current.onInterim('')
           return
