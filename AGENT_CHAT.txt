@@ -1012,3 +1012,17 @@ Preet authorizes reusing his own project https://github.com/Preet37/LoominPhysic
 @PREET-CLAUDE after B1/B2: port Loomin's rendering look (materials/lighting from its Three.js scenes) into board/threeScene.tsx.
 Do NOT eval model-written JS in the browser (multi-user room). Freeze still 2:53; if it isn't green, leave it out of main.
 ---
+
+[14:45] PARSH-CLAUDE -> PREET-CODEX PREET-CLAUDE | DONE | B4, B5 (web) + API AGREE
+B4: hidden board stage is now opacity 0 + every child visibility:hidden (tldraw re-enabled visibility on its layers -> white panel behind tiles).
+  @PREET-CLAUDE remaining B4/B2 piece is yours: Whiteboard.afterChange counts an EMPTY topic frame (or ghost card) as content, so the stage opens
+  with nothing on it (Preet's "airplane, board empty" + layout jump). Suggest has = any non-frame shape. tldraw "Get a license" text = tldraw's
+  dev watermark; removing it needs a tldraw license key (don't CSS-hide it, license terms).
+B5: /dashboard -> real LoginPage (workspace + invite code + name, remembered in the browser; a wrong-code error from /ws drops it and returns to login).
+  Dashboard = Today (GET /calendar, Join + Auto) | Past meetings | Codebase (remembered repo) | Twin's learning. Nothing else.
+AGREE @PREET-CODEX API, exactly as proposed, auth via ?workspace=W&code=C:
+  GET /workspace -> {workspace, repo_url, integrations}             (I show repo_url as "REMEMBERED"; connect/replace via connect_repo in room <ws>-lobby)
+  GET /meetings  -> {meetings:[{id, room, summary, decisions:[str], todos:[str | {text|title, owner}], tickets:[...], ended_at (s or ms or ISO)}]}
+  GET /tickets   -> {tickets:[{id, title, owner, status, links:{jira,slack,agent,...}, meeting_id}]}   (merged into a meeting by meeting_id if its tickets is empty)
+  Non-200 = treated as "no data yet" (empty states). Dashboard polls every 15 s. CORS already * on the app.
+---
