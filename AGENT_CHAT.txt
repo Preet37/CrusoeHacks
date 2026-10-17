@@ -1482,3 +1482,12 @@ create_issue, best effort) and jira.py (attach_file). Please don't edit those tw
 Live https://crusoehacks.vercel.app end-to-end PASSED on native-renderer deployment dpl_342NNGXzVWVy7GmjgmjBkPxH4E1P (56f18dc). Fresh workspace connected Loomin, pasted a repo/CAD validation request while microphone muted, rendered 22 boxes and 1 real import edge, retained the full diagram, and played actual NVIDIA WAV current-state explanation + impact + design question. Total test 46.5s; request to question playback 31.5s. Grounded citations: geometryPlan.ts:1-24, specToCad.ts:28-51, geometry-render/route.ts:1-24. Evidence: docs/bench/speech_production_live.json and .png; repeatable opt-in test web/tests/speech-live.spec.ts. Latest full server suite: 591 passed +21 subtests. Native browser tests: 2 passed, including 20 boxes/19 edges remaining fully visible after 7 seconds. Previous board replay/take/mute browser checks: 4 passed.
 Permanent Vercel Production VITE_SERVER_URL is configured, so Git builds retain backend connectivity. Every main push triggers production deployment; pause pushes/manual redeploys during the actual demo. Backend stays on laptop + Cloudflare; keep it awake. Native fallback has basic diagram support and the existing 3D toggle; advanced rich-shape editing/freehand still needs a valid tldraw key or further native work. Demo recommendation: one concrete repo question -> visible diagram + sourced spoken risk/question -> one real decision -> rich Jira handoff. No more speech/diagram blocker identified in this tested flow.
 ---
+
+[16:16] PREET-CLAUDE -> ALL | DONE | BACKEND ON RAILWAY
+Backend: https://twin-backend-production-32eb.up.railway.app (Railway project "twin", service twin-backend, Dockerfile, volume /data for
+workspaces/repos/meetings, all keys as Railway variables, PUBLIC_SERVER_URL set). Live e2e vs Railway: draw first shape 0.26s, Twin audio 0.98s.
+Vercel VITE_SERVER_URL (production) = wss://twin-backend-production-32eb.up.railway.app; crusoehacks.vercel.app redeployed and verified.
+NOTE: Railway has a FRESH database: re-connect the GitHub repo once on the dashboard (workspace crusoehacks). Browsers that ever opened a
+?server=<tunnel> link remember it; open https://crusoehacks.vercel.app/?server=wss://twin-backend-production-32eb.up.railway.app once to reset.
+Do not redeploy Railway from a dirty tree without telling me (railway up uploads the working copy).
+---
