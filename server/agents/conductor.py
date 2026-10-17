@@ -43,6 +43,8 @@ _PRESENT_CLAIM = re.compile(
 _EXPLICIT_DECISION = re.compile(
     r"\b(we decided|we agreed|decision is|we will|agreed to|"
     r"let's (?:move|switch|migrate|replace|adopt))\b", re.I)
+_EXPLICIT_ACTION = re.compile(
+    r"\b(action item|to-?do|will own|i'll own|i will own|assigned to)\b", re.I)
 _EXPLICIT_CURRENT = re.compile(
     r"\b(already|currently|still|no longer|instead of|does not|doesn't|"
     r"has switched|now uses?)\b", re.I)
@@ -83,6 +85,15 @@ def _specialist_moments(moments: list[dict], source_lines: list[dict]) -> list[d
         selected = [moment for moment in selected if moment.get("type") != "decision"]
         selected.extend({"type": "decision", "text": text[:500], "entities": []}
                         for text in dict.fromkeys(decision_lines))
+    action_lines = [str(line.get("text") or "") for line in source_lines
+                    if _EXPLICIT_ACTION.search(str(line.get("text") or ""))
+                    and not _EXPLICIT_DECISION.search(str(line.get("text") or ""))]
+    if action_lines:
+        # Keep the full spoken commitment when extraction retained only a
+        # fragment such as "Parsh will own it".
+        selected = [moment for moment in selected if moment.get("type") != "task"]
+        selected.extend({"type": "task", "text": text[:500], "entities": []}
+                        for text in dict.fromkeys(action_lines))
     if decision_lines and len(source_lines) == 1:
         # Nano sometimes returns a speculative `claim` alongside a decision
         # about a future migration. That is not a claim about live code. Keep
@@ -126,7 +137,8 @@ class Conductor:
                 selected.add("code_analyst")
             if memory is not None and kind == "claim":
                 selected.add("fact_checker")
-            if (code_map is not None or memory is not None) and kind == "decision":
+            if (code_map is not None or memory is not None) and (
+                    kind == "decision" or (kind == "task" and _EXPLICIT_ACTION.search(text))):
                 selected.add("task_planner")
             if selected:
                 routes[index] = selected
