@@ -163,3 +163,18 @@ async def test_no_ack_for_work_updates(monkeypatch):
     s = FakeSession()
     out = await responder.respond(s, "work update", stream=fake_stream, speak=fake_speak)
     assert not out.startswith("Yeah")
+
+
+def test_repo_brief_grounds_answers(tmp_path):
+    from types import SimpleNamespace
+    (tmp_path / "README.md").write_text("# Loomin\nA physics sandbox that turns prompts into 3D scenes.")
+    cm = SimpleNamespace(root=str(tmp_path), files={
+        "app/page.tsx": {"path": "app/page.tsx", "summary": "Landing page", "imported_by": ["x"], "is_test": False, "owner": "Preet37"},
+        "lib/specSheet.ts": {"path": "lib/specSheet.ts", "summary": "Spec sheet research", "imported_by": [], "is_test": False},
+    })
+    s = SimpleNamespace(code_map=cm, latest_contribution={"current": "Login lives in the auth route."})
+    lines = responder.repo_brief(s)
+    assert any("physics sandbox" in l for l in lines)
+    assert any("app/page.tsx" in l for l in lines)
+    assert any("Latest grounded take" in l for l in lines)
+    assert responder.repo_brief(SimpleNamespace()) == []

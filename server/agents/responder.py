@@ -57,6 +57,39 @@ def load_prompt() -> str:
     return PROMPT.read_text(encoding="utf-8").strip()
 
 
+def repo_brief(session, max_files: int = 8) -> list[str]:
+    """A few grounded lines about the connected repo so spoken answers are about THIS codebase."""
+    cm = getattr(session, "code_map", None)
+    files = getattr(cm, "files", None) or {}
+    if not files:
+        return []
+    out: list[str] = []
+    try:
+        readme = Path(getattr(cm, "root", "")) / "README.md"
+        if readme.is_file():
+            text = " ".join(readme.read_text(encoding="utf-8", errors="ignore").split())
+            text = re.sub(r"[#*`>\[\]]", "", text)[:360]
+            if text:
+                out.append(f"Repo README says: {text}")
+    except OSError:
+        pass
+    tops: dict[str, int] = {}
+    for path in files:
+        top = path.split("/", 1)[0] if "/" in path else "(root)"
+        tops[top] = tops.get(top, 0) + 1
+    out.append("Top-level areas (files): " + ", ".join(f"{k} ({v})" for k, v in sorted(tops.items(), key=lambda kv: -kv[1])[:8]))
+    hubs = sorted(files.values(), key=lambda r: -len(r.get("imported_by") or []))[:max_files]
+    for r in hubs:
+        if r.get("is_test"):
+            continue
+        owner = r.get("owner") or (r.get("owners") or [None])[0]
+        out.append(f"{r.get('path')}: {r.get('summary', '')[:120]}" + (f" (owner {owner})" if owner else ""))
+    c = getattr(session, "latest_contribution", None)
+    if isinstance(c, dict) and c.get("current"):
+        out.append(f"Latest grounded take: {c.get('current')}")
+    return out[:12]
+
+
 def build_messages(history: list[dict], board_summary: str, updates: list[str],
                    reason: str, memory: list[str] | None = None) -> list[dict]:
     """Stable system prefix first (prompt caching on Crusoe), changing context after."""
@@ -230,7 +263,7 @@ async def respond(session, reason: str, *, trigger_ts: int | None = None,
 
     board = getattr(session, "board", None)
     summary = board.summary() if board is not None and hasattr(board, "summary") else ""
-    messages = build_messages(list(session.history), summary, updates, reason)
+    messages = build_messages(list(session.history), summary, updates, reason, memory=repo_brief(session) or None)
 
     first_audio = {"sent": False}
 

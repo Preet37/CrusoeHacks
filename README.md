@@ -1,5 +1,9 @@
 # Twin
 
+## ▶ Try it live: **[crusoehacks.vercel.app](https://crusoehacks.vercel.app)**
+
+Open the link, sign in to a workspace, start a meeting, and talk to Twin. Backend: Railway (`twin-backend-production-32eb.up.railway.app`), all reasoning on NVIDIA Nemotron via Crusoe.
+
 **A teammate that joins your meeting, talks, draws, knows your code, and gets better every time.**
 
 Twin is not a note-taker. Note-takers remember your meetings. Twin takes part in them. It joins the call with its own tile and voice, sketches the architecture while you talk, checks what people say against the real repo, turns decisions into tickets, and after every meeting a Coach proposes changes to Twin and keeps only the ones that score better on meetings it has never seen.
