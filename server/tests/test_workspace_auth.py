@@ -30,6 +30,26 @@ def test_wrong_code_gets_error_and_valid_code_sets_trusted_workspace():
     with c.websocket_connect("/ws?room=crusoehacks-y&user=A&workspace=crusoehacks&code=s3cret") as ws:
         assert ws.receive_json()["type"] == "status"
         assert SESSIONS["crusoehacks-y"].workspace == "crusoehacks"
-    with c.websocket_connect("/ws?room=crusoehacks-z&user=A") as ws:  # room prefix alone is never trusted
+    with c.websocket_connect("/ws?room=plainroom&user=A") as ws:  # non-workspace rooms stay open and untrusted
         ws.receive_json()
-        assert getattr(SESSIONS["crusoehacks-z"], "workspace", None) is None
+        assert getattr(SESSIONS["plainroom"], "workspace", None) is None
+
+
+def test_workspace_room_rejects_no_code_and_other_workspace():
+    c = TestClient(app_module.app)
+    with c.websocket_connect("/ws?room=crusoehacks-lobby&user=A&workspace=crusoehacks&code=s3cret") as a:
+        assert a.receive_json()["type"] == "status"
+        with c.websocket_connect("/ws?room=crusoehacks-lobby&user=B") as b:  # no code
+            m = b.receive_json()
+            assert m["type"] == "error" and "invite code" in m["message"]
+        with c.websocket_connect("/ws?room=crusoehacks-lobby&user=C&workspace=other&code=xyz") as d:  # other ws
+            m = d.receive_json()
+            assert m["type"] == "error" and "invite code" in m["message"]
+        assert SESSIONS["crusoehacks-lobby"].workspace == "crusoehacks"
+
+
+def test_prefixed_room_needs_code_even_before_anyone_joined():
+    c = TestClient(app_module.app)
+    with c.websocket_connect("/ws?room=crusoehacks-fresh&user=B") as b:
+        assert b.receive_json()["type"] == "error"
+    assert "crusoehacks-fresh" not in SESSIONS

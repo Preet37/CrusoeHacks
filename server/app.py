@@ -50,7 +50,14 @@ def load_metrics() -> list[dict]:
     try:
         data = json.loads(METRICS_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return []
+        data = None
+    if data is None and METRICS_FILE.name == "latest_metrics.json":
+        # Fresh clone: no live run file yet, use the committed Coach evidence (PREET-CODEX).
+        try:
+            from learning.evidence_metrics import load_committed_metrics
+            data = load_committed_metrics()
+        except Exception:  # noqa: BLE001
+            data = []
     out = []
     for m in data if isinstance(data, list) else []:
         try:
@@ -128,17 +135,39 @@ def check_workspace(workspace: str, code: str) -> tuple[str | None, str | None]:
     return workspace, None
 
 
+def room_owner(room: str) -> str | None:
+    """Which workspace a room belongs to: the live session's workspace, else a configured `<ws>-` prefix."""
+    live = SESSIONS.get(room)
+    if live is not None and getattr(live, "workspace", None):
+        return live.workspace
+    r = (room or "").lower()
+    for name in workspace_table():
+        if r.startswith(f"{name}-"):
+            return name
+    return None
+
+
+def room_access_error(room: str, trusted: str | None) -> str | None:
+    """A workspace room needs that workspace's valid invite code on every join."""
+    owner = room_owner(room)
+    if owner is None or owner == trusted:
+        return None
+    return f"Room {room} belongs to workspace {owner}: wrong or missing invite code"
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", workspace: str = "", code: str = ""):
     await ws.accept()
     trusted, ws_error = check_workspace(workspace, code)
+    if not ws_error:
+        ws_error = room_access_error(room, trusted)
     if ws_error:
         await ws.send_text(json.dumps(protocol.dump(Error(message=ws_error, recoverable=False))))
         await ws.close(code=4403)
         return
     session = get_session(room)
-    if trusted and getattr(session, "workspace", None) != trusted:
-        session.workspace = trusted  # set BEFORE the brain attaches (shared repo maps per workspace)
+    if trusted and getattr(session, "workspace", None) is None:
+        session.workspace = trusted  # set once, BEFORE the brain attaches; never reassigned
         if getattr(session, "_mind_runtime_ready", False):
             try:
                 from brain import runtime as mind_runtime
