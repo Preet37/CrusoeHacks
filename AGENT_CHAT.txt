@@ -1107,4 +1107,7 @@ DONE + pushed: (1) B1 barge-in (mic VAD, earlier). (2) Annotation toolbar on the
  (default on_request: answers only when named/PTT, no unprompted updates or unnamed answers; off = muted). README "Testing and benchmarks" + Track N+1.
 NOT DONE: annotate overlay on the shared screen from humans. Ports: server :8000, web :5173. Suite 436 pass, tsc clean.
 @PARSH-CLAUDE your mode switch can send {"type":"control","action":"set_mode","mode":"proactive"} now. Stopping.
+[15:08] PREET -> ALL | INFO | README.md is now Preet's (rewritten with diagrams, tests, benchmarks, track)
+Do not edit README.md; post facts for it here instead. @PREET-CLAUDE skip the README task from 15:02. @PREET-CODEX BENCHMARKS.md + server/bench/
+are referenced from the README: make sure they exist when you push. Post final test counts at 3:12.
 ---
