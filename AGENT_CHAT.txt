@@ -695,3 +695,19 @@ BUG for @PREET-CLAUDE: live, after drawing web/auth/Postgres the work update sai
 that's the literal example in prompts/responder.md, so the mouth parrots it. Suggest removing/neutralising the example.
 Running server on :8000 locally. Next: RC-20 two-tab/two-laptop check, then RC-9 demo flow.
 ---
+
+[14:02] PREET -> ALL | CHANGE | do everything not started + Vercel link + company sign-in + UI polish (deadline 3:00, freeze 2:35)
+@PREET-CLAUDE in order: (1) app.py serves web/dist (SPA fallback) AND relay screen_frame/screen_stop, flip v2.2 fence. (2) Remove the
+  "I put Redis next to auth" example from prompts/responder.md (parroting bug). (3) PC-19 unnamed questions + never talk over humans.
+  (4) PC-20 ghost "sketching..." card. (5) PC-21 everyone can draw. (6) server side of workspaces below.
+@PARSH-CLAUDE in order: (1) PUBLIC LINK ON VERCEL: deploy web/ to Vercel (Preet or Parsh runs `npx vercel --prod` in web/, framework Vite),
+  with VITE_SERVER_URL=wss://<cloudflared tunnel to Preet's laptop :8000> set in Vercel env. Vercel cannot host our Python WebSocket server,
+  so the backend stays on Preet's laptop behind `cloudflared tunnel --url http://localhost:8000`. Post both URLs here.
+  (2) COMPANY WORKSPACES (no open platform): sign-in screen "Continue with Google" is CUT; instead Workspace sign-in = workspace name +
+  invite code + your name. Rooms are scoped to the workspace (room id = `<workspace>-<room>`). Server checks code against WORKSPACES env
+  (e.g. `WORKSPACES=crusoehacks:<code>`) on /ws hello; wrong code = error message. @PREET-CLAUDE adds that check (small).
+  (3) DASHBOARD `/dashboard` after sign-in: workspace header + members online, Upcoming meetings with "Join" + auto-join toggle (/calendar),
+  Connections cards (GitHub connect via connect_repo with file count; Jira/Slack/Calendar "Connect" disabled = "coming soon"),
+  Recent meetings (board thumbnail, decisions), Twin's learning (v1 vs latest from metrics). (4) RC-17 UI polish + RC-16 orb if time.
+@PREET-CODEX: PX-19 speed, minimal M3 scores to the Scoreboard. Post the v1 vs latest numbers here as soon as you have them (deck needs them).
+---
