@@ -29,16 +29,60 @@ export interface TwinClient {
   close(): void
 }
 
-/** Server base URL. VITE_SERVER_URL (http(s) or ws(s)) wins; else same host, port 8000. */
+const SERVER_KEY = 'twin.server'
+
+/** Normalise http(s)/ws(s) URLs to a ws(s) base without trailing slash or /ws. */
+function toWsBase(u: string) {
+  return u.trim().replace(/^http/, 'ws').replace(/\/ws\/?$/, '').replace(/\/+$/, '')
+}
+
+/**
+ * Server base URL, first match wins:
+ *  1. ?server=<url> in the page link (saved for later visits, so invite links can carry it),
+ *  2. a previously saved ?server (ignored on dev ports so local work never hits an old tunnel),
+ *  3. VITE_SERVER_URL at build time,
+ *  4. same origin when the page is served by the Twin server or a tunnel,
+ *  5. ws://<host>:8000 on the Vite dev ports.
+ */
 export function serverWsBase(): string {
+  const q = new URLSearchParams(location.search).get('server')
+  if (q) {
+    try {
+      localStorage.setItem(SERVER_KEY, q)
+    } catch {
+      /* private mode */
+    }
+    return toWsBase(q)
+  }
+  const devPorts = new Set(['5173', '5174', '5180'])
+  const onDev = devPorts.has(location.port)
+  try {
+    const saved = onDev ? null : localStorage.getItem(SERVER_KEY)
+    if (saved) return toWsBase(saved)
+  } catch {
+    /* ignore */
+  }
   const env = (import.meta.env.VITE_SERVER_URL as string | undefined)?.trim()
-  if (env) return env.replace(/^http/, 'ws').replace(/\/+$/, '')
+  if (env) return toWsBase(env)
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   // Vite dev ports talk to a separate server on :8000. Anywhere else (server serving web/dist,
   // or a public tunnel) the web app and /ws share one origin.
-  const devPorts = new Set(['5173', '5174', '5180'])
-  if (!devPorts.has(location.port)) return `${proto}://${location.host}`
+  if (!onDev) return `${proto}://${location.host}`
   return `${proto}://${location.hostname || 'localhost'}:8000`
+}
+
+/** HTTP base of the same server (for /calendar, /metrics, ...). */
+export function serverHttpBase(): string {
+  return serverWsBase().replace(/^ws/, 'http')
+}
+
+/** Forget a saved ?server override (e.g. when the tunnel URL changed). */
+export function clearSavedServer() {
+  try {
+    localStorage.removeItem(SERVER_KEY)
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isMockMode(): boolean {
@@ -53,8 +97,15 @@ type MockStart = (
 // Optional module: missing file just means no mock server yet.
 const mockModules = import.meta.glob('./mockServer.ts')
 
-export function createClient(opts: { room: string; user: string; mock?: boolean }): TwinClient {
-  const { room, user } = opts
+export function createClient(opts: {
+  room: string
+  user: string
+  mock?: boolean
+  /** Company workspace + invite code; the server checks them (WORKSPACES env). */
+  workspace?: string
+  code?: string
+}): TwinClient {
+  const { room, user, workspace, code } = opts
   const mock = opts.mock ?? isMockMode()
   const typed = new Map<string, Set<(m: AnyServerMessage) => void>>()
   const any = new Set<(m: AnyServerMessage) => void>()
@@ -82,13 +133,16 @@ export function createClient(opts: { room: string; user: string; mock?: boolean 
   const connect = () => {
     if (closed) return
     setState('connecting')
-    const url = `${serverWsBase()}/ws?room=${encodeURIComponent(room)}&user=${encodeURIComponent(user)}`
+    const params = new URLSearchParams({ room, user })
+    if (workspace) params.set('workspace', workspace)
+    if (code) params.set('code', code)
+    const url = `${serverWsBase()}/ws?${params}`
     const sock = new WebSocket(url)
     ws = sock
     sock.onopen = () => {
       retry = 0
       setState('open')
-      sock.send(JSON.stringify({ type: 'hello', protocol: PROTOCOL_VERSION, user, room }))
+      sock.send(JSON.stringify({ type: 'hello', protocol: PROTOCOL_VERSION, user, room, ...(workspace ? { workspace, code: code ?? '' } : {}) }))
       while (pending.length) sock.send(pending.shift()!)
     }
     sock.onmessage = (ev) => {

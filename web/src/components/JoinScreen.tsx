@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useLocalMedia, useVideoRef } from '../lib/media'
+import { inviteLink as makeInvite, loadSession, saveSession, slug, type WorkspaceSession } from '../lib/workspace'
 import { CamIcon, CamOffIcon, MicIcon, MicOffIcon } from './Icons'
 import { TwinAvatar } from './ParticipantTile'
 
 export interface JoinChoice {
   name: string
   room: string
+  session: WorkspaceSession | null
   cam: boolean
   mic: boolean
 }
@@ -19,12 +21,25 @@ function savedName() {
   }
 }
 
-export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c: JoinChoice) => void }) {
-  const [name, setName] = useState(savedName)
+export default function JoinScreen({
+  room,
+  onJoin,
+  error,
+}: {
+  room: string
+  onJoin: (c: JoinChoice) => void
+  error?: string | null
+}) {
+  const initial = loadSession()
+  const [name, setName] = useState(initial?.name || savedName())
   const [roomName, setRoomName] = useState(room)
+  const [workspace, setWorkspace] = useState(initial?.workspace ?? '')
+  const [code, setCode] = useState(initial?.code ?? '')
   const [copied, setCopied] = useState(false)
-  const cleanRoom = roomName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'demo'
-  const inviteLink = `${location.origin}/room/${encodeURIComponent(cleanRoom)}${location.search}`
+  const cleanRoom = slug(roomName, 'demo')
+  const ws = slug(workspace)
+  const session: WorkspaceSession | null = ws ? { workspace: ws, code: code.trim(), name: name.trim() } : null
+  const inviteLink = makeInvite(session, cleanRoom)
   const copyInvite = async () => {
     try {
       await navigator.clipboard.writeText(inviteLink)
@@ -46,9 +61,10 @@ export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c:
     } catch {
       /* private mode */
     }
+    if (session) saveSession({ ...session, name: n })
     // Release devices; the meeting room acquires its own.
     media.stream?.getTracks().forEach((t) => t.stop())
-    onJoin({ name: n, room: cleanRoom, cam: media.camOn, mic: media.micOn })
+    onJoin({ name: n, room: cleanRoom, session: session ? { ...session, name: n } : null, cam: media.camOn, mic: media.micOn })
   }
 
   return (
@@ -103,6 +119,26 @@ export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c:
               <div className="hint">AI teammate. Listens, talks, and draws on the whiteboard.</div>
             </div>
           </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="field"
+              style={{ flex: 1, minWidth: 0 }}
+              placeholder="Workspace (e.g. crusoehacks)"
+              aria-label="Workspace"
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+            />
+            <input
+              className="field"
+              style={{ width: 130 }}
+              placeholder="Invite code"
+              aria-label="Invite code"
+              type="password"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+          </div>
+          {error && <div className="join-error">{error}</div>}
           <input
             className="field"
             placeholder="Your name"
