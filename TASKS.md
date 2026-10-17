@@ -58,9 +58,9 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
-| RC-1 | todo | `MeetingRoom.tsx` layout per ARCH 1E.1 (Meet/Zoom-like): tile grid (humans + Twin labeled "AI"), whiteboard as main stage when it has content (Whiteboard component from PREET-CLAUDE), captions, control bar, side panel | RX-1 | Page renders with mock data |
+| RC-1 | doing | `MeetingRoom.tsx` layout per ARCH 1E.1 (Meet/Zoom-like): tile grid (humans + Twin labeled "AI"), whiteboard as main stage when it has content (Whiteboard component from PREET-CLAUDE), captions, control bar, side panel | RX-1 | Page renders with mock data |
 | RC-2 | todo | `styles/theme.css`: Mac-native look per ARCHITECTURE.md section 4 (style only, no coucou assets). Dark and light | RC-1 | Looks like a native Mac app, not a web template |
-| RC-3 | todo | `lib/ws.ts`: connect `ws://localhost:8000/ws?room=demo&user=<name>`, auto-reconnect, typed send/receive using `protocol.ts`, event emitter | RX-1 | Connects to server; logs `status` messages |
+| RC-3 | doing | `lib/ws.ts`: connect `ws://localhost:8000/ws?room=demo&user=<name>`, auto-reconnect, typed send/receive using `protocol.ts`, event emitter | RX-1 | Connects to server; logs `status` messages |
 | RC-4 | todo | `lib/speech.ts`: Web Speech API wrapper: continuous, interim + final; emits `speechstart` the instant a user starts talking; auto-restarts when Chrome stops it; send `user_text` | RC-3 | Talking shows live captions; finals reach server |
 | RC-5 | todo | `lib/player.ts`: audio queue by `say_id`/`seq`, decode base64 WAV, play in order, `stopAll()` instantly; `data:null` -> `speechSynthesis` fallback; report playback start time for latency logging | RC-3 | Plays server chunks smoothly; stop is instant |
 | RC-6 | todo | Barge-in: on speechstart while playing -> `player.stopAll()` then send `barge_in`; handle `stop_audio` | RC-4, RC-5 | Talking over Twin silences it immediately |
@@ -81,8 +81,8 @@ PARSH-CODEX does not exist (Parsh has only Claude). RX-1 (the scaffold) is done 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
 | RX-1 | done | (PARSH-CLAUDE) Scaffold `web/` with Vite + React + TS + tldraw, `lib/protocol.ts` v1 types. **Follow-up for PREET-CLAUDE: add the PROTOCOL v2 types to `protocol.ts`** | - | `npm run dev` serves on 5173 |
-| RX-2 | todo | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
-| RX-3 | todo | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
+| RX-2 | doing | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
+| RX-3 | doing | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
 | RX-4 | todo | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
 | RX-5 | todo | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
 | RX-6 | todo | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
