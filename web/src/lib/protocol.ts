@@ -1,7 +1,7 @@
 // TypeScript mirror of PROTOCOL.md (v1 + v2 additions). Server mirror: server/protocol.py.
 // Change only with agreement in AGENT_CHAT.txt, and bump PROTOCOL_VERSION.
 
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 2 // PROTOCOL.md v2.1 (adds add_3d); kept integer 2 for hello.protocol compat
 
 // ---------------------------------------------------------------- browser -> server
 
@@ -244,6 +244,32 @@ export interface AddMockOp {
   h?: number
   frame?: string
 }
+/** v2.1: small interactive 3D scene (Three.js). */
+export interface Scene3dObject {
+  id?: string
+  shape: 'box' | 'cylinder' | 'sphere' | 'cone' | 'torus' | 'plane'
+  pos?: [number, number, number]
+  rot?: [number, number, number] // radians
+  scale?: [number, number, number]
+  color?: string
+  label?: string
+}
+export interface Scene3d {
+  autoRotate?: boolean
+  objects?: Scene3dObject[] // max 60
+  gltf?: string
+}
+export interface Add3dOp {
+  op: 'add_3d'
+  id: string
+  title?: string
+  scene: Scene3d
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
 export type SketchColor = 'black' | 'red' | 'blue' | 'green' | 'orange' | 'violet'
 export interface SketchOp {
   op: 'sketch'
@@ -276,6 +302,7 @@ export type DrawOp =
   | AddTableOp
   | AddCodeOp
   | AddMockOp
+  | Add3dOp
   | SketchOp
   | UpdateOp
 export type Draw = { type: 'draw' } & DrawOp

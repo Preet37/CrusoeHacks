@@ -345,3 +345,11 @@ def test_calendar_endpoints(_no_mouth):
             r = client.post(f"/simulate/calendar_join?room={room}&meeting=Daily%20standup").json()
             assert r["ok"] is True and r["brief"]["title"] == "Daily standup"
             assert _recv_type(a, "brief")["predictions"] == r["brief"]["predictions"]
+
+
+def test_echo_guard_never_drops_addressed_or_short_lines():
+    from session import is_echo
+    twin = ["I put the postgres connection next to auth.", "Does that look right?"]
+    assert not is_echo("Twin, does that look right?", twin)
+    assert not is_echo("does that look right", twin)
+    assert is_echo("I put the postgres connection next to auth", twin)

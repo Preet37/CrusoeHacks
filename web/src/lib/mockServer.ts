@@ -181,6 +181,27 @@ export function startMockServer(
     at(30000, () => send({ type: 'metric', version: 'v4 (rejected)', split: 'locked_test', name: 'prediction_score', value: 0.39 }))
     say('Prediction score went from 0.42 to 0.58. I rejected one change that scored worse.', 30500)
 
+    // ---- topic 3: Robotics (v2.1 add_3d), then an update that swings link1
+    const F3 = 't_robot'
+    const arm = (link1Rot: number, jointX: number) => ({
+      autoRotate: true,
+      objects: [
+        { id: 'base', shape: 'cylinder', pos: [0, 0.15, 0], rot: [0, 0, 0], scale: [1.2, 0.3, 1.2], color: '#8a8f98', label: 'Base' },
+        { id: 'link1', shape: 'box', pos: [Math.sin(-link1Rot) * 0.8, 0.3 + Math.cos(link1Rot) * 0.8, 0], rot: [0, 0, link1Rot], scale: [0.3, 1.6, 0.3], color: '#4f8cff', label: 'Link 1' },
+        { id: 'joint', shape: 'sphere', pos: [jointX, 0.3 + Math.cos(link1Rot) * 1.6, 0], rot: [0, 0, 0], scale: [0.45, 0.45, 0.45], color: '#ffb020', label: 'Joint' },
+        { id: 'grip', shape: 'cone', pos: [jointX + 0.35, 0.3 + Math.cos(link1Rot) * 1.6, 0], rot: [0, 0, -Math.PI / 2], scale: [0.25, 0.5, 0.25], color: '#ff5f57' },
+      ],
+    })
+    human('Parsh', 'The robot arm team wants to see the 3-joint layout.', 31000)
+    agentChain(31600, 'Diagrammer', '3d robot arm', 1200)
+    at(31700, () => send({ type: 'topic', topic_id: F3, title: 'Robotics', active: true, changed: true }))
+    draws(31800, [
+      { op: 'frame', id: F3, title: 'Robotics', x: 0, y: 0, w: 1000, h: 1000 },
+      { op: 'focus', id: F3 },
+      { op: 'add_3d', id: 'r1', title: 'Robot arm, 3 joints', x: 150, y: 100, w: 700, h: 600, frame: F3, scene: arm(0, 0) },
+    ])
+    at(34200, () => send({ type: 'draw', op: 'update', id: 'r1', title: 'Robot arm, link1 at 0.4 rad', scene: arm(0.4, -0.62) }))
+
     at(36000, () => send({ type: 'draw', op: 'focus', id: F1 }))
     say('Back to auth: the session migration is the main risk.', 36500)
   }

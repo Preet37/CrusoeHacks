@@ -49,11 +49,17 @@ def _words(text: str) -> list[str]:
     return _WORD_RE.findall((text or "").lower())
 
 
-def is_echo(human_text: str, twin_texts) -> bool:
+def is_echo(human_text: str, twin_texts, min_words: int = 5) -> bool:
     """True if human_text looks like the mic picking up Twin's own speech."""
     hw = _words(human_text)
-    if not hw:
-        return False
+    if len(hw) < min_words:
+        return False  # short replies ("yes", "does that look right?") are too ambiguous to drop
+    try:
+        import turn_taking
+        if turn_taking.mentions_name(human_text):
+            return False  # Twin never says its own name, so an address is always a human
+    except Exception:  # noqa: BLE001
+        pass
     hs = " ".join(hw)
     hset = set(hw)
     for t in twin_texts:
@@ -61,10 +67,10 @@ def is_echo(human_text: str, twin_texts) -> bool:
         if not tw:
             continue
         ts = " ".join(tw)
-        if len(hw) >= 4 and f" {hs} " in f" {ts} ":
+        if f" {hs} " in f" {ts} ":
             return True
-        if len(hw) < 3:
-            continue  # "yes" / "okay" are too short to call an echo
+        if len(tw) < 5:
+            continue  # comparing against a tiny Twin sentence gives false matches
         tset = set(tw)
         if len(hset | tset) and len(hset & tset) / len(hset | tset) >= ECHO_RATIO:
             return True
@@ -359,8 +365,8 @@ class Session:
             # also keep the whole turn so multi-sentence echoes match
             self.twin_recent.append(text.strip())
 
-    def is_echo(self, text: str) -> bool:
-        return bool(self.twin_recent) and is_echo(text, list(self.twin_recent))
+    def is_echo(self, text: str, final: bool = True) -> bool:
+        return bool(self.twin_recent) and is_echo(text, list(self.twin_recent), 5 if final else 3)
 
     # ------------------------------------------------------------ participants / topic (PC-15)
 
@@ -516,7 +522,7 @@ class Session:
                 await self.broadcast_participants()
         elif t == "user_text":
             text = msg.text.strip()
-            if self.is_echo(text):
+            if self.is_echo(text, bool(msg.final)):
                 # PC-14: the mic heard Twin. No history, hooks, transcript or speaking state.
                 if msg.final:
                     log.info("[%s] echo guard dropped %r from %s", self.room, text, msg.speaker or user)

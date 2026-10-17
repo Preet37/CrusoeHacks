@@ -22,21 +22,25 @@ import { renderCodeSvg } from './code'
 import { createMock, TwinMockShapeUtil, updateMock } from './mock'
 import { createSketch } from './sketch'
 import { placeSvgImage, type Box } from './svgImage'
+import { create3d, set3dErrorSink, Twin3DShapeUtil, update3d } from './threeD'
+import { validateScene } from './scene3d'
 
 export type { RichCtx } from './types'
 export { TwinMockShapeUtil } from './mock'
+export { Twin3DShapeUtil } from './threeD'
 
-export const richShapeUtils = [TwinMockShapeUtil]
+export const richShapeUtils = [TwinMockShapeUtil, Twin3DShapeUtil]
 
 type Op = { op: string; id?: string; [k: string]: unknown }
 
-const RICH_OPS = new Set(['add_sticky', 'add_text', 'add_mermaid', 'add_chart', 'add_table', 'add_code', 'add_mock', 'sketch'])
+const RICH_OPS = new Set(['add_sticky', 'add_text', 'add_mermaid', 'add_chart', 'add_table', 'add_code', 'add_mock', 'sketch', 'add_3d'])
 const DEFAULT_SIZE: Record<string, [number, number]> = {
   add_mermaid: [600, 400],
   add_chart: [400, 260],
   add_table: [500, 300],
   add_code: [420, 240],
   add_mock: [300, 400],
+  add_3d: [400, 350],
 }
 
 /** Original (merged) op dicts by protocol id, so `update` can merge and re-render. */
@@ -108,6 +112,11 @@ function render(editor: Editor, op: Op, ctx: RichCtx, existing?: TLShapeId) {
       case 'add_mock':
         reg(createMock(editor, op, box, existing))
         return
+      case 'add_3d': {
+        const scene = validateScene(op.scene) // throws -> draw_error below
+        reg(create3d(editor, id ?? '', String(op.title ?? ''), scene, box, existing))
+        return
+      }
       case 'sketch': {
         const frame = typeof op.frame === 'string' ? op.frame : undefined
         reg(createSketch(editor, op, (x, y) => ctx.gridToPage(x, y, frame), existing))
@@ -155,6 +164,7 @@ function render(editor: Editor, op: Op, ctx: RichCtx, existing?: TLShapeId) {
 
 export function renderRichOp(editor: Editor, op: { op: string; id?: string; [k: string]: unknown }, ctx: RichCtx): boolean {
   if (!editor || !op || typeof op.op !== 'string') return false
+  set3dErrorSink((pid, error) => ctx.send({ type: 'draw_error', id: pid, op: 'add_3d', error }))
   try {
     if (RICH_OPS.has(op.op)) {
       const id = op.id ?? `rich_${Math.random().toString(36).slice(2, 9)}`
@@ -168,6 +178,25 @@ export function renderRichOp(editor: Editor, op: { op: string; id?: string; [k: 
     if (op.op === 'update' && op.id) {
       const base = richOps.get(op.id)
       if (!base) return false
+      if (base.op === 'add_3d') {
+        // Validate before committing so a bad update keeps the previous good scene.
+        let scene
+        try { scene = op.scene !== undefined ? validateScene(op.scene) : undefined } catch (e) {
+          try { ctx.send({ type: 'draw_error', id: op.id, op: 'add_3d', error: errMsg(e).slice(0, 300) }) } catch { /* ignore */ }
+          return true
+        }
+        const sid3 = ctx.shapeIdFor(op.id)
+        const { op: _o, ...f3 } = op
+        void _o
+        const merged3: Op = { ...base, ...f3, op: 'add_3d', id: op.id }
+        richOps.set(op.id, merged3)
+        if (sid3 && editor.getShape(sid3)?.type === 'twin-3d') {
+          update3d(editor, sid3, op.id, { title: op.title !== undefined ? String(op.title) : undefined, scene })
+        } else {
+          render(editor, merged3, ctx, sid3 && editor.getShape(sid3) ? sid3 : undefined)
+        }
+        return true
+      }
       const shapeId = ctx.shapeIdFor(op.id)
       const { op: _ignored, ...fields } = op
       void _ignored

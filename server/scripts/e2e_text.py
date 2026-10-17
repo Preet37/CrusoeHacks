@@ -452,6 +452,7 @@ async def main() -> int:
     ap.add_argument("--room", default=f"e2e-{int(time.time())}")
     ap.add_argument("--only", default="")
     ap.add_argument("--report", default=DEFAULT_REPORT)
+    ap.add_argument("--strict", action="store_true", help="exit 1 if ANY selected step fails (not just gating steps)")
     a = ap.parse_args()
     only = [int(s) for s in a.only.split(",") if s.strip()] or sorted(STEPS)
     http = re.sub(r"^ws", "http", a.url.rstrip("/"))
@@ -478,13 +479,13 @@ async def main() -> int:
     print("------+--------+-------------------------------+------------------------------")
     for r in results:
         print(f" {r['step']:>4} | {'PASS' if r['pass'] else 'FAIL':<6} | {r['name']:<29} | {r['timing']}")
-    gating = [r for r in results if r["step"] in GATING]
+    gating = results if a.strict else [r for r in results if r["step"] in GATING]
     code = 0 if all(r["pass"] for r in gating) else 1
     au = [e["msg"] for e in c.msgs if e["msg"].get("type") == "audio"]
     nulls = sum(1 for m in au if m.get("data") is None)
     if au and nulls:
         print(f"\nWARN: {nulls}/{len(au)} audio chunks had data=null (server TTS failed; browser falls back to speechSynthesis)")
-    print(f"\ngating steps (1-5,10-12) present: {[r['step'] for r in gating]} -> exit {code}; total {c.t():.0f}s")
+    print(f"\n{'strict: all selected' if a.strict else 'gating steps (1-5,10-12)'} present: {[r['step'] for r in gating]} -> exit {code}; total {c.t():.0f}s")
 
     rep = {"room": a.room, "url": a.url, "started_ms": now_ms() - int(c.t() * 1000), "results": results,
            "sent": c.sent, "received": [{"t": e["t"], "msg": scrub(e["msg"])} for e in c.msgs]}

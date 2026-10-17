@@ -16,7 +16,7 @@ from typing import Annotated, Any, ClassVar, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 2  # PROTOCOL.md says 2.1 (adds add_3d); kept int 2 for hello.protocol compat
 
 
 def now_ms() -> int:
@@ -129,6 +129,8 @@ DrawOp = Literal[
     # v2
     "frame", "focus", "add_sticky", "add_text", "add_mermaid", "add_chart", "add_table",
     "add_code", "add_mock", "sketch", "update",
+    # v2.1
+    "add_3d",
 ]
 BoxKind = Literal["service", "datastore", "client", "external", "note"]
 
@@ -164,6 +166,8 @@ class Draw(Msg):
     language: Optional[str] = None
     html: Optional[str] = None
     strokes: Optional[list[Any]] = None
+    # v2.1: add_3d scene {"autoRotate"?, "objects"?: [...], "gltf"?: url}
+    scene: Optional[dict[str, Any]] = None
 
 
 class Box(BaseModel):
