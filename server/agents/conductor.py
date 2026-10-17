@@ -63,6 +63,9 @@ def _measured_comparison(text: str) -> bool:
 
 
 def _wants_visual(moments: list[dict], source_lines: list[dict]) -> bool:
+    from agents.repo_diagram import repo_architecture_request
+    if repo_architecture_request(moments, source_lines):
+        return True
     if any(line.get("wants_visual") in _VISUAL_HINTS for line in source_lines):
         return True
     texts = [str(line.get("text") or "") for line in source_lines]

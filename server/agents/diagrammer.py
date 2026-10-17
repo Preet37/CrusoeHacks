@@ -246,7 +246,10 @@ class Diagrammer:
             required_visual = None  # A classifier hint must not force an unrequested 3D scene.
         from agents.paragraph_diagram import paragraph_request
         paragraph = paragraph_request(moments, source_lines)
-        selected_model = (config.MODEL_RESPONDER if paragraph is not None else
+        from agents.repo_diagram import repo_architecture_request
+        repo_request = repo_architecture_request(moments, source_lines)
+        selected_model = ("code_map" if repo_request is not None else
+                          config.MODEL_RESPONDER if paragraph is not None else
                           config.MODEL_FAST if simple or rough_refine else config.MODEL_SMART)
         detail = f"draw {len(moments)} system fact(s)"
         if topic_id:
@@ -351,6 +354,16 @@ class Diagrammer:
         # Topic bookkeeping is deterministic and does not consume model tool budget.
         attempts = 0
         if not moments:
+            return draws
+        from agents.repo_diagram import repo_architecture_request, draw_repo
+        if repo_architecture_request(moments, source_lines) is not None:
+            planned = await draw_repo(session, board, topic_id, self._publish_draw, expected_revision)
+            draws.extend(planned)
+            message = ("I mapped the indexed repository files and their import dependencies on the board."
+                       if planned else "I don't have indexed repository files to draw yet. Connect the repository first.")
+            update = session.push_update(message)
+            if inspect.isawaitable(update):
+                await update
             return draws
         from agents.paragraph_diagram import paragraph_request, draw_paragraph
         paragraph = paragraph_request(moments, source_lines)
