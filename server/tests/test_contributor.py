@@ -142,3 +142,28 @@ async def test_missing_code_map_does_not_call_model(monkeypatch):
     result = await Contributor().handle(Session(), {"text": "login"})
     assert result["sources"] == []
     assert "don't have verified repo context" in result["current"]
+
+
+def test_evidence_uses_terms_after_long_pasted_prefix():
+    from agents.contributor import _evidence
+
+    class GeometryMap:
+        files = {'lib/geometryAudit.ts': {}, 'app/page.tsx': {}}
+        def resolve(self, query):
+            return ['lib/geometryAudit.ts'] if 'geometry' in query else []
+        def read_file(self, path, max_chars=2400):
+            return 'export function auditGeometry() { return validateMesh(); }'
+
+    session = Session(GeometryMap())
+    session.active_topic = None
+    request = ' '.join(['Please sketch the connected repository architecture'] * 8) + ' and explain geometry validation'
+    excerpts, _ = _evidence(session, [{'text': request}], {})
+    assert excerpts[0]['path'] == 'lib/geometryAudit.ts'
+
+
+def test_evidence_overview_selects_indexed_non_test_entrypoint():
+    from agents.contributor import _evidence
+    session = Session(Map())
+    session.active_topic = None
+    excerpts, _ = _evidence(session, [{'text': 'Describe repository architecture'}], {})
+    assert excerpts[0]['path'] == 'auth/login.py'

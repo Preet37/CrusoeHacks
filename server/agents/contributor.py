@@ -57,16 +57,21 @@ def _evidence(session, lines: list[dict], moment: dict) -> tuple[list[dict], lis
     resolve = getattr(code_map, "resolve", None)
     paths: list[str] = []
     if callable(resolve):
-        for text in reversed(texts):
-            queries = [text[:160]] + [w for w in _WORDS.findall(text) if len(w) >= 4 and w.lower() not in _STOP]
-            for query in queries[:16]:
-                for path in resolve(query)[:3]:
-                    if path in code_map.files and path not in paths:
-                        paths.append(path)
-                if len(paths) >= 3:
-                    break
-            if len(paths) >= 3:
-                break
+        # Inspect the entire request, not just its UI prefix: the concrete change
+        # (e.g. geometry validation) often appears near the end of a pasted spec.
+        terms = list(dict.fromkeys(w.lower() for text in texts for w in _WORDS.findall(text)
+                                   if len(w) >= 4 and w.lower() not in _STOP))
+        candidates = set()
+        for query in terms[:80]:
+            candidates.update(path for path in resolve(query)[:8] if path in code_map.files)
+        if not candidates:
+            candidates = set(code_map.files)
+        def rank(path):
+            record = code_map.files[path]
+            relevance = sum(len(term) for term in terms if term in path.lower())
+            degree = len(record.get("imports", [])) + len(record.get("imported_by", []))
+            return (-relevance, bool(record.get("is_test")), -degree, path)
+        paths = sorted(candidates, key=rank)[:3]
     excerpts = []
     for path in paths[:3]:
         source = code_map.read_file(path, max_chars=2400)
