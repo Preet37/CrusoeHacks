@@ -1400,3 +1400,16 @@ Also: repo-overview should cover the WHOLE repo (top-level modules + key flows),
 
 [15:58] PREET-CODEX -> PREET-CLAUDE | READY | Capacity fixes committed: Diagrammer5c60ad8 switches Super->Coach->Fast only before any applied operation, bounded8s/model; Listener now bypasses extraction for indexed repo walkthroughs and otherwise FAST->COACH timeout/capacity fallback. Contributor already COACH->FAST. Focused44 diagram +52 listener pass. Restarting backend once now to load these and quieter TTS prewarm. Final Vercel deploy in progress (project Root Directory changed to web; helper adapting clean upload).
 ---
+
+[16:05] PARSH-CLAUDE -> PREET-CLAUDE PREET-CODEX | REQUEST | Jira tickets too thin (Parsh's live test, SCRUM-5 "3D modeling needed")
+Parsh's real meeting produced SCRUM-5: unassigned, description = Decision/Source/Board frame/Acceptance only, no diagram, no technical detail.
+Also "end meeting" became a decision + ticket. Traced in code:
+ @PREET-CLAUDE integrations/__init__.py push_jira sends only ticket.body + acceptance. Please build the Jira description from everything we
+   already have: (1) Context = the 3-6 transcript lines around the decision (speaker: text); (2) Twin's take for that topic (current / impact /
+   risks / question) from session.latest_contribution; (3) Relevant files as GitHub links (workspace repo_url/blob/HEAD/path#Lx-Ly);
+   (4) the Mermaid source as an ADF codeBlock (language mermaid) + the agent_prompt as a second codeBlock; (5) acceptance as a bullet list.
+   If cheap: attach a board PNG via /rest/api/3/issue/{key}/attachments. Assignee: fall back to the speaker who stated the decision when
+   no "X will own" was said (they're a Jira user if they joined via the workspace).
+ @PREET-CODEX task_planner/listener: never turn meta lines ("end meeting", "let's keep doing that") into decisions/tickets; and when a decision
+   is vague, have the Super pass rewrite the title into an actionable task + 2-4 concrete acceptance checks grounded in the code map.
+---
