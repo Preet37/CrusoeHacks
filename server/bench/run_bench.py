@@ -260,6 +260,7 @@ async def run(*, full: bool, concurrency: int, timeout: float) -> dict:
     semaphore = asyncio.Semaphore(concurrency)
     rows = await asyncio.gather(*(_one(*job, semaphore, timeout) for job in jobs))
     return {"created_at": datetime.now(timezone.utc).isoformat(), "mode": "full" if full else "smoke",
+            "scoring_version": 2,
             "timeout_seconds": timeout, "concurrency": concurrency, "labels": LABELS,
             "paragraph": PARAGRAPH, "paragraph_ground_truth": {
                 "nodes": sorted(PARA_NODES), "edges": sorted(map(list, PARA_EDGES))},

@@ -1,0 +1,1833 @@
+{
+  "created_at": "2026-10-17T22:07:18.118444+00:00",
+  "mode": "full",
+  "timeout_seconds": 8.0,
+  "concurrency": 4,
+  "labels": {
+    "01_login_impact": [
+      [
+        "login"
+      ],
+      []
+    ],
+    "02_redis_false_claim": [
+      [
+        "auth",
+        "redis",
+        "jwt"
+      ],
+      [
+        [
+          "auth",
+          "redis"
+        ]
+      ]
+    ],
+    "03_redis_decision": [
+      [
+        "login",
+        "redis"
+      ],
+      [
+        [
+          "login",
+          "redis"
+        ]
+      ]
+    ],
+    "04_web_auth_database": [
+      [
+        "web app",
+        "auth",
+        "postgres"
+      ],
+      [
+        [
+          "web app",
+          "auth"
+        ],
+        [
+          "auth",
+          "postgres"
+        ]
+      ]
+    ],
+    "05_latency_chart": [
+      [
+        "latency",
+        "cache"
+      ],
+      []
+    ],
+    "06_login_mock": [
+      [
+        "login screen"
+      ],
+      []
+    ],
+    "07_jwt_impact": [
+      [
+        "auth/jwt_tokens.py"
+      ],
+      []
+    ],
+    "08_postgres_false_claim": [
+      [
+        "database",
+        "sqlite",
+        "postgres"
+      ],
+      [
+        [
+          "database",
+          "sqlite"
+        ]
+      ]
+    ],
+    "09_notifications_impact": [
+      [
+        "notifications"
+      ],
+      []
+    ],
+    "10_login_decision": [
+      [
+        "login",
+        "redis"
+      ],
+      [
+        [
+          "login",
+          "redis"
+        ]
+      ]
+    ],
+    "11_billing_impact": [
+      [
+        "billing"
+      ],
+      []
+    ],
+    "12_login_correction_and_plan": [
+      [
+        "auth",
+        "redis",
+        "jwt",
+        "login"
+      ],
+      [
+        [
+          "auth",
+          "redis"
+        ],
+        [
+          "login",
+          "redis"
+        ]
+      ]
+    ]
+  },
+  "paragraph": "Draw a layered architecture for a shopping checkout. The browser web app calls the API gateway. The gateway sends identity requests to Auth and orders to Checkout. Auth reads the User DB. Checkout calls Inventory and Payments. Inventory reads the Catalog DB. Payments calls the Fraud service. Checkout publishes order events to the Event Bus. Notifications consumes events from the Event Bus. Put browser, gateway, services, data stores, and events into distinct layers.",
+  "paragraph_ground_truth": {
+    "nodes": [
+      "api gateway",
+      "auth",
+      "catalog db",
+      "checkout",
+      "event bus",
+      "fraud service",
+      "inventory",
+      "notifications",
+      "payments",
+      "user db",
+      "web app"
+    ],
+    "edges": [
+      [
+        "api gateway",
+        "auth"
+      ],
+      [
+        "api gateway",
+        "checkout"
+      ],
+      [
+        "auth",
+        "user db"
+      ],
+      [
+        "checkout",
+        "event bus"
+      ],
+      [
+        "checkout",
+        "inventory"
+      ],
+      [
+        "checkout",
+        "payments"
+      ],
+      [
+        "event bus",
+        "notifications"
+      ],
+      [
+        "inventory",
+        "catalog db"
+      ],
+      [
+        "payments",
+        "fraud service"
+      ],
+      [
+        "web app",
+        "api gateway"
+      ]
+    ]
+  },
+  "summary": [
+    {
+      "model": "Lightning",
+      "task": "extraction",
+      "N_attempted": 12,
+      "N_responses": 12,
+      "N_scored": 12,
+      "p50_ms": 662.5,
+      "p95_ms": 2224.8,
+      "mean_tokens": 104.8,
+      "metrics": {
+        "combined_f1": 0.432,
+        "entity_f1": 0.502,
+        "edge_f1": 0.45
+      }
+    },
+    {
+      "model": "Lightning",
+      "task": "visual_routing",
+      "N_attempted": 3,
+      "N_responses": 3,
+      "N_scored": 3,
+      "p50_ms": 283.0,
+      "p95_ms": 425.6,
+      "mean_tokens": 95.7,
+      "metrics": {
+        "accuracy": 0.333
+      }
+    },
+    {
+      "model": "Lightning",
+      "task": "fact_check",
+      "N_attempted": 2,
+      "N_responses": 2,
+      "N_scored": 2,
+      "p50_ms": 944.4,
+      "p95_ms": 1025.4,
+      "mean_tokens": 323.5,
+      "metrics": {
+        "cited": 1,
+        "caught": 1.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "task": "3d_validity",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 3232.7,
+      "p95_ms": 3232.7,
+      "mean_tokens": 530,
+      "metrics": {
+        "valid": 0.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "task": "paragraph_completeness",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 4200.3,
+      "p95_ms": 4200.3,
+      "mean_tokens": 686,
+      "metrics": {
+        "edge_recall": 1.0,
+        "size_valid": 1,
+        "node_recall": 1.0,
+        "layer_count": 4
+      }
+    },
+    {
+      "model": "Nano",
+      "task": "extraction",
+      "N_attempted": 12,
+      "N_responses": 12,
+      "N_scored": 12,
+      "p50_ms": 1027.8,
+      "p95_ms": 1801.8,
+      "mean_tokens": 141.8,
+      "metrics": {
+        "combined_f1": 0.491,
+        "entity_f1": 0.666,
+        "edge_f1": 0.167
+      }
+    },
+    {
+      "model": "Nano",
+      "task": "visual_routing",
+      "N_attempted": 3,
+      "N_responses": 3,
+      "N_scored": 3,
+      "p50_ms": 391.0,
+      "p95_ms": 429.2,
+      "mean_tokens": 96.3,
+      "metrics": {
+        "accuracy": 0.667
+      }
+    },
+    {
+      "model": "Nano",
+      "task": "fact_check",
+      "N_attempted": 2,
+      "N_responses": 2,
+      "N_scored": 2,
+      "p50_ms": 769.0,
+      "p95_ms": 818.2,
+      "mean_tokens": 283,
+      "metrics": {
+        "cited": 1,
+        "caught": 1.0
+      }
+    },
+    {
+      "model": "Nano",
+      "task": "3d_validity",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 2845.8,
+      "p95_ms": 2845.8,
+      "mean_tokens": 582,
+      "metrics": {
+        "parts": 6,
+        "valid": 1.0
+      }
+    },
+    {
+      "model": "Nano",
+      "task": "paragraph_completeness",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 3586.9,
+      "p95_ms": 3586.9,
+      "mean_tokens": 722,
+      "metrics": {
+        "edge_recall": 0.9,
+        "size_valid": 1,
+        "node_recall": 1.0,
+        "layer_count": 4
+      }
+    },
+    {
+      "model": "Super",
+      "task": "extraction",
+      "N_attempted": 12,
+      "N_responses": 8,
+      "N_scored": 8,
+      "p50_ms": 1485.6,
+      "p95_ms": 2961.2,
+      "mean_tokens": 92.6,
+      "metrics": {
+        "combined_f1": 0.53,
+        "entity_f1": 0.558,
+        "edge_f1": 0.875
+      }
+    },
+    {
+      "model": "Super",
+      "task": "visual_routing",
+      "N_attempted": 3,
+      "N_responses": 3,
+      "N_scored": 3,
+      "p50_ms": 1118.8,
+      "p95_ms": 1960.1,
+      "mean_tokens": 98,
+      "metrics": {
+        "accuracy": 0.667
+      }
+    },
+    {
+      "model": "Super",
+      "task": "fact_check",
+      "N_attempted": 2,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 3326.7,
+      "p95_ms": 3326.7,
+      "mean_tokens": 326,
+      "metrics": {
+        "cited": 1,
+        "caught": 1.0
+      }
+    },
+    {
+      "model": "Super",
+      "task": "3d_validity",
+      "N_attempted": 1,
+      "N_responses": 0,
+      "N_scored": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "mean_tokens": null,
+      "metrics": {}
+    },
+    {
+      "model": "Super",
+      "task": "paragraph_completeness",
+      "N_attempted": 1,
+      "N_responses": 0,
+      "N_scored": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "mean_tokens": null,
+      "metrics": {}
+    },
+    {
+      "model": "Super-VL",
+      "task": "extraction",
+      "N_attempted": 12,
+      "N_responses": 12,
+      "N_scored": 12,
+      "p50_ms": 1089.5,
+      "p95_ms": 2118.6,
+      "mean_tokens": 101.4,
+      "metrics": {
+        "combined_f1": 0.766,
+        "entity_f1": 0.813,
+        "edge_f1": 0.694
+      }
+    },
+    {
+      "model": "Super-VL",
+      "task": "visual_routing",
+      "N_attempted": 3,
+      "N_responses": 3,
+      "N_scored": 3,
+      "p50_ms": 387.3,
+      "p95_ms": 1484.7,
+      "mean_tokens": 97.3,
+      "metrics": {
+        "accuracy": 0.333
+      }
+    },
+    {
+      "model": "Super-VL",
+      "task": "fact_check",
+      "N_attempted": 2,
+      "N_responses": 2,
+      "N_scored": 2,
+      "p50_ms": 1800.2,
+      "p95_ms": 1878.4,
+      "mean_tokens": 266.5,
+      "metrics": {
+        "cited": 1,
+        "caught": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "task": "3d_validity",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 3708.5,
+      "p95_ms": 3708.5,
+      "mean_tokens": 448,
+      "metrics": {
+        "valid": 0.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "task": "paragraph_completeness",
+      "N_attempted": 1,
+      "N_responses": 1,
+      "N_scored": 1,
+      "p50_ms": 3191.2,
+      "p95_ms": 3191.2,
+      "mean_tokens": 757,
+      "metrics": {
+        "edge_recall": 1.0,
+        "size_valid": 1,
+        "node_recall": 1.0,
+        "layer_count": 5
+      }
+    }
+  ],
+  "rows": [
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "01_login_impact",
+      "request": "Twin, what does changing login touch?",
+      "latency_ms": 2267.1,
+      "raw_response": "{\n  \"entities\": [\n    \"login\",\n    \"touch\",\n    \"browser\",\n    \"settings\"\n  ],\n  \"edges\": [\n    [\n      \"login\",\n      \"touch\",\n      \"user interaction\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 50,
+        "total": 120
+      },
+      "metrics": {
+        "entity_f1": 0.4,
+        "edge_f1": 0.0,
+        "combined_f1": 0.3333333333333333
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "02_redis_false_claim",
+      "request": "Auth already uses Redis sessions instead of JWT.",
+      "latency_ms": 1405.1,
+      "raw_response": "{\n  \"entities\": [\"Auth\", \"Redis\", \"JWT\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 22,
+        "total": 92
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 0.0,
+        "combined_f1": 0.8571428571428571
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "03_redis_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1408.4,
+      "raw_response": "{\n  \"entities\": [\"redis\", \"login\", \"avery\"],\n  \"edges\": [[\"login\", \"redis\"]]\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 29,
+        "total": 104
+      },
+      "metrics": {
+        "entity_f1": 0.8,
+        "edge_f1": 1.0,
+        "combined_f1": 0.8571428571428571
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 2190.2,
+      "raw_response": "{\n  \"entities\": [\"web app\", \"auth service\", \"users\", \"postgres\"],\n  \"edges\": [[\"web app\", \"talks to\", \"auth service\"], [\"auth service\", \"stores\", \"users\"], [\"users\", \"stored in\", \"postgres\"]]\n}",
+      "tokens": {
+        "prompt": 78,
+        "completion": 64,
+        "total": 142
+      },
+      "metrics": {
+        "entity_f1": 0.8571428571428571,
+        "edge_f1": 0.4,
+        "combined_f1": 0.6666666666666666
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 804.4,
+      "raw_response": "{\n  \"entities\": [\"p95 latency\", \"cache\"],\n  \"edges\": [[\"p95 latency\", \"cache\", \"went from 420 to 180 milliseconds after\"]]\n}",
+      "tokens": {
+        "prompt": 82,
+        "completion": 46,
+        "total": 128
+      },
+      "metrics": {
+        "entity_f1": 0.5,
+        "edge_f1": 0.0,
+        "combined_f1": 0.4
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 793.3,
+      "raw_response": "{\n  \"entities\": [\"new login screen\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 17,
+        "total": 87
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "07_jwt_impact",
+      "request": "Twin, what does changing auth/jwt_tokens.py touch?",
+      "latency_ms": 332.2,
+      "raw_response": "{\n  \"entities\": [\"auth\", \"jwt_tokens\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 74,
+        "completion": 19,
+        "total": 93
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "08_postgres_false_claim",
+      "request": "The database now uses SQLite instead of Postgres.",
+      "latency_ms": 422.5,
+      "raw_response": "{\n  \"entities\": [\"sqlite\", \"postgres\"],\n  \"edges\": [[\"postgres\", \"sqlite\"]]\n}",
+      "tokens": {
+        "prompt": 71,
+        "completion": 27,
+        "total": 98
+      },
+      "metrics": {
+        "entity_f1": 0.8,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5714285714285714
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "09_notifications_impact",
+      "request": "Twin, what does changing notifications touch?",
+      "latency_ms": 319.3,
+      "raw_response": "{\n  \"entities\": [\"notifications\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 16,
+        "total": 86
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "10_login_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 412.3,
+      "raw_response": "{\n  \"entities\": [\"redis sessions\", \"avery\"],\n  \"edges\": [[\"login\", \"avery\"]]\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 28,
+        "total": 103
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 0.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "11_billing_impact",
+      "request": "Twin, what does changing billing touch?",
+      "latency_ms": 337.4,
+      "raw_response": "{\n  \"entities\": [],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 13,
+        "total": 83
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "extraction",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 531.7,
+      "raw_response": "{\n  \"entities\": [\"redis\", \"sessions\", \"jwt\", \"login\", \"avery\"],\n  \"edges\": [[\"jwt\", \"redis session\"]]\n}",
+      "tokens": {
+        "prompt": 84,
+        "completion": 37,
+        "total": 121
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 441.5,
+      "raw_response": "{ \"visual\": \"none\" }",
+      "tokens": {
+        "prompt": 88,
+        "completion": 9,
+        "total": 97
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_box"
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 283.0,
+      "raw_response": "{ \"visual\": \"add_chart\" }",
+      "tokens": {
+        "prompt": 92,
+        "completion": 11,
+        "total": 103
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_chart"
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 221.3,
+      "raw_response": "{\"visual\": \"none\"}",
+      "tokens": {
+        "prompt": 80,
+        "completion": 7,
+        "total": 87
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_mock"
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "fact_check",
+      "case_id": "02_redis_false_claim",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 1034.4,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The provided code from lines 18-24 of demo_project/auth/login.py calls the function `issue_token(user.id, [\\\"invoices:write\\\"], secret)` on line 24. This function generates and returns a JWT (JSON Web Token), as indicated by its name and the typical behavior of token-issuing functions in authentication systems. The claim that 'Auth already uses Redis sessions instead of JWT' is contradicted by this implementation, which explicitly issues a JWT upon successful login.\"\n}",
+      "tokens": {
+        "prompt": 192,
+        "completion": 136,
+        "total": 328
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "fact_check",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 854.3,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The login function in demo_project/auth/login.py:18-24 returns the result of `issue_token(user.id, ['invoices:write'], secret)`, which indicates this code uses JWT tokens rather than Redis sessions. A Redis session implementation would typically set a session identifier in a cookie or store session data in Redis, rather than issuing a token via an `issue_token` function call.\"\n}",
+      "tokens": {
+        "prompt": 206,
+        "completion": 113,
+        "total": 319
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "3d_validity",
+      "case_id": "3d_validity",
+      "request": "Show a three-joint robot arm.",
+      "latency_ms": 3232.7,
+      "raw_response": "{\n  \"scene\": {\n    \"objects\": [\n      {\n        \"id\": \"base_link\",\n        \"shape\": \"box\",\n        \"pos\": [0.0, 0.0, 0.0],\n        \"scale\": [0.6, 0.2, 0.2],\n        \"color\": \"#2C3E50\",\n        \"label\": \"base\"\n      },\n      {\n        \"id\": \"shoulder_link\",\n        \"shape\": \"box\",\n        \"pos\": [0.0, 0.3, 0.0],\n        \"scale\": [0.4, 0.1, 0.1],\n        \"color\": \"#E74C3C\",\n        \"label\": \"shoulder\"\n      },\n      {\n        \"id\": \"elbow_link\",\n        \"shape\": \"box\",\n        \"pos\": [0.0, 0.65, 0.0],\n        \"scale\": [0.3, 0.1, 0.1],\n        \"color\": \"#F1C40F\",\n        \"label\": \"elbow\"\n      },\n      {\n        \"id\": \"wrist_link\",\n        \"shape\": \"box\",\n        \"pos\": [0.0, 1.05, 0.0],\n        \"scale\": [0.2, 0.08, 0.08],\n        \"color\": \"#2ECC71\",\n        \"label\": \"wrist\"\n      },\n      {\n        \"id\": \"hand_link\",\n        \"shape\": \"box\",\n        \"pos\": [0.0, 1.35, 0.0],\n        \"scale\": [0.15, 0.06, 0.06],\n        \"color\": \"#9B59B6\",\n        \"label\": \"hand\"\n      }\n    ]\n  }\n}",
+      "tokens": {
+        "prompt": 120,
+        "completion": 410,
+        "total": 530
+      },
+      "metrics": {
+        "valid": 0.0,
+        "validation_issue": "3D structural issues: requested 3 joints; found 0 joint-named parts; floating parts do not touch another part: base_link, shoulder_link, elbow_link, wrist_link, hand_link"
+      }
+    },
+    {
+      "model": "Lightning",
+      "model_id": "nvidia/Nemotron-3.5-Lightning-30B-A3B",
+      "task": "paragraph_completeness",
+      "case_id": "paragraph_completeness",
+      "request": "Draw a layered architecture for a shopping checkout. The browser web app calls the API gateway. The gateway sends identity requests to Auth and orders to Checkout. Auth reads the User DB. Checkout calls Inventory and Payments. Inventory reads the Catalog DB. Payments calls the Fraud service. Checkout publishes order events to the Event Bus. Notifications consumes events from the Event Bus. Put browser, gateway, services, data stores, and events into distinct layers.",
+      "latency_ms": 4200.3,
+      "raw_response": "{\n  \"nodes\": [\n    { \"id\": \"browser\", \"label\": \"Browser Web App\", \"layer\": 1 },\n    { \"id\": \"api_gateway\", \"label\": \"API Gateway\", \"layer\": 1 },\n    { \"id\": \"auth\", \"label\": \"Auth Service\", \"layer\": 2 },\n    { \"id\": \"checkout\", \"label\": \"Checkout Service\", \"layer\": 2 },\n    { \"id\": \"inventory\", \"label\": \"Inventory Service\", \"layer\": 2 },\n    { \"id\": \"payments\", \"label\": \"Payments Service\", \"layer\": 2 },\n    { \"id\": \"fraud\", \"label\": \"Fraud Service\", \"layer\": 3 },\n    { \"id\": \"event_bus\", \"label\": \"Event Bus\", \"layer\": 3 },\n    { \"id\": \"notifications\", \"label\": \"Notifications Service\", \"layer\": 3 },\n    { \"id\": \"user_db\", \"label\": \"User DB\", \"layer\": 4 },\n    { \"id\": \"catalog_db\", \"label\": \"Catalog DB\", \"layer\": 4 },\n    { \"id\": \"order_events\", \"label\": \"Order Events\", \"layer\": 3 }\n  ],\n  \"edges\": [\n    { \"from\": \"browser\", \"to\": \"api_gateway\", \"label\": \"HTTP Request\" },\n    { \"from\": \"api_gateway\", \"to\": \"auth\", \"label\": \"Identity Request\" },\n    { \"from\": \"api_gateway\", \"to\": \"checkout\", \"label\": \"Order Request\" },\n    { \"from\": \"auth\", \"to\": \"user_db\", \"label\": \"Read User\" },\n    { \"from\": \"checkout\", \"to\": \"inventory\", \"label\": \"Check Stock\" },\n    { \"from\": \"checkout\", \"to\": \"payments\", \"label\": \"Process Payment\" },\n    { \"from\": \"payments\", \"to\": \"fraud\", \"label\": \"Fraud Check\" },\n    { \"from\": \"inventory\", \"to\": \"catalog_db\", \"label\": \"Read Catalog\" },\n    { \"from\": \"checkout\", \"to\": \"event_bus\", \"label\": \"Publish Order Events\" },\n    { \"from\": \"event_bus\", \"to\": \"notifications\", \"label\": \"Consume Events\" }\n  ]\n}",
+      "tokens": {
+        "prompt": 168,
+        "completion": 518,
+        "total": 686
+      },
+      "metrics": {
+        "node_recall": 1.0,
+        "edge_recall": 1.0,
+        "layer_count": 4,
+        "size_valid": true
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "01_login_impact",
+      "request": "Twin, what does changing login touch?",
+      "latency_ms": 592.8,
+      "raw_response": "{\n  \"entities\": [\n    \"login\",\n    \"twin\"\n  ],\n  \"edges\": [\n    [\n      \"twin\",\n      \"login\",\n      \"changes\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 43,
+        "total": 113
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "02_redis_false_claim",
+      "request": "Auth already uses Redis sessions instead of JWT.",
+      "latency_ms": 591.7,
+      "raw_response": "{\n  \"entities\": [\"redis\", \"jwt\", \"session\"],\n  \"edges\": [\n    [\"redis\", \"auth\", \"session\"],\n    [\"auth\", \"uses\", \"session\"],\n    [\"session\", \"replace\", \"jwt\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 53,
+        "total": 123
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.4
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "03_redis_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1799.6,
+      "raw_response": "{\n  \"entities\": [\n    \"migrate\",\n    \"login\",\n    \"redis\",\n    \"sessions\",\n    \"own\"\n  ],\n  \"edges\": [\n    [\n      \"migrate\",\n      \"login\",\n      \"target\"\n    ],\n    [\n      \"login\",\n      \"redis\",\n      \"migrate_to\"\n    ],\n    [\n      \"sessions\",\n      \"redis\",\n      \"migrate_to\"\n    ],\n    [\n      \"migrate\",\n      \"sessions\",\n      \"target\"\n    ],\n    [\n      \"migrate\",\n      \"redis\",\n      \"target\"\n    ],\n    [\n      \"login\",\n      \"sessions\",\n      \"target\"\n    ],\n    [\n      \"migrate\",\n      \"own\",\n      \"target\"\n    ],\n    [\n      \"own\",\n      \"averyl\",\n      \"target\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 179,
+        "total": 254
+      },
+      "metrics": {
+        "entity_f1": 0.5714285714285714,
+        "edge_f1": 0.0,
+        "combined_f1": 0.3076923076923077
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 935.1,
+      "raw_response": "{\n  \"entities\": [\n    \"web app\",\n    \"auth service\",\n    \"postgres\"\n  ],\n  \"edges\": [\n    [\n      \"web app\",\n      \"talks to\",\n      \"auth service\"\n    ],\n    [\n      \"auth service\",\n      \"stores users in\",\n      \"postgres\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 78,
+        "completion": 73,
+        "total": 151
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 1804.6,
+      "raw_response": "{\n  \"entities\": [\n    \"p95 latency\",\n    \"cache\",\n    \"420\",\n    \"180\",\n    \"milliseconds\"\n  ],\n  \"edges\": [\n    [\"went from\", \"420\"],\n    [\"420\", \"milliseconds\"],\n    [\"went from\", \"p95 latency\"],\n    [\"p95 latency\", \"after\"],\n    [\"after\", \"cache\"],\n    [\"went to\", \"180\"],\n    [\"180\", \"milliseconds\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 82,
+        "completion": 113,
+        "total": 195
+      },
+      "metrics": {
+        "entity_f1": 0.2857142857142857,
+        "edge_f1": 0.0,
+        "combined_f1": 0.14285714285714285
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 980.1,
+      "raw_response": "{\n  \"entities\": [\"login screen\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 16,
+        "total": 86
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "07_jwt_impact",
+      "request": "Twin, what does changing auth/jwt_tokens.py touch?",
+      "latency_ms": 973.7,
+      "raw_response": "{\n  \"entities\": [\"auth/jwt_tokens.py\"],\n  \"edges\": [[\"twin\", \"auth/jwt_tokens.py\"]]\n}",
+      "tokens": {
+        "prompt": 74,
+        "completion": 31,
+        "total": 105
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 0.0,
+        "combined_f1": 0.6666666666666666
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "08_postgres_false_claim",
+      "request": "The database now uses SQLite instead of Postgres.",
+      "latency_ms": 1034.1,
+      "raw_response": "{\n  \"entities\": [\n    \"sqlite\",\n    \"postgres\"\n  ],\n  \"edges\": [\n    [\n      \"sqlite\",\n      \"replaces\",\n      \"postgres\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 71,
+        "completion": 44,
+        "total": 115
+      },
+      "metrics": {
+        "entity_f1": 0.8,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5714285714285714
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "09_notifications_impact",
+      "request": "Twin, what does changing notifications touch?",
+      "latency_ms": 1029.7,
+      "raw_response": "{\n  \"entities\": [\"twin\", \"notifications\"],\n  \"edges\": [[\"twin\", \"touch\"], [\"notifications\", \"touch\"]]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 35,
+        "total": 105
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.4
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "10_login_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1045.7,
+      "raw_response": "{\n  \"entities\": [\n    \"redis sessions\",\n    \"avery\"\n  ],\n  \"edges\": [\n    [\"login\", \"migrate\", \"redis sessions\"],\n    [\"migrate\", \"migrate\", \"redis sessions\"],\n    [\"redis sessions\", \"owned by\", \"avery\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 65,
+        "total": 140
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 0.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "11_billing_impact",
+      "request": "Twin, what does changing billing touch?",
+      "latency_ms": 1025.8,
+      "raw_response": "{\n  \"entities\": [\n    \"twin\",\n    \"billing\"\n  ],\n  \"edges\": [\n    [\n      \"billing\",\n      \"changed\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 40,
+        "total": 110
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "extraction",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1031.0,
+      "raw_response": "{\n  \"entities\": [\n    \"auth\",\n    \"redis sessions\",\n    \"jwt\",\n    \"login\",\n    \"redis sessions\",\n    \"avery\"\n  ],\n  \"edges\": [\n    [\n      \"auth\",\n      \"uses\",\n      \"redis sessions\"\n    ],\n    [\n      \"auth\",\n      \"decided to migrate\",\n      \"login\"\n    ],\n    [\n      \"login\",\n      \"migrated to\",\n      \"redis sessions\"\n    ],\n    [\n      \"rediss sessions\",\n      \"owned by\",\n      \"avery\"\n    ]\n  ]\n}",
+      "tokens": {
+        "prompt": 84,
+        "completion": 120,
+        "total": 204
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.4
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 379.8,
+      "raw_response": "{\n  \"visual\": \"add_mermaid\"\n}",
+      "tokens": {
+        "prompt": 88,
+        "completion": 13,
+        "total": 101
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_box"
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 433.4,
+      "raw_response": "{\"visual\":\"add_chart\"}",
+      "tokens": {
+        "prompt": 92,
+        "completion": 8,
+        "total": 100
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_chart"
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "visual_routing",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 391.0,
+      "raw_response": "{\"visual\":\"add_mock\"}",
+      "tokens": {
+        "prompt": 80,
+        "completion": 8,
+        "total": 88
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_mock"
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "fact_check",
+      "case_id": "02_redis_false_claim",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 823.7,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The code explicitly calls `issue_token`, which matches the claim about JWT token issuance, and there is no reference to `Redis`;\\nconsequently, the claim about Auth using Redis sessions instead of JWT is not supported and directly contradicts the provided source excerpt.\"}",
+      "tokens": {
+        "prompt": 192,
+        "completion": 88,
+        "total": 280
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "fact_check",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 714.4,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The source shows the login function ending with 'return issue_token(user.id, [\\\"invoices:write\\\"], secret)' which issues a JWT token, directly contradicting the claim that login now uses Redis sessions instead of JWT.\"\n}",
+      "tokens": {
+        "prompt": 206,
+        "completion": 80,
+        "total": 286
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "3d_validity",
+      "case_id": "3d_validity",
+      "request": "Show a three-joint robot arm.",
+      "latency_ms": 2845.8,
+      "raw_response": "{\n  \"scene\": {\n    \"objects\": [\n      {\n        \"id\": \"joint1\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 0],\n        \"scale\": [0.1, 0.1, 1.5],\n        \"color\": \"#8B4513\",\n        \"label\": \"Base\"\n      },\n      {\n        \"id\": \"joint2\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 1.5],\n        \"scale\": [0.08, 0.08, 1.2],\n        \"color\": \"#A52A2A\",\n        \"label\": \"Shoulder\"\n      },\n      {\n        \"id\": \"joint3\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 2.7],\n        \"scale\": [0.06, 0.06, 1.0],\n        \"color\": \"#DEB887\",\n        \"label\": \"Elbow\"\n      },\n      {\n        \"id\": \"link1\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 0.75],\n        \"scale\": [0.2, 0.2, 1.5],\n        \"color\": \"#808080\",\n        \"label\": \"Link1\"\n      },\n      {\n        \"id\": \"link2\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 2.0],\n        \"scale\": [0.2, 0.2, 1.2],\n        \"color\": \"#808080\",\n        \"label\": \"Link2\"\n      },\n      {\n        \"id\": \"link3\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0, 3.5],\n        \"scale\": [0.2, 0.2, 1.0],\n        \"color\": \"#808080\",\n        \"label\": \"Link3\"\n      }\n    ]\n  }\n}",
+      "tokens": {
+        "prompt": 120,
+        "completion": 462,
+        "total": 582
+      },
+      "metrics": {
+        "valid": 1.0,
+        "parts": 6
+      }
+    },
+    {
+      "model": "Nano",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "task": "paragraph_completeness",
+      "case_id": "paragraph_completeness",
+      "request": "Draw a layered architecture for a shopping checkout. The browser web app calls the API gateway. The gateway sends identity requests to Auth and orders to Checkout. Auth reads the User DB. Checkout calls Inventory and Payments. Inventory reads the Catalog DB. Payments calls the Fraud service. Checkout publishes order events to the Event Bus. Notifications consumes events from the Event Bus. Put browser, gateway, services, data stores, and events into distinct layers.",
+      "latency_ms": 3586.9,
+      "raw_response": "{\n  \"nodes\": [\n    { \"id\": \"browser\", \"layer\": 1, \"label\": \"Browser\" },\n    { \"id\": \"gateway\", \"layer\": 2, \"label\": \"API Gateway\" },\n    { \"id\": \"auth\", \"layer\": 3, \"label\": \"Auth Service\" },\n    { \"id\": \"checkout\", \"layer\": 3, \"label\": \"Checkout Service\" },\n    { \"id\": \"inventory\", \"layer\": 3, \"label\": \"Inventory Service\" },\n    { \"id\": \"payments\", \"layer\": 3, \"label\": \"Payments Service\" },\n    { \"id\": \"fraud\", \"layer\": 4, \"label\": \"Fraud Service\" },\n    { \"id\": \"user_db\", \"layer\": 4, \"label\": \"User DB\" },\n    { \"id\": \"catalog_db\", \"layer\": 4, \"label\": \"Catalog DB\" },\n    { \"id\": \"order_events\", \"layer\": 2, \"label\": \"Order Events\" },\n    { \"id\": \"event_bus\", \"layer\": 2, \"label\": \"Event Bus\" },\n    { \"id\": \"notifications\", \"layer\": 2, \"label\": \"Notifications\" }\n  ],\n  \"edges\": [\n    { \"from\": \"browser\", \"to\": \"gateway\", \"label\": \"calls\" },\n    { \"from\": \"gateway\", \"to\": \"auth\", \"label\": \"sends identity request to\" },\n    { \"from\": \"gateway\", \"to\": \"checkout\", \"label\": \"sends order request to\" },\n    { \"from\": \"auth\", \"to\": \"user_db\", \"label\": \"reads from\" },\n    { \"from\": \"checkout\", \"to\": \"inventory\", \"label\": \"calls\" },\n    { \"from\": \"inventory\", \"to\": \"catalog_db\", \"label\": \"reads from\" },\n    { \"from\": \"checkout\", \"to\": \"payments\", \"label\": \"calls\" },\n    { \"from\": \"payments\", \"to\": \"fraud\", \"label\": \"calls\" },\n    { \"from\": \"checkout\", \"to\": \"order_events\", \"label\": \"publishes\" },\n    { \"from\": \"order_events\", \"to\": \"event_bus\", \"label\": \"publishes to\" },\n    { \"from\": \"event_bus\", \"to\": \"notifications\", \"label\": \"consumes\" }\n  ]\n}",
+      "tokens": {
+        "prompt": 168,
+        "completion": 554,
+        "total": 722
+      },
+      "metrics": {
+        "node_recall": 1.0,
+        "edge_recall": 0.9,
+        "layer_count": 4,
+        "size_valid": true
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "01_login_impact",
+      "request": "Twin, what does changing login touch?",
+      "latency_ms": 619.1,
+      "raw_response": "{\n  \"entities\": [\"login\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 15,
+        "total": 85
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "02_redis_false_claim",
+      "request": "Auth already uses Redis sessions instead of JWT.",
+      "latency_ms": 2075.1,
+      "raw_response": "{\n  \"entities\": [\"redis\", \"jwt\"],\n  \"edges\": [[\"redis\", \"jwt\"]]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 25,
+        "total": 95
+      },
+      "metrics": {
+        "entity_f1": 0.8,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5714285714285714
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "03_redis_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 2881.7,
+      "error": "InternalServerError: Error code: 503 - {'code': 'capacity_unavailable', 'message': 'No capacity available, retry later', 'error_id': '3cd14b5959b5ff0fdba888740dfd93ea'}"
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 1635.6,
+      "raw_response": "{\n  \"entities\": [\"web app\", \"auth service\", \"postgres\"],\n  \"edges\": [\n    [\"web app\", \"auth service\"],\n    [\"auth service\", \"postgres\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 78,
+        "completion": 44,
+        "total": 122
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 1335.6,
+      "raw_response": "{\n  \"entities\": [\"cache\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 82,
+        "completion": 15,
+        "total": 97
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 1.0,
+        "combined_f1": 0.6666666666666666
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 480.9,
+      "raw_response": "{\n  \"entities\": [],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 13,
+        "total": 83
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "07_jwt_impact",
+      "request": "Twin, what does changing auth/jwt_tokens.py touch?",
+      "latency_ms": 3027.8,
+      "raw_response": "{\n  \"entities\": [\"auth/jwt_tokens.py\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 74,
+        "completion": 19,
+        "total": 93
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "08_postgres_false_claim",
+      "request": "The database now uses SQLite instead of Postgres.",
+      "latency_ms": 2057.7,
+      "error": "InternalServerError: Error code: 503 - {'code': 'capacity_unavailable', 'message': 'No capacity available, retry later', 'error_id': '903bfc9f1fed9a789c0d571bb16d7e90'}"
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "09_notifications_impact",
+      "request": "Twin, what does changing notifications touch?",
+      "latency_ms": 622.4,
+      "raw_response": "{\n  \"entities\": [],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 13,
+        "total": 83
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "10_login_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 2114.3,
+      "error": "InternalServerError: Error code: 503 - {'code': 'capacity_unavailable', 'message': 'No capacity available, retry later', 'error_id': '25ccfbc63d57ad04f942e7d707e8a3ab'}"
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "11_billing_impact",
+      "request": "Twin, what does changing billing touch?",
+      "latency_ms": 2837.5,
+      "raw_response": "{\n  \"entities\": [],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 13,
+        "total": 83
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "extraction",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 2213.4,
+      "error": "InternalServerError: Error code: 503 - {'code': 'capacity_unavailable', 'message': 'No capacity available, retry later', 'error_id': '490733f9c23a693ac59351d0214ea60f'}"
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "visual_routing",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 439.5,
+      "raw_response": "{\n  \"visual\": \"none\"\n}",
+      "tokens": {
+        "prompt": 88,
+        "completion": 10,
+        "total": 98
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_box"
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "visual_routing",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 1118.8,
+      "raw_response": "{\n  \"visual\": \"add_chart\"\n}",
+      "tokens": {
+        "prompt": 92,
+        "completion": 12,
+        "total": 104
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_chart"
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "visual_routing",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 2053.6,
+      "raw_response": "{\n  \"visual\": \"add_mock\"\n}",
+      "tokens": {
+        "prompt": 80,
+        "completion": 12,
+        "total": 92
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_mock"
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "fact_check",
+      "case_id": "02_redis_false_claim",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 3326.7,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The source code shows the login function returns a token issued by `issue_token(user.id, ['invoices:write'], secret)`, which indicates JWT-based token issuance (common pattern for JWTs). There is no mention of Redis, session storage, or session IDs in the provided excerpt. Since the function returns a signed token (likely JWT) and does not interact with a session store like Redis, the claim that 'Auth already uses Redis sessions instead of JWT' is contradicted by the code.\"\n}",
+      "tokens": {
+        "prompt": 192,
+        "completion": 134,
+        "total": 326
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "fact_check",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 2552.5,
+      "error": "InternalServerError: Error code: 503 - {'code': 'capacity_unavailable', 'message': 'No capacity available, retry later', 'error_id': 'cb01f0bc186f6e2bcedf2d9367fa0fee'}"
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "3d_validity",
+      "case_id": "3d_validity",
+      "request": "Show a three-joint robot arm.",
+      "latency_ms": 8004.5,
+      "error": "TimeoutError: "
+    },
+    {
+      "model": "Super",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "task": "paragraph_completeness",
+      "case_id": "paragraph_completeness",
+      "request": "Draw a layered architecture for a shopping checkout. The browser web app calls the API gateway. The gateway sends identity requests to Auth and orders to Checkout. Auth reads the User DB. Checkout calls Inventory and Payments. Inventory reads the Catalog DB. Payments calls the Fraud service. Checkout publishes order events to the Event Bus. Notifications consumes events from the Event Bus. Put browser, gateway, services, data stores, and events into distinct layers.",
+      "latency_ms": 8006.8,
+      "error": "TimeoutError: "
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "01_login_impact",
+      "request": "Twin, what does changing login touch?",
+      "latency_ms": 1432.3,
+      "raw_response": "{\n  \"entities\": [\"login\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 15,
+        "total": 85
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "02_redis_false_claim",
+      "request": "Auth already uses Redis sessions instead of JWT.",
+      "latency_ms": 2523.7,
+      "raw_response": "{\n  \"entities\": [\"auth\", \"redis\", \"jwt\"],\n  \"edges\": [\n    [\"auth\", \"redis\"],\n    [\"auth\", \"jwt\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 37,
+        "total": 107
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 0.6666666666666666,
+        "combined_f1": 0.8888888888888888
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "03_redis_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1479.9,
+      "raw_response": "{\n  \"entities\": [\"redis\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 15,
+        "total": 90
+      },
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "edge_f1": 0.0,
+        "combined_f1": 0.5
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 1787.2,
+      "raw_response": "{\n  \"entities\": [\"web app\", \"auth service\", \"postgres\"],\n  \"edges\": [\n    [\"web app\", \"auth service\"],\n    [\"auth service\", \"postgres\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 78,
+        "completion": 44,
+        "total": 122
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 1785.0,
+      "raw_response": "{\n  \"entities\": [\"p95 latency\", \"milliseconds\", \"cache\"],\n  \"edges\": [[\"p95 latency\", \"cache\"]]\n}",
+      "tokens": {
+        "prompt": 82,
+        "completion": 35,
+        "total": 117
+      },
+      "metrics": {
+        "entity_f1": 0.4,
+        "edge_f1": 0.0,
+        "combined_f1": 0.3333333333333333
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 612.5,
+      "raw_response": "{\n  \"entities\": [\"login screen\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 16,
+        "total": 86
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "07_jwt_impact",
+      "request": "Twin, what does changing auth/jwt_tokens.py touch?",
+      "latency_ms": 630.8,
+      "raw_response": "{\n  \"entities\": [\n    \"auth/jwt_tokens.py\"\n  ],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 74,
+        "completion": 23,
+        "total": 97
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "08_postgres_false_claim",
+      "request": "The database now uses SQLite instead of Postgres.",
+      "latency_ms": 879.5,
+      "raw_response": "{\n  \"entities\": [\"sqlite\", \"postgres\"],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 71,
+        "completion": 19,
+        "total": 90
+      },
+      "metrics": {
+        "entity_f1": 0.8,
+        "edge_f1": 0.0,
+        "combined_f1": 0.6666666666666666
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "09_notifications_impact",
+      "request": "Twin, what does changing notifications touch?",
+      "latency_ms": 854.0,
+      "raw_response": "{\"entities\": [], \"edges\": []}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 10,
+        "total": 80
+      },
+      "metrics": {
+        "entity_f1": 0.0,
+        "edge_f1": 1.0,
+        "combined_f1": 0.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "10_login_decision",
+      "request": "We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 1299.6,
+      "raw_response": "{\n  \"entities\": [\"redis\", \"login\"],\n  \"edges\": [\n    [\"login\", \"redis\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 75,
+        "completion": 27,
+        "total": 102
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "11_billing_impact",
+      "request": "Twin, what does changing billing touch?",
+      "latency_ms": 689.9,
+      "raw_response": "{\n  \"entities\": [\n    \"billing\"\n  ],\n  \"edges\": []\n}",
+      "tokens": {
+        "prompt": 70,
+        "completion": 20,
+        "total": 90
+      },
+      "metrics": {
+        "entity_f1": 1.0,
+        "edge_f1": 1.0,
+        "combined_f1": 1.0
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "extraction",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.",
+      "latency_ms": 874.7,
+      "raw_response": "{\n  \"entities\": [\n    \"auth\",\n    \"redis\",\n    \"jwt\",\n    \"login\",\n    \"avery\"\n  ],\n  \"edges\": [\n    [\"auth\", \"redis\"],\n    [\"auth\", \"jwt\"],\n    [\"login\", \"redis\"],\n    [\"avery\", \"login\"]\n  ]\n}",
+      "tokens": {
+        "prompt": 84,
+        "completion": 67,
+        "total": 151
+      },
+      "metrics": {
+        "entity_f1": 0.8888888888888888,
+        "edge_f1": 0.6666666666666666,
+        "combined_f1": 0.8
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "visual_routing",
+      "case_id": "04_web_auth_database",
+      "request": "Our web app talks to an auth service, and auth stores users in Postgres.",
+      "latency_ms": 1606.6,
+      "raw_response": "{\"visual\": \"add_mermaid\"}",
+      "tokens": {
+        "prompt": 88,
+        "completion": 10,
+        "total": 98
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_box"
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "visual_routing",
+      "case_id": "05_latency_chart",
+      "request": "Our p95 latency went from 420 to 180 milliseconds after the cache.",
+      "latency_ms": 387.3,
+      "raw_response": "{\n  \"visual\": \"none\"\n}",
+      "tokens": {
+        "prompt": 92,
+        "completion": 10,
+        "total": 102
+      },
+      "metrics": {
+        "accuracy": 0.0,
+        "expected": "add_chart"
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "visual_routing",
+      "case_id": "06_login_mock",
+      "request": "What would the new login screen look like?",
+      "latency_ms": 356.2,
+      "raw_response": "{\n  \"visual\": \"add_mock\"\n}",
+      "tokens": {
+        "prompt": 80,
+        "completion": 12,
+        "total": 92
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "expected": "add_mock"
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "fact_check",
+      "case_id": "02_redis_false_claim",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 1887.1,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The source code demonstrates that the login function uses issue_token to generate a token using a secret, which is indicative of JWT-based authentication. There is no evidence of Redis session usage in the provided excerpt.\"\n}",
+      "tokens": {
+        "prompt": 192,
+        "completion": 74,
+        "total": 266
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "fact_check",
+      "case_id": "12_login_correction_and_plan",
+      "request": "Claim: Auth already uses Redis sessions instead of JWT. We decided to migrate login to Redis sessions; Avery will own it.\nSource:\n18: def login(email: str, password: str, find_user, secret: str) -> str:\n19:     user: User | None = find_user(email)\n20:     if user is None or not hmac.compare_digest(\n21:         password_digest(password, user.salt), user.password_hash\n22:     ):\n23:         raise LoginError(\"Invalid credentials\")\n24:     return issue_token(user.id, [\"invoices:write\"], secret)",
+      "latency_ms": 1713.3,
+      "raw_response": "{\n  \"contradiction\": true,\n  \"source\": \"demo_project/auth/login.py:18-24\",\n  \"explanation\": \"The code implements JWT-based authentication via the issue_token function rather than Redis sessions, contradicting the claim that login already uses Redis sessions.\"\n}",
+      "tokens": {
+        "prompt": 206,
+        "completion": 61,
+        "total": 267
+      },
+      "metrics": {
+        "caught": 1.0,
+        "expected_source": "demo_project/auth/login.py:18-24",
+        "cited": true
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "3d_validity",
+      "case_id": "3d_validity",
+      "request": "Show a three-joint robot arm.",
+      "latency_ms": 3708.5,
+      "raw_response": "{\n  \"scene\": {\n    \"objects\": [\n      {\n        \"id\": \"base\",\n        \"shape\": \"cylinder\",\n        \"pos\": [0, 0.25, 0],\n        \"scale\": [0.6, 0.5, 0.6],\n        \"color\": \"#2C3E50\",\n        \"label\": \"Joint 1\"\n      },\n      {\n        \"id\": \"upper_arm\",\n        \"shape\": \"box\",\n        \"pos\": [0.5, 0.75, 0],\n        \"scale\": [1.0, 0.3, 0.3],\n        \"color\": \"#34495E\",\n        \"label\": \"Joint 2\"\n      },\n      {\n        \"id\": \"forearm\",\n        \"shape\": \"box\",\n        \"pos\": [1.0, 0.75, 0],\n        \"scale\": [1.0, 0.25, 0.25],\n        \"color\": \"#7F8C8D\",\n        \"label\": \"Joint 3\"\n      },\n      {\n        \"id\": \"end_effector\",\n        \"shape\": \"box\",\n        \"pos\": [1.5, 0.75, 0],\n        \"scale\": [0.3, 0.2, 0.2],\n        \"color\": \"#95A5A6\",\n        \"label\": \"Gripper\"\n      }\n    ]\n  }\n}",
+      "tokens": {
+        "prompt": 120,
+        "completion": 328,
+        "total": 448
+      },
+      "metrics": {
+        "valid": 0.0,
+        "validation_issue": "3D structural issues: floating parts do not touch another part: base"
+      }
+    },
+    {
+      "model": "Super-VL",
+      "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "task": "paragraph_completeness",
+      "case_id": "paragraph_completeness",
+      "request": "Draw a layered architecture for a shopping checkout. The browser web app calls the API gateway. The gateway sends identity requests to Auth and orders to Checkout. Auth reads the User DB. Checkout calls Inventory and Payments. Inventory reads the Catalog DB. Payments calls the Fraud service. Checkout publishes order events to the Event Bus. Notifications consumes events from the Event Bus. Put browser, gateway, services, data stores, and events into distinct layers.",
+      "latency_ms": 3191.2,
+      "raw_response": "{\n  \"nodes\": [\n    {\n      \"id\": \"browser\",\n      \"label\": \"Browser Web App\",\n      \"layer\": \"Client\"\n    },\n    {\n      \"id\": \"gateway\",\n      \"label\": \"API Gateway\",\n      \"layer\": \"Edge\"\n    },\n    {\n      \"id\": \"auth\",\n      \"label\": \"Auth Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"checkout\",\n      \"label\": \"Checkout Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"inventory\",\n      \"label\": \"Inventory Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"payments\",\n      \"label\": \"Payments Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"fraud\",\n      \"label\": \"Fraud Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"notifications\",\n      \"label\": \"Notifications Service\",\n      \"layer\": \"Service\"\n    },\n    {\n      \"id\": \"user_db\",\n      \"label\": \"User DB\",\n      \"layer\": \"Data Store\"\n    },\n    {\n      \"id\": \"catalog_db\",\n      \"label\": \"Catalog DB\",\n      \"layer\": \"Data Store\"\n    },\n    {\n      \"id\": \"event_bus\",\n      \"label\": \"Event Bus\",\n      \"layer\": \"Events\"\n    }\n  ],\n  \"edges\": [\n    {\n      \"from\": \"browser\",\n      \"to\": \"gateway\",\n      \"label\": \"calls\"\n    },\n    {\n      \"from\": \"gateway\",\n      \"to\": \"auth\",\n      \"label\": \"identity requests\"\n    },\n    {\n      \"from\": \"gateway\",\n      \"to\": \"checkout\",\n      \"label\": \"orders\"\n    },\n    {\n      \"from\": \"auth\",\n      \"to\": \"user_db\",\n      \"label\": \"reads\"\n    },\n    {\n      \"from\": \"checkout\",\n      \"to\": \"inventory\",\n      \"label\": \"calls\"\n    },\n    {\n      \"from\": \"checkout\",\n      \"to\": \"payments\",\n      \"label\": \"calls\"\n    },\n    {\n      \"from\": \"inventory\",\n      \"to\": \"catalog_db\",\n      \"label\": \"reads\"\n    },\n    {\n      \"from\": \"payments\",\n      \"to\": \"fraud\",\n      \"label\": \"calls\"\n    },\n    {\n      \"from\": \"checkout\",\n      \"to\": \"event_bus\",\n      \"label\": \"publishes order events\"\n    },\n    {\n      \"from\": \"event_bus\",\n      \"to\": \"notifications\",\n      \"label\": \"consumes events\"\n    }\n  ]\n}",
+      "tokens": {
+        "prompt": 168,
+        "completion": 589,
+        "total": 757
+      },
+      "metrics": {
+        "node_recall": 1.0,
+        "edge_recall": 1.0,
+        "layer_count": 5,
+        "size_valid": true
+      }
+    }
+  ],
+  "scoring_version": 2
+}
