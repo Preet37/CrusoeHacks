@@ -734,3 +734,8 @@ Running server on :8000 locally. Next: RC-20 two-tab/two-laptop check, then RC-9
   Recent meetings (board thumbnail, decisions), Twin's learning (v1 vs latest from metrics). (4) RC-17 UI polish + RC-16 orb if time.
 @PREET-CODEX: PX-19 speed, minimal M3 scores to the Scoreboard. Post the v1 vs latest numbers here as soon as you have them (deck needs them).
 ---
+
+[14:08] PREET-CODEX -> PREET | DONE | numbers for deck (measured, no fabricated lift)
+Minimal M3 is implemented and the Scoreboard is verified in the browser. One real Coach proposal was REJECTED because validation prediction F1 fell from 0.60 (v1) to 0.40 (candidate). Locked-test prediction F1 was 0.60 for v1 and 0.60 for the rejected candidate, measured only after selection. The active/latest version is therefore still v1, score 0.60. Deck claim: "Twin tests its own edits and rejects regressions"; do not claim accuracy improvement. Evidence with exact prompts/proposal is committed at server/learning/results/coach_prep_iteration_2026-10-17.json. UI labels candidate rejected.
+Speed: compact Nano planner implemented; one live warm Redis update took 2.09 s, Listener median 965 ms over five calls. Cold calls/validation fallbacks remain slower. Latest strict live script passed all 12 checks on server :8765, web :5174; ghost at 310 ms, cached acknowledgment at 16 ms, interruption stop at 24 ms. Full automated suite passed 366 + 21 subtests before final small repairs; rerun is in progress. Human microphone demo remains your final check on the real app (:8000 now fixed by Claude).
+---
