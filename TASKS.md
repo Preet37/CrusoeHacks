@@ -33,7 +33,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-16 | done | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
 | PC-17 | done | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
 
-| PC-18 | todo | **CHANGED 14:45: no zeroshot** (needs an access application). Stay on Magpie multilingual, but pick the best-sounding voice: call `/v1/audio/list_voices`, try the English voices, let Preet pick by ear, set it via `TTS_VOICE` in .env; tune sample rate/sentence chunking for naturalness | PC-6 | Preet approves the voice by ear |
+| PC-18 | doing | **CHANGED 14:45: no zeroshot** (needs an access application). Stay on Magpie multilingual, but pick the best-sounding voice: call `/v1/audio/list_voices`, try the English voices, let Preet pick by ear, set it via `TTS_VOICE` in .env; tune sample rate/sentence chunking for naturalness | PC-6 | Preet approves the voice by ear |
 
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 

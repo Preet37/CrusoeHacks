@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import os
 import re
 import struct
 import time
@@ -23,7 +24,7 @@ log = logging.getLogger("twin.tts")
 MAGPIE_BASE = "https://877104f7-e885-42b9-8de8-f6e4c6303969.invocation.api.nvcf.nvidia.com"
 MAGPIE_SYNTH_URL = f"{MAGPIE_BASE}/v1/audio/synthesize"
 MAGPIE_VOICES_URL = f"{MAGPIE_BASE}/v1/audio/list_voices"
-VOICE = "Magpie-Multilingual.EN-US.Aria"
+VOICE = os.getenv("TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")
 LANGUAGE = "en-US"
 SAMPLE_RATE = 44100
 TTS_TIMEOUT = 10.0
