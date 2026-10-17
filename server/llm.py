@@ -149,6 +149,15 @@ def _schema_for(name: str, tools: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _validate(value: Any, schema: dict[str, Any], path: str = "arguments") -> None:
+    if "anyOf" in schema:
+        for option in schema["anyOf"]:
+            try:
+                _validate(value, option, path)
+                break
+            except ValueError:
+                pass
+        else:
+            raise ValueError(f"{path} does not match any allowed shape")
     kind = schema.get("type")
     types = {
         "object": lambda v: isinstance(v, dict),
@@ -157,11 +166,21 @@ def _validate(value: Any, schema: dict[str, Any], path: str = "arguments") -> No
         "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
         "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
         "boolean": lambda v: isinstance(v, bool),
+        "null": lambda v: v is None,
     }
+    if isinstance(kind, list):
+        kind = next((option for option in kind if option in types and types[option](value)), None)
+        if kind is None:
+            raise ValueError(f"{path} does not match an allowed type")
     if kind in types and not types[kind](value):
         raise ValueError(f"{path} must be {kind}")
     if "enum" in schema and value not in schema["enum"]:
         raise ValueError(f"{path} is outside its allowed values")
+    if kind == "string":
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            raise ValueError(f"{path} is shorter than minLength")
+        if "maxLength" in schema and len(value) > schema["maxLength"]:
+            raise ValueError(f"{path} is longer than maxLength")
     if kind in ("integer", "number"):
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f"{path} must be finite")
@@ -169,6 +188,10 @@ def _validate(value: Any, schema: dict[str, Any], path: str = "arguments") -> No
             raise ValueError(f"{path} is below minimum")
         if "maximum" in schema and value > schema["maximum"]:
             raise ValueError(f"{path} is above maximum")
+        if "exclusiveMinimum" in schema and value <= schema["exclusiveMinimum"]:
+            raise ValueError(f"{path} must exceed exclusiveMinimum")
+        if "exclusiveMaximum" in schema and value >= schema["exclusiveMaximum"]:
+            raise ValueError(f"{path} must be below exclusiveMaximum")
     if kind == "object":
         props = schema.get("properties", {})
         for key in schema.get("required", ()):
@@ -180,6 +203,10 @@ def _validate(value: Any, schema: dict[str, Any], path: str = "arguments") -> No
             elif schema.get("additionalProperties") is False:
                 raise ValueError(f"{path}.{key} is unknown")
     elif kind == "array":
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            raise ValueError(f"{path} has fewer than minItems")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            raise ValueError(f"{path} has more than maxItems")
         for index, item in enumerate(value):
             _validate(item, schema.get("items", {}), f"{path}[{index}]")
 

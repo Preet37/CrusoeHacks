@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock
@@ -13,6 +14,7 @@ import pytest
 from openai import BadRequestError, RateLimitError
 
 import llm
+from agents.draw_tools import DRAW_TOOLS as RICH_DRAW_TOOLS
 
 
 def response(content="", calls=None, usage=None):
@@ -214,6 +216,58 @@ async def test_nonfinite_json_number_is_repaired_before_handler(fake_client):
 def test_number_schema_rejects_nonfinite_values(value):
     with pytest.raises(ValueError, match="finite"):
         llm._validate(value, {"type": "number"})
+
+
+@pytest.mark.parametrize("value", [3, 3.5, [1, 2], [1.25, 2.5]])
+def test_chart_series_accepts_finite_number_or_pair(value):
+    schema = llm._schema_for("add_chart", RICH_DRAW_TOOLS)
+    op = {"id": "chart", "x": 0, "y": 0, "chart": "scatter", "title": "Values",
+          "labels": ["a"], "series": [{"name": "s", "values": [value]}]}
+    llm._validate(op, schema)
+
+
+@pytest.mark.parametrize("value", [[1], [1, 2, 3], [1, math.nan], [math.inf, 2], "not a point", True])
+def test_chart_series_rejects_malformed_pair_or_value(value):
+    schema = llm._schema_for("add_chart", RICH_DRAW_TOOLS)
+    op = {"id": "chart", "x": 0, "y": 0, "chart": "scatter", "title": "Values",
+          "labels": ["a"], "series": [{"name": "s", "values": [value]}]}
+    with pytest.raises(ValueError, match="allowed shape"):
+        llm._validate(op, schema)
+
+
+def test_rich_schema_limits_dimensions_and_text_length():
+    mermaid = llm._schema_for("add_mermaid", RICH_DRAW_TOOLS)
+    with pytest.raises(ValueError, match="exclusiveMinimum"):
+        llm._validate({"id": "m", "x": 0, "y": 0, "w": 0, "code": "graph TD"}, mermaid)
+    with pytest.raises(ValueError, match="maxLength"):
+        llm._validate({"id": "u", "x": 0, "y": 0, "title": "UI", "html": "x" * 4097},
+                      llm._schema_for("add_mock", RICH_DRAW_TOOLS))
+    with pytest.raises(ValueError, match="minItems"):
+        llm._validate([[1]], {"type": "array", "items": {"type": "number"}, "minItems": 2})
+    with pytest.raises(ValueError, match="minLength"):
+        llm._validate("", {"type": "string", "minLength": 1})
+    llm._validate(None, {"type": ["string", "null"]})
+    with pytest.raises(ValueError, match="must be null"):
+        llm._validate("x", {"type": "null"})
+
+
+@pytest.mark.asyncio
+async def test_mixed_rich_batch_rejects_bad_scatter_before_any_handler(fake_client):
+    sticky = AsyncMock(return_value={"ok": True})
+    chart = AsyncMock(return_value={"ok": True})
+    batch = {"ops": [
+        {"op": "add_sticky", "id": "s1", "x": 100, "y": 100, "text": "Risk"},
+        {"op": "add_chart", "id": "c1", "x": 300, "y": 200, "chart": "scatter",
+         "title": "Latency", "labels": ["v1"],
+         "series": [{"name": "p95", "values": [[420, 180, 90]]}]},
+    ]}
+    fake_client.return_value = response(json.dumps(batch))
+    with pytest.raises(ValueError, match="invalid JSON ops"):
+        await llm.run_json_ops("model", [], RICH_DRAW_TOOLS,
+                               {"add_sticky": sticky, "add_chart": chart})
+    sticky.assert_not_awaited()
+    chart.assert_not_awaited()
+    assert fake_client.await_count == 2  # one repair attempt, still no side effects
 
 
 @pytest.mark.asyncio
