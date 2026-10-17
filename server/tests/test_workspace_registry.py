@@ -27,7 +27,8 @@ class Session:
 
 
 @pytest.fixture
-def registry(monkeypatch):
+def registry(monkeypatch, tmp_path):
+    monkeypatch.setenv('TWIN_DB_PATH', str(tmp_path / 'workspace.sqlite3'))
     value = workspace_registry.WorkspaceRegistry()
     monkeypatch.setattr(runtime, "REGISTRY", value)
     monkeypatch.setattr(connector, "REGISTRY", value)
