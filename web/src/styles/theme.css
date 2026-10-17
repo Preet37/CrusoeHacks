@@ -508,3 +508,12 @@ input { font: inherit; }
   .tb-agent { justify-content: flex-start; }
 }
 .tb-links a.pill, .ticket a.pill { color: var(--text); }
+
+.annot-panel { position: absolute; width: 32%; min-width: 220px; max-width: 420px; background: rgba(18, 20, 28, 0.92); color: #fff; border: 2px solid #ff9f0a; border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.45); pointer-events: none; animation: pop 400ms var(--spring); font: 500 14px var(--font); z-index: 3; }
+.annot-panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+.annot-panel-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff9f0a; }
+.annot-panel-by { margin-left: auto; font-size: 11px; opacity: .65; font-weight: 600; }
+.annot-panel ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.annot-panel li { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; position: relative; line-height: 1.3; }
+.annot-panel li + li::before { content: ''; position: absolute; left: 10px; top: -6px; height: 10px; border-left: 2px solid rgba(255,159,10,.7); }
+.annot-step-n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #ff9f0a; color: #111; font-weight: 800; font-size: 12px; display: grid; place-items: center; }

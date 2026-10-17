@@ -63,7 +63,7 @@ VISION_FAIL = "I couldn't read the screen just now."
 VISION_FRESH_MS = 20_000          # a frame older than this means nobody is sharing
 VISION_TIMEOUT_S = 12.0
 VISION_HISTORY_LINES = 12
-VISION_TTL_S = 20
+VISION_TTL_S = 45
 _VISION_STRONG = re.compile(
     r"\b(screen|look|looks|looking|see|seeing|showing|ticket|this page|what is this|what's this|"
     r"on my screen|what does it look like)\b", re.I)

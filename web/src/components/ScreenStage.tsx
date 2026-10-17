@@ -11,7 +11,7 @@ export interface RemoteFrame {
 }
 
 export interface AnnotateItem {
-  kind: 'box' | 'arrow' | 'text' | 'highlight' | 'circle'
+  kind: 'box' | 'arrow' | 'text' | 'highlight' | 'circle' | 'panel'
   x: number
   y: number
   w?: number
@@ -19,6 +19,8 @@ export interface AnnotateItem {
   x2?: number
   y2?: number
   text?: string
+  title?: string
+  steps?: string[]
 }
 
 export interface Annotation {
@@ -45,6 +47,34 @@ function useFitBox(aspect: number) {
     return () => ro.disconnect()
   }, [aspect])
   return { ref, box }
+}
+
+/** Twin's diagram card drawn on the shared screen: numbered steps linked by arrows. */
+function Panels({ annotations }: { annotations: Annotation[] }) {
+  const panels = annotations.flatMap((a) => a.items.filter((it) => it.kind === 'panel' && it.steps?.length).map((it, i) => ({ it, k: `${a.id}_p${i}` })))
+  return (
+    <>
+      {panels.map(({ it, k }) => {
+        const left = it.x > 0 || it.y > 0 ? Math.min(it.x, 0.68) : 0.66
+        const top = it.x > 0 || it.y > 0 ? Math.min(it.y, 0.5) : 0.05
+        return (
+          <div key={k} className="annot-panel" style={{ left: `${left * 100}%`, top: `${top * 100}%` }}>
+            <div className="annot-panel-title">
+              <span className="annot-panel-dot" /> {it.title || 'Plan'} <span className="annot-panel-by">Twin</span>
+            </div>
+            <ol>
+              {(it.steps ?? []).map((st, j) => (
+                <li key={j}>
+                  <span className="annot-step-n">{j + 1}</span>
+                  <span>{st}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 function Overlay({ annotations }: { annotations: Annotation[] }) {
@@ -130,6 +160,7 @@ export default function ScreenStage({
           <img src={`data:image/jpeg;base64,${remote.jpeg}`} alt={`${remote.user}'s screen`} />
         ) : null}
         <Overlay annotations={annotations} />
+        <Panels annotations={annotations} />
       </div>
       {!myStream && !remote && <div className="board-placeholder">No one is sharing</div>}
     </div>

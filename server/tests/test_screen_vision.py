@@ -24,7 +24,7 @@ async def test_saved_screenshot_returns_box_near_visible_region(monkeypatch):
     async def chat(model, messages, **kwargs):
         calls.append(1)
         assert model == config.MODEL_COACH
-        assert kwargs["max_tokens"] == 550
+        assert kwargs["max_tokens"] == 800
         assert kwargs["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
         assert messages[-1]["content"][1]["image_url"]["url"] == "data:image/jpeg;base64," + jpeg
         context = json.loads(messages[-1]["content"][0]["text"])
@@ -58,20 +58,36 @@ async def test_bad_input_never_calls_model(monkeypatch, jpeg, question):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("item", [
-    {"kind": "box", "x": 0.9, "y": 0.2, "w": 0.2, "h": 0.1},
     {"kind": "box", "x": float("nan"), "y": 0.2, "w": 0.2, "h": 0.1},
     {"kind": "box", "x": 10**1000, "y": 0.2, "w": 0.2, "h": 0.1},
-    {"kind": "arrow", "x": 0.1, "y": 0.1, "x2": 1.2, "y2": 0.4},
     {"kind": "text", "x": 0.2, "y": 0.4},
-    {"kind": "box", "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "script": "x"},
+    {"kind": "script", "x": 0.1, "y": 0.1},
+    {"kind": "panel", "title": "Plan", "steps": []},
 ])
-async def test_invalid_annotations_rejected(monkeypatch, item):
+async def test_invalid_annotations_dropped_answer_kept(monkeypatch, item):
     async def chat(*args, **kwargs):
         return json.dumps({"say": "I found it.", "items": [item]})
 
     monkeypatch.setattr(llm, "chat", chat)
-    with pytest.raises(ValueError):
-        await screen_vision.analyze(SAMPLE.read_bytes(), "Where?", "screen")
+    result = await screen_vision.analyze(SAMPLE.read_bytes(), "Where?", "screen")
+    assert result == {"say": "I found it.", "items": []}
+
+
+@pytest.mark.asyncio
+async def test_out_of_frame_geometry_is_clamped_and_extra_fields_ignored(monkeypatch):
+    async def chat(*args, **kwargs):
+        return json.dumps({"say": "Here.", "extra": 1, "items": [
+            {"kind": "box", "x": 0.9, "y": 0.2, "w": 0.2, "h": 0.1, "script": "x"},
+            {"kind": "arrow", "x": 0.1, "y": 0.1, "x2": 1.2, "y2": 0.4},
+            {"kind": "panel", "title": "Ticket plan", "steps": ["Read the ticket", "Write the fix", "Open PR"]},
+        ]})
+
+    monkeypatch.setattr(llm, "chat", chat)
+    result = await screen_vision.analyze(SAMPLE.read_bytes(), "Diagram what I need to do", "screen")
+    box, arrow, panel = result["items"]
+    assert box["x"] + box["w"] <= 1 and "script" not in box
+    assert arrow["x2"] == 1.0
+    assert panel["kind"] == "panel" and panel["steps"] == ["Read the ticket", "Write the fix", "Open PR"]
 
 
 @pytest.mark.asyncio

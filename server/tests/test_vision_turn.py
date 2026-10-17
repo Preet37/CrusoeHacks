@@ -95,7 +95,7 @@ async def test_vision_turn_annotates_and_speaks(room):
     ann = [x for x in sent if x.get("type") == "annotate"]
     assert len(ann) == 1
     a = ann[0]
-    assert a["target"] == "screen" and a["user"] == "Preet" and a["ttl_s"] == 20
+    assert a["target"] == "screen" and a["user"] == "Preet" and a["ttl_s"] == mouth.VISION_TTL_S
     assert a["id"].startswith("twin_") and a["by"] == "Twin"
     assert a["items"][0]["kind"] == "box"
     assert spoken == ["That's the PROJ-12 ticket, assigned to nobody."]

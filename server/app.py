@@ -329,6 +329,10 @@ async def health():
     return {"ok": True}
 
 
+from cad.part_rig import router as part_rig_router  # noqa: E402  (POST /cad/part-rig)
+app.include_router(part_rig_router)
+
+
 @app.get("/cad/{model_id}.glb")
 async def cad_model(model_id: str):
     """GLB built by server/cad (rough-then-refine 3D). 404 for unknown ids."""
