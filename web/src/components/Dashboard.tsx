@@ -16,6 +16,7 @@ interface CalMeeting {
 interface Ticket {
   id?: string
   title: string
+  agent_prompt?: string
   owner?: string | null
   status?: string
   links?: Record<string, string | null>
@@ -23,6 +24,7 @@ interface Ticket {
 interface Meeting {
   id: string
   room: string
+  title?: string
   summary?: string
   decisions?: string[]
   todos?: (string | { text?: string; title?: string; owner?: string })[]
@@ -228,6 +230,7 @@ export default function Dashboard({
                 <details key={m.id} className="meet" open={m === meetings?.[meetings.length - 1]}>
                   <summary>
                     <span className="dash-title">{m.room.replace(`${session.workspace}-`, '').replace(/-/g, ' ')}</span>
+                    {m.title && <span className="hint">· {m.title}</span>}
                     <span className="hint">{m.ended_at ? fmt(toMs(m.ended_at)) : ''}</span>
                     {!!m.tickets?.length && <span className="tag">{m.tickets.length} tickets</span>}
                   </summary>
@@ -254,6 +257,16 @@ export default function Dashboard({
                             <span className="tag">{t.id ?? 'T'}</span>
                             <span style={{ flex: 1 }}>{t.title}</span>
                             {t.owner && <span className="hint">{t.owner}</span>}
+                            {t.status && <span className="tag">{t.status}</span>}
+                            {t.agent_prompt && (
+                              <button
+                                className="pill small"
+                                title="Copy a ready-to-run prompt for a coding agent"
+                                onClick={() => void navigator.clipboard?.writeText(t.agent_prompt ?? '')}
+                              >
+                                Copy agent prompt
+                              </button>
+                            )}
                             {links.map(([k, v]) => (
                               <a key={k} href={v} target="_blank" rel="noreferrer" className="pill small">
                                 {k}
