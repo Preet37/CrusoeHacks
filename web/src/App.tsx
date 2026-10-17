@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import JoinScreen, { type JoinChoice } from './components/JoinScreen'
+import LoginPage from './components/LoginPage'
 import MeetingRoom from './components/MeetingRoom'
 import { unlockAudio } from './lib/player'
 import { loadSession, recordMeeting, scopedRoom, type WorkspaceSession } from './lib/workspace'
@@ -71,6 +72,8 @@ export default function App() {
       if (/workspace|invite|code/i.test(m.message)) {
         setJoinError(m.message)
         setJoined(null)
+        // A wrong code shouldn't stay remembered: back to the login page.
+        if (session) setSession(null)
       }
     })
     // Joining from the calendar: Twin joins this meeting and posts its brief.
@@ -90,20 +93,17 @@ export default function App() {
       c.close()
       setClient(null)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, route])
 
   if (route.page === 'dashboard') {
     if (!session)
       return (
-        <JoinScreen
-          room="standup"
+        <LoginPage
           error={joinError}
-          onJoin={(choice) => {
-            void unlockAudio()
-            if (choice.session) {
-              setSession(choice.session)
-              setJoinError(null)
-            } else setJoinError('Enter your workspace and invite code to open the dashboard.')
+          onSignedIn={(s) => {
+            setSession(s)
+            setJoinError(null)
           }}
         />
       )

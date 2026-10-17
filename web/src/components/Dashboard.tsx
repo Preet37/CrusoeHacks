@@ -1,8 +1,7 @@
-// /dashboard: the workspace home outside a call. Upcoming meetings (join / auto-join), connections,
-// recent meetings and Twin's learning. Not the product's main feature: the call is.
-import { useEffect, useMemo, useState } from 'react'
-import type { Participant } from '../lib/protocol'
-import { avatarColor, initials } from '../lib/media'
+// /dashboard (B5): the company home outside a call. Fewer things, more space:
+// Upcoming meetings, past meetings (summary, decisions, to-dos, tickets), the remembered repo, Twin's learning.
+// Server data: GET /workspace, /meetings, /tickets (same invite auth as /ws), GET /calendar.
+import { useEffect, useState } from 'react'
 import { meetingHistory, scopedRoom, signOut, slug, type WorkspaceSession } from '../lib/workspace'
 import { createClient, serverHttpBase, type TwinClient } from '../lib/ws'
 import { Scoreboard } from './optional'
@@ -12,8 +11,28 @@ interface CalMeeting {
   title: string
   scheduled: string
   duration_min?: number
-  attendees?: string[]
   predictions?: string[]
+}
+interface Ticket {
+  id?: string
+  title: string
+  owner?: string | null
+  status?: string
+  links?: Record<string, string | null>
+}
+interface Meeting {
+  id: string
+  room: string
+  summary?: string
+  decisions?: string[]
+  todos?: (string | { text?: string; title?: string; owner?: string })[]
+  tickets?: Ticket[]
+  ended_at?: number | string
+}
+interface WorkspaceInfo {
+  workspace: string
+  repo_url?: string | null
+  integrations?: Record<string, unknown>
 }
 
 const AUTO_KEY = 'twin.autojoin'
@@ -24,17 +43,26 @@ function loadAuto(): Record<string, boolean> {
     return {}
   }
 }
-
-/** "13:30" today -> ms. */
 function todayAt(hhmm: string) {
   const [h, m] = hhmm.split(':').map(Number)
   const d = new Date()
   d.setHours(h || 0, m || 0, 0, 0)
   return d.getTime()
 }
+const fmt = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+const toMs = (v: number | string | undefined) => (typeof v === 'number' ? (v < 1e12 ? v * 1000 : v) : v ? Date.parse(v) : 0)
+const todoText = (t: string | { text?: string; title?: string; owner?: string }) =>
+  typeof t === 'string' ? t : `${t.text ?? t.title ?? ''}${t.owner ? ` (${t.owner})` : ''}`
 
-function fmtTime(hhmm: string) {
-  return new Date(todayAt(hhmm)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+async function getJson<T>(path: string, s: WorkspaceSession): Promise<T | null> {
+  try {
+    const q = new URLSearchParams({ workspace: s.workspace, code: s.code })
+    const r = await fetch(`${serverHttpBase()}${path}?${q}`)
+    if (!r.ok) return null
+    return (await r.json()) as T
+  } catch {
+    return null
+  }
 }
 
 export default function Dashboard({
@@ -46,63 +74,71 @@ export default function Dashboard({
   onOpenRoom: (room: string, briefFor?: string) => void
   onSignOut: () => void
 }) {
-  const [meetings, setMeetings] = useState<CalMeeting[] | null>(null)
-  const [calErr, setCalErr] = useState<string | null>(null)
+  const [calendar, setCalendar] = useState<CalMeeting[]>([])
+  const [meetings, setMeetings] = useState<Meeting[] | null>(null)
+  const [info, setInfo] = useState<WorkspaceInfo | null>(null)
   const [auto, setAuto] = useState(loadAuto)
   const [lobby, setLobby] = useState<TwinClient | null>(null)
-  const [online, setOnline] = useState<Participant[]>([])
   const [repo, setRepo] = useState('')
   const [repoStatus, setRepoStatus] = useState<string | null>(null)
   const [newRoom, setNewRoom] = useState('')
-  const [, tick] = useState(0)
-  const history = useMemo(() => meetingHistory(), [])
 
-  // Calendar from the server.
+  const refresh = () => {
+    void getJson<{ meetings: CalMeeting[] }>('/calendar', session).then((d) => setCalendar(d?.meetings ?? []))
+    void getJson<WorkspaceInfo>('/workspace', session).then((d) => d && setInfo(d))
+    void Promise.all([
+      getJson<{ meetings: Meeting[] }>('/meetings', session),
+      getJson<{ tickets: (Ticket & { meeting_id?: string })[] }>('/tickets', session),
+    ]).then(([m, t]) => {
+      if (!m) return setMeetings(null)
+      const loose = t?.tickets ?? []
+      setMeetings(
+        (m.meetings ?? []).map((x) => ({
+          ...x,
+          tickets: x.tickets?.length ? x.tickets : loose.filter((k) => k.meeting_id === x.id),
+        })),
+      )
+    })
+  }
+
   useEffect(() => {
-    fetch(`${serverHttpBase()}/calendar`)
-      .then((r) => r.json())
-      .then((d) => setMeetings(d.meetings ?? []))
-      .catch(() => {
-        setMeetings([])
-        setCalErr("Couldn't reach the Twin server")
-      })
-  }, [])
+    refresh()
+    const id = window.setInterval(refresh, 15_000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session])
 
-  // A lobby connection: who's online in the workspace, Twin's scores, and repo connect.
+  // Lobby connection: Twin's scores + repo connect (the server remembers the repo per workspace).
   useEffect(() => {
     const c = createClient({ room: scopedRoom(session, 'lobby'), user: session.name, workspace: session.workspace, code: session.code })
     setLobby(c)
-    const offP = c.on('participants', (m) => setOnline(m.people.filter((p) => p.kind === 'human')))
-    const offE = c.on('error', (m) => {
-      if (/repo/i.test(m.message)) setRepoStatus(m.message)
-    })
+    const offE = c.on('error', (m) => /repo/i.test(m.message) && setRepoStatus(m.message))
     const offT = c.on('transcript', (m) => {
-      if (m.speaker === 'Twin' && /repo|files|indexed|code map/i.test(m.text)) setRepoStatus(m.text)
+      if (m.speaker === 'Twin' && /repo|files|indexed|code map/i.test(m.text)) {
+        setRepoStatus(m.text)
+        refresh()
+      }
     })
     return () => {
-      offP()
       offE()
       offT()
       c.close()
       setLobby(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session])
 
-  // Auto-join: when a toggled meeting's start time arrives (within its first 5 minutes), jump in.
+  // Auto-join at start time.
   useEffect(() => {
     const id = window.setInterval(() => {
-      tick((n) => n + 1)
       const now = Date.now()
-      for (const m of meetings ?? []) {
+      for (const m of calendar) {
         const at = todayAt(m.scheduled)
-        if (auto[m.title] && now >= at && now - at < 5 * 60_000) {
-          onOpenRoom(slug(m.title), m.title)
-          return
-        }
+        if (auto[m.title] && now >= at && now - at < 5 * 60_000) return onOpenRoom(slug(m.title), m.title)
       }
     }, 5000)
     return () => window.clearInterval(id)
-  }, [meetings, auto, onOpenRoom])
+  }, [calendar, auto, onOpenRoom])
 
   const toggleAuto = (title: string) => {
     const next = { ...auto, [title]: !auto[title] }
@@ -116,7 +152,8 @@ export default function Dashboard({
 
   const validRepo = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(repo.trim())
   const now = Date.now()
-  const upcoming = (meetings ?? []).slice().sort((a, b) => todayAt(a.scheduled) - todayAt(b.scheduled))
+  const upcoming = calendar.slice().sort((a, b) => todayAt(a.scheduled) - todayAt(b.scheduled))
+  const local = meetingHistory()
 
   return (
     <div className="dash">
@@ -128,79 +165,132 @@ export default function Dashboard({
             <div className="hint">Signed in as {session.name}</div>
           </div>
         </div>
-        <div className="dash-online">
-          {online.slice(0, 6).map((p) => (
-            <span key={p.name} className="mini" title={p.name} style={{ background: avatarColor(p.name) }}>
-              {initials(p.name)}
-            </span>
-          ))}
-          <span className="hint">{online.length} online</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="field"
-            style={{ height: 36, width: 160 }}
-            placeholder="New room name"
-            value={newRoom}
-            onChange={(e) => setNewRoom(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onOpenRoom(slug(newRoom, 'standup'))}
-          />
-          <button className="pill primary" style={{ height: 36 }} onClick={() => onOpenRoom(slug(newRoom, 'standup'))}>
-            Start meeting
-          </button>
-          <button
-            className="pill"
-            onClick={() => {
-              signOut()
-              onSignOut()
-            }}
-          >
-            Sign out
-          </button>
-        </div>
+        <input
+          className="field"
+          style={{ height: 36, width: 180 }}
+          placeholder="Room name"
+          value={newRoom}
+          onChange={(e) => setNewRoom(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onOpenRoom(slug(newRoom, 'standup'))}
+        />
+        <button className="pill primary" style={{ height: 36 }} onClick={() => onOpenRoom(slug(newRoom, 'standup'))}>
+          Start meeting
+        </button>
+        <button
+          className="pill"
+          onClick={() => {
+            signOut()
+            onSignOut()
+          }}
+        >
+          Sign out
+        </button>
       </header>
 
-      <main className="dash-grid">
-        <section className="dash-card glass">
-          <h2>Upcoming</h2>
-          {meetings === null && <div className="empty">Loading calendar…</div>}
-          {calErr && <div className="empty">{calErr}</div>}
-          {upcoming.map((m) => {
-            const at = todayAt(m.scheduled)
-            const live = now >= at && now - at < (m.duration_min ?? 30) * 60_000
-            return (
-              <div key={m.title} className="dash-row">
-                <div className="dash-time">{fmtTime(m.scheduled)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="dash-title">
-                    {m.title} {live && <span className="tag-live">LIVE</span>}
+      <main className="dash-cols">
+        <div className="dash-col">
+          <section className="dash-card glass">
+            <h2>Today</h2>
+            {upcoming.length === 0 && <div className="empty">No meetings scheduled.</div>}
+            {upcoming.map((m) => {
+              const at = todayAt(m.scheduled)
+              const live = now >= at && now - at < (m.duration_min ?? 30) * 60_000
+              return (
+                <div key={m.title} className="dash-row">
+                  <div className="dash-time">{fmt(at)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="dash-title">
+                      {m.title} {live && <span className="tag-live">LIVE</span>}
+                    </div>
+                    {m.predictions?.[0] && <div className="hint ellipsis">Twin expects: {m.predictions[0]}</div>}
                   </div>
-                  {m.predictions?.[0] && <div className="hint ellipsis">Twin expects: {m.predictions[0]}</div>}
+                  <label className="switch" title="Twin joins automatically at start time">
+                    <input type="checkbox" checked={!!auto[m.title]} onChange={() => toggleAuto(m.title)} />
+                    <span />
+                    Auto
+                  </label>
+                  <button className="pill small on" onClick={() => onOpenRoom(slug(m.title), m.title)}>
+                    Join
+                  </button>
                 </div>
-                <label className="switch" title="Twin joins automatically at start time">
-                  <input type="checkbox" checked={!!auto[m.title]} onChange={() => toggleAuto(m.title)} />
-                  <span />
-                  Auto-join
-                </label>
-                <button className="pill small on" onClick={() => onOpenRoom(slug(m.title), m.title)}>
-                  Join
-                </button>
-              </div>
-            )
-          })}
-          <div className="hint" style={{ marginTop: 8 }}>Calendar is demo data from the Twin server.</div>
-        </section>
+              )
+            })}
+          </section>
 
-        <section className="dash-card glass">
-          <h2>Connections</h2>
-          <div className="conn-card">
-            <div className="head">
-              <span className="logo" style={{ background: '#24292f' }}>GH</span>GitHub
-              <span className="tag live">LIVE</span>
-            </div>
-            <p>Connect a public repo so Twin can answer "what does this change touch?"</p>
-            <div className="row">
-              <input className="field" placeholder="https://github.com/owner/repo" value={repo} onChange={(e) => setRepo(e.target.value)} />
+          <section className="dash-card glass">
+            <h2>Past meetings</h2>
+            {meetings === null && local.length === 0 && <div className="empty">Summaries, decisions and tickets appear here after a meeting ends.</div>}
+            {meetings?.length === 0 && <div className="empty">No meetings yet. Summaries, decisions and tickets appear here after a meeting ends.</div>}
+            {(meetings ?? [])
+              .slice()
+              .sort((a, b) => toMs(b.ended_at) - toMs(a.ended_at))
+              .map((m) => (
+                <details key={m.id} className="meet" open={m === meetings?.[meetings.length - 1]}>
+                  <summary>
+                    <span className="dash-title">{m.room.replace(`${session.workspace}-`, '').replace(/-/g, ' ')}</span>
+                    <span className="hint">{m.ended_at ? fmt(toMs(m.ended_at)) : ''}</span>
+                    {!!m.tickets?.length && <span className="tag">{m.tickets.length} tickets</span>}
+                  </summary>
+                  {m.summary && <p className="meet-sum">{m.summary}</p>}
+                  {!!m.decisions?.length && (
+                    <>
+                      <h3>Decisions</h3>
+                      <ul>{m.decisions.map((d, i) => <li key={i}>{d}</li>)}</ul>
+                    </>
+                  )}
+                  {!!m.todos?.length && (
+                    <>
+                      <h3>To-dos</h3>
+                      <ul>{m.todos.map((t, i) => <li key={i}>{todoText(t)}</li>)}</ul>
+                    </>
+                  )}
+                  {!!m.tickets?.length && (
+                    <>
+                      <h3>Tickets</h3>
+                      {m.tickets.map((t, i) => {
+                        const links = Object.entries(t.links ?? {}).filter(([, v]) => !!v) as [string, string][]
+                        return (
+                          <div key={t.id ?? i} className="ticket">
+                            <span className="tag">{t.id ?? 'T'}</span>
+                            <span style={{ flex: 1 }}>{t.title}</span>
+                            {t.owner && <span className="hint">{t.owner}</span>}
+                            {links.map(([k, v]) => (
+                              <a key={k} href={v} target="_blank" rel="noreferrer" className="pill small">
+                                {k}
+                              </a>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+                </details>
+              ))}
+            {meetings === null &&
+              local.map((h) => (
+                <div key={`${h.room}_${h.at}`} className="dash-row">
+                  <div className="dash-time">{fmt(h.at)}</div>
+                  <div style={{ flex: 1 }} className="dash-title">{h.title}</div>
+                  <button className="pill small" onClick={() => onOpenRoom(h.room)}>Rejoin</button>
+                </div>
+              ))}
+          </section>
+        </div>
+
+        <div className="dash-col">
+          <section className="dash-card glass">
+            <h2>Codebase</h2>
+            {info?.repo_url ? (
+              <div className="repo">
+                <span className="logo">GH</span>
+                <a href={info.repo_url} target="_blank" rel="noreferrer">{info.repo_url.replace('https://github.com/', '')}</a>
+                <span className="tag live">REMEMBERED</span>
+              </div>
+            ) : (
+              <p className="hint">Connect your repo once. Twin loads it whenever anyone in {session.workspace} joins a meeting.</p>
+            )}
+            <div className="row" style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <input className="field" style={{ flex: 1, height: 32, fontSize: 12 }} placeholder="https://github.com/owner/repo" value={repo} onChange={(e) => setRepo(e.target.value)} />
               <button
                 className="pill small on"
                 disabled={!validRepo || !lobby}
@@ -209,50 +299,17 @@ export default function Dashboard({
                   setRepoStatus('Sent to Twin, indexing…')
                 }}
               >
-                Connect
+                {info?.repo_url ? 'Replace' : 'Connect'}
               </button>
             </div>
-            {repoStatus && <div className="hint">{repoStatus}</div>}
-          </div>
-          {[
-            ['Jira', '#0052cc', 'J'],
-            ['Slack', '#611f69', 'S'],
-            ['Google Calendar', '#1a73e8', '31'],
-          ].map(([n, c, l]) => (
-            <div key={n} className="conn-card">
-              <div className="head">
-                <span className="logo" style={{ background: c }}>{l}</span>
-                {n}
-                <span className="tag">COMING SOON</span>
-              </div>
-              <button className="pill small" disabled>
-                Connect
-              </button>
-            </div>
-          ))}
-        </section>
+            {repoStatus && <div className="hint" style={{ marginTop: 6 }}>{repoStatus}</div>}
+          </section>
 
-        <section className="dash-card glass">
-          <h2>Recent meetings</h2>
-          {history.length === 0 && <div className="empty">Meetings you join show up here.</div>}
-          {history.map((h) => (
-            <div key={`${h.room}_${h.at}`} className="dash-row">
-              <div className="dash-time">{new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
-              <div style={{ flex: 1 }} className="dash-title">
-                {h.title}
-              </div>
-              <button className="pill small" onClick={() => onOpenRoom(h.room)}>
-                Rejoin
-              </button>
-            </div>
-          ))}
-          <div className="hint" style={{ marginTop: 8 }}>From this browser.</div>
-        </section>
-
-        <section className="dash-card glass">
-          <h2>Twin's learning</h2>
-          {lobby ? <Scoreboard client={lobby} /> : <div className="empty">Connecting…</div>}
-        </section>
+          <section className="dash-card glass">
+            <h2>Twin's learning</h2>
+            {lobby ? <Scoreboard client={lobby} /> : <div className="empty">Connecting…</div>}
+          </section>
+        </div>
       </main>
     </div>
   )
