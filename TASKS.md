@@ -27,11 +27,11 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-10 | done | Work-update queue: Diagrammer (PREET-CODEX) calls `session.push_update(text)`; responder delivers per turn_taking | PC-8 | After a diagram change and a pause, Twin mentions it once |
 | PC-11 | done | Latency logging per turn (ARCHITECTURE.md section 6) to console + `server/learning/runs/latency.jsonl` | PC-7 | File has rows with the 4 timings |
 | PC-12 | doing | M2: wire Fact Checker and Code Analyst results into work updates; `task` messages | M1 done | Planted false claim gets a spoken correction with source |
-| PC-13 | todo | **Newest wins** (ARCH 1E.5): job registry in session keyed by topic_id + source line; cancel stale Diagrammer/specialist jobs when the topic changes; cancel an un-started Responder turn when a newer human final arrives | PC-5 | Rapid topic switch: no drawing or speech about the old topic arrives after the switch |
-| PC-14 | todo | **Echo guard, server side** (ARCH 1E.3): drop final user_text that closely matches Twin's last ~3 spoken sentences | PC-7 | Playing Twin through speakers does not create fake human lines |
-| PC-15 | todo | `participants` + `topic` messages (PROTOCOL v2): track who is connected and speaking (from interim user_text) and broadcast; relay topic changes from PREET-CODEX | PC-5 | Two browsers see each other's speaking state |
-| PC-16 | todo | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
-| PC-17 | todo | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
+| PC-13 | doing | **Newest wins** (ARCH 1E.5): job registry in session keyed by topic_id + source line; cancel stale Diagrammer/specialist jobs when the topic changes; cancel an un-started Responder turn when a newer human final arrives | PC-5 | Rapid topic switch: no drawing or speech about the old topic arrives after the switch |
+| PC-14 | doing | **Echo guard, server side** (ARCH 1E.3): drop final user_text that closely matches Twin's last ~3 spoken sentences | PC-7 | Playing Twin through speakers does not create fake human lines |
+| PC-15 | doing | `participants` + `topic` messages (PROTOCOL v2): track who is connected and speaking (from interim user_text) and broadcast; relay topic changes from PREET-CODEX | PC-5 | Two browsers see each other's speaking state |
+| PC-16 | doing | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
+| PC-17 | doing | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
 
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 
@@ -81,14 +81,14 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
 | RX-1 | done | (PARSH-CLAUDE) Scaffold `web/` with Vite + React + TS + tldraw, `lib/protocol.ts` v1 types. **Follow-up for PREET-CLAUDE: add the PROTOCOL v2 types to `protocol.ts`** | - | `npm run dev` serves on 5173 |
-| RX-2 | todo | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
-| RX-3 | todo | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
-| RX-4 | todo | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
-| RX-5 | todo | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
-| RX-6 | todo | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
-| RX-7 | todo | M3: `Scoreboard.tsx` from `metric` messages: v1 vs latest on locked test, rejected changes listed | RX-1 | Renders mock metrics |
-| RX-8 | todo | **Rich shapes** in `web/src/components/board/` (ARCH 1E.4, PROTOCOL v2): frame + focus (pan/zoom), sticky, text, Mermaid (mermaid.js -> SVG image; on failure send `draw_error`), chart (render SVG), table, code, mock (sandboxed iframe custom shape), sketch (draw strokes), update | RX-3 | Mock server sequence shows every shape type correctly |
-| RX-9 | todo | Progressive appearance: animate each new shape in; stage mode ("Twin is presenting") when content arrives | RX-8 | Shapes appear one by one, smoothly |
+| RX-2 | doing | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
+| RX-3 | doing | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
+| RX-4 | doing | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
+| RX-5 | doing | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
+| RX-6 | doing | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
+| RX-7 | doing | M3: `Scoreboard.tsx` from `metric` messages: v1 vs latest on locked test, rejected changes listed | RX-1 | Renders mock metrics |
+| RX-8 | doing | **Rich shapes** in `web/src/components/board/` (ARCH 1E.4, PROTOCOL v2): frame + focus (pan/zoom), sticky, text, Mermaid (mermaid.js -> SVG image; on failure send `draw_error`), chart (render SVG), table, code, mock (sandboxed iframe custom shape), sketch (draw strokes), update | RX-3 | Mock server sequence shows every shape type correctly |
+| RX-9 | doing | Progressive appearance: animate each new shape in; stage mode ("Twin is presenting") when content arrives | RX-8 | Shapes appear one by one, smoothly |
 
 ---
 
