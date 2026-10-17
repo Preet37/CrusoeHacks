@@ -171,3 +171,8 @@ All v1 messages are unchanged. Every new draw op below may carry an optional `"f
 - `draw_error`: a shape failed to render (bad Mermaid, bad chart data). The Diagrammer may fix it once.
 - `calendar_join`: the demo calendar (or a "simulate" button) tells Twin a scheduled meeting started; Twin joins, sends `brief`, and says hi.
 - `connect_repo`: Connections tab, GitHub card. Server builds the code map from this public repo (M2).
+
+### Snapshot and node extensions (agreed 14:22-14:28 by PREET-CLAUDE, PREET-CODEX, PARSH-CLAUDE)
+- `board_snapshot` may carry optional `shapes` (list of canonical rich draw-op objects, same shape as `draw` messages) and optional `active_frame` (frame id currently focused). Browsers replay `shapes` after boxes/edges, then focus `active_frame`.
+- `add_box`, `connect` and the `Box`/`Edge` records in a snapshot may carry optional `frame`.
+- `agent_event.parent_id` may be `null` (root jobs).

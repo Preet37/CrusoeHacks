@@ -1,4 +1,5 @@
-"""FastAPI app: /health, /state (debug), and the meeting WebSocket at /ws."""
+"""FastAPI app: /health, /state (debug), /calendar, /simulate/calendar_join, and the meeting WebSocket at /ws."""
+import json
 import logging
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -7,12 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import protocol
 from protocol import Error, Status
 import mouth
-from session import SESSIONS, get_session
+from session import DEMO_CALENDAR, SESSIONS, get_session
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("twin.app")
 
 app = FastAPI(title="Twin")
+# Two-laptop demo: any origin (LAN IP, cloudflared tunnel) may call the API.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -29,6 +31,24 @@ async def state(room: str = "demo"):
     return {"exists": True, **session.debug_state()}
 
 
+@app.get("/calendar")
+async def calendar():
+    try:
+        return json.loads(DEMO_CALENDAR.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"meetings": []}
+
+
+@app.post("/simulate/calendar_join")
+async def simulate_calendar_join(room: str = "demo", meeting: str = "Daily standup"):
+    """Demo button: same flow as a `calendar_join` message from the browser."""
+    session = SESSIONS.get(room)
+    if session is None or not session.sockets:
+        return {"ok": False, "error": f"no one is connected to room {room!r}"}
+    brief = await session.calendar_join(meeting)
+    return {"ok": True, "brief": brief}
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
     await ws.accept()
@@ -39,6 +59,7 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
     try:
         await session.send_to(ws, Status(state=session.status))
         await session.send_to(ws, session.snapshot_message())
+        await session.send_initial_state(ws)
         while True:
             frame = await ws.receive()
             if frame["type"] == "websocket.disconnect":
@@ -60,6 +81,10 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
         pass
     finally:
         session.remove_socket(ws)
+        try:
+            await session.broadcast_participants()
+        except Exception:  # noqa: BLE001
+            log.exception("[%s] participants broadcast failed", room)
         if not session.sockets:
             await mouth.detach(session)
         log.info("[%s] %s disconnected (%d sockets)", room, user, len(session.sockets))

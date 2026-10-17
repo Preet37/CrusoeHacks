@@ -1,4 +1,4 @@
-"""Pydantic v2 mirror of PROTOCOL.md (v1). Every WebSocket message has a `type` field.
+"""Pydantic v2 mirror of PROTOCOL.md (v1 + v2 additions). Every WebSocket message has a `type` field.
 
 Usage:
     msg = protocol.parse(raw_text)          # -> one of the models below, ValueError if bad
@@ -16,7 +16,7 @@ from typing import Annotated, Any, ClassVar, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 
 
 def now_ms() -> int:
@@ -69,6 +69,27 @@ class Control(Msg):
     action: ControlAction
 
 
+class DrawError(Msg):
+    """v2: a shape failed to render in the browser."""
+    type: Literal["draw_error"] = "draw_error"
+    id: Optional[str] = None
+    op: Optional[str] = None
+    error: str = ""
+
+
+class CalendarJoin(Msg):
+    """v2: a scheduled meeting started; Twin joins, sends `brief`, says hi."""
+    type: Literal["calendar_join"] = "calendar_join"
+    meeting: str
+    scheduled: Optional[str] = None
+
+
+class ConnectRepo(Msg):
+    """v2: build the code map from a public GitHub repo."""
+    type: Literal["connect_repo"] = "connect_repo"
+    url: str
+
+
 # ---------------------------------------------------------------- server -> browser
 
 StatusState = Literal["listening", "thinking", "speaking", "hand_raised"]
@@ -103,22 +124,46 @@ class StopAudio(Msg):
     say_id: Optional[str] = None  # None = stop everything
 
 
-DrawOp = Literal["add_box", "connect", "rename", "remove", "highlight", "clear"]
+DrawOp = Literal[
+    "add_box", "connect", "rename", "remove", "highlight", "clear",
+    # v2
+    "frame", "focus", "add_sticky", "add_text", "add_mermaid", "add_chart", "add_table",
+    "add_code", "add_mock", "sketch", "update",
+]
 BoxKind = Literal["service", "datastore", "client", "external", "note"]
 
 
 class Draw(Msg):
+    # Permissive: unknown extra fields are kept and forwarded to the browser.
+    model_config = ConfigDict(extra="allow")
     type: Literal["draw"] = "draw"
     op: DrawOp
     id: Optional[str] = None
     label: Optional[str] = None
-    x: Optional[int] = None
-    y: Optional[int] = None
+    x: Optional[Union[int, float]] = None
+    y: Optional[Union[int, float]] = None
     kind: Optional[BoxKind] = None
     from_id: Optional[str] = None
     to_id: Optional[str] = None
     ids: Optional[list[str]] = None
     on: Optional[bool] = None
+    # v2
+    frame: Optional[str] = None
+    title: Optional[str] = None
+    w: Optional[Union[int, float]] = None
+    h: Optional[Union[int, float]] = None
+    text: Optional[str] = None
+    color: Optional[str] = None
+    size: Optional[str] = None
+    code: Optional[str] = None
+    chart: Optional[str] = None
+    labels: Optional[list[Any]] = None
+    series: Optional[list[Any]] = None
+    columns: Optional[list[Any]] = None
+    rows: Optional[list[Any]] = None
+    language: Optional[str] = None
+    html: Optional[str] = None
+    strokes: Optional[list[Any]] = None
 
 
 class Box(BaseModel):
@@ -128,6 +173,7 @@ class Box(BaseModel):
     x: int
     y: int
     kind: BoxKind
+    frame: Optional[str] = None
 
 
 class Edge(BaseModel):
@@ -136,12 +182,15 @@ class Edge(BaseModel):
     from_id: str
     to_id: str
     label: Optional[str] = None
+    frame: Optional[str] = None
 
 
 class BoardSnapshot(Msg):
     type: Literal["board_snapshot"] = "board_snapshot"
     boxes: list[Box] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
+    shapes: Optional[list[dict]] = None       # v2 shapes (omitted when none)
+    active_frame: Optional[str] = None        # v2
 
 
 AgentState = Literal["started", "done", "failed", "cancelled"]
@@ -180,17 +229,48 @@ class Error(Msg):
     recoverable: bool = True
 
 
+class Topic(Msg):
+    """v2: current meeting topic (one whiteboard frame per topic)."""
+    type: Literal["topic"] = "topic"
+    topic_id: str
+    title: str
+    active: bool = True
+    changed: bool = False
+
+
+class Person(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str
+    kind: Literal["human", "ai"] = "human"
+    speaking: bool = False
+
+
+class Participants(Msg):
+    type: Literal["participants"] = "participants"
+    people: list[Person] = Field(default_factory=list)
+
+
+class Brief(Msg):
+    """v2: Twin's pre-meeting brief."""
+    type: Literal["brief"] = "brief"
+    title: str
+    predictions: list[str] = Field(default_factory=list)
+    ts: Optional[int] = None
+
+
 # ---------------------------------------------------------------- parse / dump / send
 
 ALL_MESSAGES = (
-    Hello, UserText, BargeIn, PushToTalk, Control,
+    Hello, UserText, BargeIn, PushToTalk, Control, DrawError, CalendarJoin, ConnectRepo,
     Status, Transcript, Audio, StopAudio, Draw, BoardSnapshot, AgentEvent, Task, Metric, Error,
+    Topic, Participants, Brief,
 )
 
 AnyMessage = Annotated[
     Union[
-        Hello, UserText, BargeIn, PushToTalk, Control,
+        Hello, UserText, BargeIn, PushToTalk, Control, DrawError, CalendarJoin, ConnectRepo,
         Status, Transcript, Audio, StopAudio, Draw, BoardSnapshot, AgentEvent, Task, Metric, Error,
+        Topic, Participants, Brief,
     ],
     Field(discriminator="type"),
 ]

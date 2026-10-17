@@ -14,15 +14,26 @@ def _room() -> str:
     return f"t_{uuid.uuid4().hex[:8]}"
 
 
+_SKIP = {"participants", "topic"}
+
+
+def _rj(ws):
+    """receive_json, skipping v2 presence messages (covered in test_v2.py)."""
+    while True:
+        msg = ws.receive_json()
+        if msg["type"] not in _SKIP:
+            return msg
+
+
 def _connect(client, room, user):
     ws = client.websocket_connect(f"/ws?room={room}&user={user}").__enter__()
-    first, second = ws.receive_json(), ws.receive_json()
+    first, second = _rj(ws), _rj(ws)
     return ws, first, second
 
 
 def _recv_until(ws, type_, limit=10):
     for _ in range(limit):
-        msg = ws.receive_json()
+        msg = _rj(ws)
         if msg["type"] == type_:
             return msg
     raise AssertionError(f"no {type_} message")
@@ -49,8 +60,8 @@ def test_two_clients_get_initial_state_and_shared_transcript():
         a.send_json({"type": "user_text", "speaker": "Preet", "text": "the app talks to auth",
                      "final": True, "ts": 123})
         expected = {"type": "transcript", "speaker": "Preet", "text": "the app talks to auth", "ts": 123}
-        assert a.receive_json() == expected
-        assert b.receive_json() == expected
+        assert _rj(a) == expected
+        assert _rj(b) == expected
 
         s = get_session(room)
         assert len(s.history) == 1 and s.history[0]["text"] == "the app talks to auth"
@@ -70,8 +81,8 @@ def test_barge_in_sends_stop_audio_and_listening():
         s = get_session(room)
         s.status, s.speaking, s.current_say_id = "speaking", True, "s_9"
         a.send_json({"type": "barge_in", "speaker": "Preet", "ts": 1})
-        assert a.receive_json() == {"type": "stop_audio", "say_id": "s_9"}
-        assert a.receive_json() == {"type": "status", "state": "listening"}
+        assert _rj(a) == {"type": "stop_audio", "say_id": "s_9"}
+        assert _rj(a) == {"type": "status", "state": "listening"}
         assert s.current_say_id is None and s.speaking is False
         a.__exit__(None, None, None)
 
@@ -81,12 +92,12 @@ def test_invalid_json_yields_recoverable_error_and_socket_survives():
     with TestClient(app) as client:
         a, _, _ = _connect(client, room, "Preet")
         a.send_text("{not json")
-        err = a.receive_json()
+        err = _rj(a)
         assert err["type"] == "error" and err["recoverable"] is True
         a.send_text('{"type":"nope"}')
-        assert a.receive_json()["type"] == "error"
+        assert _rj(a)["type"] == "error"
         a.send_json({"type": "user_text", "speaker": "Preet", "text": "still alive", "final": True})
-        assert a.receive_json()["type"] == "transcript"
+        assert _rj(a)["type"] == "transcript"
         a.__exit__(None, None, None)
 
 
@@ -97,8 +108,8 @@ def test_controls_clear_board_and_reset():
         s = get_session(room)
         s.board.apply({"op": "add_box", "id": "web", "label": "Web", "x": 1, "y": 2, "kind": "client"})
         a.send_json({"type": "control", "action": "clear_board"})
-        assert a.receive_json() == {"type": "draw", "op": "clear"}
-        assert a.receive_json() == {"type": "board_snapshot", "boxes": [], "edges": []}
+        assert _rj(a) == {"type": "draw", "op": "clear"}
+        assert _rj(a) == {"type": "board_snapshot", "boxes": [], "edges": []}
         a.send_json({"type": "control", "action": "mute_twin"})
         a.send_json({"type": "push_to_talk", "active": True})
         a.send_json({"type": "user_text", "speaker": "Preet", "text": "x", "final": True})
@@ -128,7 +139,7 @@ def test_final_text_hook_and_decide_hook_are_called():
     with TestClient(app) as client:
         a, _, _ = _connect(client, room, "Preet")
         a.send_json({"type": "user_text", "speaker": "Preet", "text": "Twin, hi", "final": True})
-        a.receive_json()
+        _rj(a)
         # Hooks ran as background tasks on the server loop; give them a moment.
         a.send_json({"type": "hello", "protocol": 1, "user": "Preet", "room": room})
         for _ in range(50):

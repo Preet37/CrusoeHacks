@@ -47,7 +47,18 @@ class Mouth:
         s.decide_and_respond = self.on_final
         s.on_final_text(self.on_final_mind)
         s.on_reset(self.on_reset)
+        self._register_draw_repair()
         self.ensure_idle_loop()
+
+    def _register_draw_repair(self) -> None:
+        """PREET-CODEX's Diagrammer may fix a shape the browser failed to render."""
+        try:
+            from agents import diagrammer
+        except Exception:  # noqa: BLE001
+            return
+        repair = getattr(diagrammer, "repair_draw", None)
+        if repair is not None and hasattr(self.session, "on_draw_error"):
+            self.session.on_draw_error(repair)
 
     def ensure_idle_loop(self) -> None:
         loop = asyncio.get_running_loop()
@@ -95,6 +106,13 @@ class Mouth:
         self.session.spawn("responder", responder.respond(
             self.session, reason, trigger_ts=trigger_ts, updates=updates))
 
+    def greet(self, meeting: str, predictions: list[str]) -> None:
+        """calendar_join: Twin says hi, mentioning the brief."""
+        preds = "; ".join(predictions[:3]) if predictions else "nothing specific"
+        self.speak("calendar join: greet the team in one short sentence and mention the first prediction",
+                   trigger_ts=_now_ms(),
+                   updates=[f"You just joined {meeting}. Your brief predicts: {preds}"])
+
     async def _idle_loop(self) -> None:
         while True:
             try:
@@ -107,6 +125,8 @@ class Mouth:
 
     async def _tick(self) -> None:
         s = self.session
+        if hasattr(s, "broadcast_participants"):
+            await s.broadcast_participants()  # diffs; sends only when someone starts/stops speaking
         self._sync()
         now = _now_ms()
         has = s.has_updates()

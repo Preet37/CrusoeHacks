@@ -16,9 +16,11 @@ def _examples() -> list[dict]:
     out = []
     for block in re.findall(r"```json\n(.*?)```", text, flags=re.S):
         for line in block.splitlines():
-            line = re.sub(r"\s*//.*$", "", line).strip()
+            line = line.strip()
             if line:
-                out.append(json.loads(line))
+                # raw_decode ignores trailing `// comment` text without touching `//` inside strings
+                obj, _ = json.JSONDecoder().raw_decode(line)
+                out.append(obj)
     return out
 
 
@@ -28,7 +30,7 @@ EXAMPLES = _examples()
 def test_found_examples_for_every_type():
     types = {e["type"] for e in EXAMPLES}
     assert types == {m.model_fields["type"].default for m in protocol.ALL_MESSAGES}
-    assert len(EXAMPLES) >= 20
+    assert len(EXAMPLES) >= 35
 
 
 @pytest.mark.parametrize("example", EXAMPLES, ids=lambda e: f"{e['type']}:{e.get('op', e.get('state', ''))}")
@@ -47,7 +49,7 @@ def test_type_defaults_and_none_handling():
     a = protocol.dump(Audio(say_id="s_1", seq=0, text="hi", last=True))
     assert a["data"] is None and "sample_rate" not in a
     assert protocol.dump(Draw(op="clear")) == {"type": "draw", "op": "clear"}
-    assert protocol.PROTOCOL_VERSION == 1
+    assert protocol.PROTOCOL_VERSION == 2
     assert isinstance(protocol.now_ms(), int) and protocol.now_ms() > 1_700_000_000_000
 
 

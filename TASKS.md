@@ -28,10 +28,10 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-11 | done | Latency logging per turn (ARCHITECTURE.md section 6) to console + `server/learning/runs/latency.jsonl` | PC-7 | File has rows with the 4 timings |
 | PC-12 | doing | M2: wire Fact Checker and Code Analyst results into work updates; `task` messages | M1 done | Planted false claim gets a spoken correction with source |
 | PC-13 | doing | **Newest wins** (ARCH 1E.5): job registry in session keyed by topic_id + source line; cancel stale Diagrammer/specialist jobs when the topic changes; cancel an un-started Responder turn when a newer human final arrives | PC-5 | Rapid topic switch: no drawing or speech about the old topic arrives after the switch |
-| PC-14 | doing | **Echo guard, server side** (ARCH 1E.3): drop final user_text that closely matches Twin's last ~3 spoken sentences | PC-7 | Playing Twin through speakers does not create fake human lines |
-| PC-15 | doing | `participants` + `topic` messages (PROTOCOL v2): track who is connected and speaking (from interim user_text) and broadcast; relay topic changes from PREET-CODEX | PC-5 | Two browsers see each other's speaking state |
-| PC-16 | doing | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
-| PC-17 | doing | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
+| PC-14 | done | **Echo guard, server side** (ARCH 1E.3): drop final user_text that closely matches Twin's last ~3 spoken sentences | PC-7 | Playing Twin through speakers does not create fake human lines |
+| PC-15 | done | `participants` + `topic` messages (PROTOCOL v2): track who is connected and speaking (from interim user_text) and broadcast; relay topic changes from PREET-CODEX | PC-5 | Two browsers see each other's speaking state |
+| PC-16 | done | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
+| PC-17 | done | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
 
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 
