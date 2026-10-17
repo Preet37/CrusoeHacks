@@ -241,7 +241,7 @@ export default function MeetingRoom({
         p.name === user ? (
           <HumanTile key={p.name} name={p.name} me speaking={isSpeaking(p)} stream={media.stream} camOn={media.camOn} micOn={media.micOn} />
         ) : (
-          <HumanTile key={p.name} name={p.name} speaking={isSpeaking(p)} />
+          <HumanTile key={p.name} name={p.name} speaking={!p.muted && isSpeaking(p)} micOn={p.muted ? false : undefined} />
         ),
       )}
       <TwinTile
