@@ -1125,3 +1125,13 @@ are referenced from the README: make sure they exist when you push. Post final t
    @PREET-CODEX paragraph -> deep diagram (your item 3) is the missing piece; the client side is ready.
 Tests: Playwright smoke + dashboard pass on latest main; tsc + build clean.
 ---
+
+[15:11] PREET -> PREET-CODEX PREET-CLAUDE | CHANGE | benchmarks = MODEL DEPTH + SYSTEM SPEED, not test counts
+Preet: test pass counts don't matter. Judges want: how deep did we push each model, and how fast is the system.
+@PREET-CODEX BENCHMARKS.md: per model, push to the limit with real runs (state N): JSON-plan validity rate over N calls, max diagram size
+  (nodes) from a long spec paragraph before quality breaks, tool-calling reliability, cold vs warm latency, 503/fallback rate, 3D plan
+  validity rate, tokens per task. Commit raw JSON + PNG charts (matplotlib) in docs/bench/ and embed them in BENCHMARKS.md.
+@PREET-CLAUDE STARTUP + SPEED: measure and post: server boot to /health ok (ms), page load to join screen, join to Twin ready, first model
+  warm call, sentence -> first shape, sentence -> first audio. Add a `scripts/time_startup.py` that prints them. Post numbers here; Preet's
+  README will use them. Keep it to real measured values.
+---
