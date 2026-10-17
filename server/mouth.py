@@ -31,6 +31,93 @@ QUIET_AFTER_HOLD_MS = 2000   # after "not now", a held update may come out once 
 _QUESTION_START = ("what", "how", "why", "should", "could", "can", "do ", "does", "is ", "are ", "would", "which", "who", "any thoughts")
 
 
+# Step 1 of a visual turn (15:17): say WHAT is coming, instantly (pre-synthesized at startup).
+VISUAL_PHRASES = {
+    "architecture": "Here's how those pieces connect.",
+    "sequence": "Let me lay out the flow.",
+    "chart": "I'll chart those numbers.",
+    "mockup": "Here's a rough screen.",
+    "table": "Let me compare those side by side.",
+    "code": "Here's the relevant code.",
+    "3d": "Let me show it in 3D.",
+}
+FACT_PHRASE = "Let me pull up what the repo says."
+PREWARM_PHRASES = list(dict.fromkeys([*VISUAL_PHRASES.values(), FACT_PHRASE, SKETCH_ACK]))
+
+# Contribution speech (Codex 15:23 contract: broadcast {"type": "contribution", show, current,
+# impact[], risks[], question, sources[]}, also session.latest_contribution).
+CONTRIB_MAX_SENTENCES = 4
+CONTRIB_MAX_WORDS = 30
+CONTRIB_PHRASE_WAIT_MS = 3000     # addressed: let the step-1 phrase finish first (max)
+CONTRIB_BUSY_WAIT_MS = 8000       # addressed: let an already-speaking reply finish (max)
+CONTRIB_GAP_MS = 1200             # proactive: speak at the next gap this long
+CONTRIB_GAP_WAIT_MS = 10000       # proactive: give up if the room never pauses
+CONTRIB_TRIGGER_TTL_MS = 30000    # a visual trigger older than this no longer counts
+NARRATE_MAX_LABELS = 4
+_SHAPE_OPS = {"add_box", "add_sticky", "add_text", "add_mermaid", "add_chart", "add_table",
+              "add_code", "add_mock", "add_3d", "sketch"}
+_CODE_CHANGE_CLAIM = re.compile(
+    r"\b(i|we)('ve| have)?\s+(just\s+)?(changed|updated|modified|fixed|edited|refactored|committed|pushed|"
+    r"rewrote|rewritten|implemented|patched|deployed)\b", re.I)
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def visual_phrase(decision) -> str:
+    """The <=0.5 s line for a predicted visual: what Twin is about to show."""
+    visual, _ = _choice(decision, "wants_visual") if isinstance(decision, dict) else (None, 0.0)
+    if visual in VISUAL_PHRASES:
+        return VISUAL_PHRASES[visual]
+    kind, _ = _choice(decision, "kind") if isinstance(decision, dict) else (None, 0.0)
+    return FACT_PHRASE if kind == "system_fact" else SKETCH_ACK
+
+
+def _sentence(text) -> str:
+    """First sentence of text, capped, ending in punctuation. File names (auth/login.py) survive."""
+    t = " ".join(str(text or "").split())
+    if not t:
+        return ""
+    t = _SENT_SPLIT.split(t, maxsplit=1)[0].strip()
+    words = t.split()
+    if len(words) > CONTRIB_MAX_WORDS:
+        t = " ".join(words[:CONTRIB_MAX_WORDS]).rstrip(",;:")
+    if t and t[-1] not in ".!?":
+        t += "."
+    return t
+
+
+def narration(labels: list[str]) -> str:
+    """One sentence grounded in labels that were actually drawn; "" when none."""
+    labels = [l for l in labels if l][:NARRATE_MAX_LABELS]
+    if not labels:
+        return ""
+    if len(labels) == 1:
+        return f"That's {labels[0]} on the board."
+    return "Left is " + ", then ".join(labels) + "."
+
+
+def compose_contribution(c: dict, labels: list[str] | None = None) -> str:
+    """narration?, current, top impact, top risk, question -> at most 4 short sentences.
+
+    The question is always kept; risk then impact are trimmed first. Sentences that
+    claim code was changed are dropped (Twin only reads the repo).
+    """
+    if not isinstance(c, dict):
+        return ""
+    def first(v):
+        if isinstance(v, (list, tuple)):
+            v = next((x for x in v if str(x or "").strip()), "")
+        return _sentence(v)
+    q = _sentence(c.get("question"))
+    if q and q[-1] != "?":
+        q = q.rstrip(".!") + "?"
+    body = [narration(labels or []), _sentence(c.get("current")), first(c.get("impact")), first(c.get("risks"))]
+    body = [b for b in body if b and not _CODE_CHANGE_CLAIM.search(b)]
+    if q and _CODE_CHANGE_CLAIM.search(q):
+        q = ""
+    body = body[:CONTRIB_MAX_SENTENCES - (1 if q else 0)]
+    return " ".join(body + ([q] if q else [])).strip()
+
+
 _DRAW_CLAIM = re.compile(r"\b(drew|drawn|draw|built|build|sketch\w*|added|put|placed|diagram|board)\b", re.I)
 
 
@@ -136,6 +223,10 @@ class Mouth:
         self._ghost: dict | None = None  # {"id", "line_ts", "ghost_ms", "timer"}
         self._ghost_ids = itertools.count(1)
         self._ghost_tasks: set[asyncio.Task] = set()
+        self._phrase_until_ms = 0          # when the step-1 phrase finishes playing
+        self._visual_turn: dict | None = None  # {"ts", "addressed"} of the latest visual line
+        self._shape_labels: list[tuple[float, int, str]] = []  # (x, order, label) drawn since then
+        self._spoken_contribs: set[str] = set()
 
     # ------------------------------------------------------------ wiring
     def attach(self) -> None:
@@ -192,14 +283,15 @@ class Mouth:
             if decision is not None:
                 line["decision"] = decision
                 if wants_ghost(decision):
+                    self._mark_visual_turn(session, line, decision)
                     try:
                         await self._show_ghost(session, line)
                     except Exception:  # noqa: BLE001 - the ghost is cosmetic
                         log.exception("ghost card failed")
                     try:
-                        await self._say_cached(session, SKETCH_ACK)  # B3: never silent while drawing
+                        await self._say_cached(session, visual_phrase(decision))  # step 1: what's coming
                     except Exception:  # noqa: BLE001
-                        log.exception("sketch ack failed")
+                        log.exception("visual phrase failed")
             if self.listener is listener:  # a reset may have swapped it while we waited
                 listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
         if decision is not None and addressed_without_name(decision, line.get("text", "")):
@@ -238,6 +330,8 @@ class Mouth:
         from voice import tts
         wav = tts.cached(text)
         say_id = session.new_say_id()
+        if wav:  # 16-bit mono 44.1 kHz after a 44-byte header
+            self._phrase_until_ms = _now_ms() + int(max(0, len(wav) - 44) / 88.2)
         await session.broadcast({"type": "audio", "say_id": say_id, "seq": 0, "format": "wav", "sample_rate": 44100,
                                  "text": text, "data": base64.b64encode(wav).decode("ascii") if wav else None,
                                  "last": True})
@@ -294,9 +388,18 @@ class Mouth:
             await self.session.broadcast({"type": "draw", "op": "remove", "id": gid})
 
     def _on_broadcast(self, data) -> None:
-        """Session broadcast observer: the first real draw replaces the ghost."""
+        """Session broadcast observer: contributions get spoken, shape labels are kept
+        for narration, and the first real draw replaces the ghost."""
+        if not isinstance(data, dict):
+            return
+        if data.get("type") == "contribution":
+            self._on_contribution(data)
+            return
+        if data.get("type") != "draw":
+            return
+        self._collect_label(data)
         g = self._ghost
-        if g is None or not isinstance(data, dict) or data.get("type") != "draw":
+        if g is None:
             return
         op, item_id = data.get("op"), str(data.get("id") or "")
         if op in _NON_SHAPE_OPS or item_id.startswith("ghost_"):
@@ -316,7 +419,123 @@ class Mouth:
             g["timer"].cancel()
             await self.session.broadcast({"type": "draw", "op": "remove", "id": g["id"]})
 
+    # ------------------------------------------------------------ contribution (15:17)
+    def _mark_visual_turn(self, session, line: dict, decision) -> None:
+        import turn_taking as tt
+        text = line.get("text", "")
+        addressed = bool(tt.mentions_name(text) or getattr(session, "push_to_talk_active", False)
+                         or addressed_without_name(decision, text))
+        self._visual_turn = {"ts": _now_ms(), "addressed": addressed}
+        self._shape_labels = []
+
+    def _collect_label(self, data: dict) -> None:
+        if data.get("op") not in _SHAPE_OPS or str(data.get("id") or "").startswith("ghost_"):
+            return
+        if data.get("by") not in (None, "Twin", config.TWIN_NAME):
+            return  # a human drew it
+        label = next((str(data[k]).strip() for k in ("label", "title", "text")
+                      if isinstance(data.get(k), str) and data[k].strip()), "")
+        if not label:
+            return
+        label = " ".join(label.split()[:4])
+        if any(l == label for _, _, l in self._shape_labels):
+            return
+        x = data.get("x")
+        self._shape_labels.append((float(x) if isinstance(x, (int, float)) else float("inf"),
+                                   len(self._shape_labels), label))
+
+    def narration_labels(self) -> list[str]:
+        return [l for _, _, l in sorted(self._shape_labels)][:NARRATE_MAX_LABELS]
+
+    def _on_contribution(self, msg: dict) -> None:
+        cid = str(msg.get("id") or "")
+        if not cid or cid in self._spoken_contribs:
+            return
+        try:
+            self.session.spawn("contribution", self._deliver_contribution(msg))
+        except RuntimeError:  # no running loop
+            log.warning("contribution arrived without a running loop")
+
+    def _contribution_addressed(self) -> bool:
+        t = self._visual_turn
+        if t is not None and _now_ms() - t["ts"] <= CONTRIB_TRIGGER_TTL_MS:
+            return bool(t["addressed"])
+        import turn_taking as tt
+        hist = [h for h in list(self.session.history) if h.get("speaker") != config.TWIN_NAME]
+        return bool(hist and tt.mentions_name(hist[-1].get("text", "")))
+
+    async def _deliver_contribution(self, msg: dict) -> None:
+        """Timing + mode for the spoken contribution. Card-only when it should stay quiet."""
+        s = self.session
+        cid = str(msg.get("id"))
+        mode = getattr(s, "twin_mode", "proactive")
+        if mode == "off" or s.muted:
+            return
+        addressed = self._contribution_addressed()
+        if not addressed and (mode != "proactive" or _now_ms() < self.state.hold_until_ms):
+            return  # on_request and not asked: the "Twin's take" card carries it
+        arrived = _now_ms()
+        if addressed:
+            while _now_ms() - arrived < CONTRIB_PHRASE_WAIT_MS and (
+                    _now_ms() < self._phrase_until_ms or s.speaking):
+                await asyncio.sleep(0.05)
+            while s.speaking and _now_ms() - arrived < CONTRIB_BUSY_WAIT_MS:
+                await asyncio.sleep(0.05)  # an answer is already playing: follow it, don't cut it
+            if s.speaking:
+                return
+        else:
+            while True:
+                quiet = _now_ms() - (s.last_human_speech_ts or 0)
+                if quiet >= CONTRIB_GAP_MS and not s.speaking and not s.current_say_id \
+                        and _now_ms() >= self._phrase_until_ms:
+                    break
+                if _now_ms() - arrived > CONTRIB_GAP_WAIT_MS:
+                    return
+                await asyncio.sleep(0.1)
+        if getattr(s, "twin_mode", "proactive") == "off" or s.muted or cid in self._spoken_contribs:
+            return
+        labels = self.narration_labels() if not board_is_empty(s) else []
+        text = compose_contribution(msg, labels)
+        sentences = drop_false_draw_claims(s, _SENT_SPLIT.split(text)) if text else []
+        text = " ".join(sentences).strip()
+        if not text:
+            return
+        self._spoken_contribs.add(cid)
+        self._turn = None
+        self._updates_since = None
+        s.spawn("responder", self._speak_contribution(text))  # barge-in cancels "responder"
+
+    async def _speak_contribution(self, text: str) -> str:
+        from voice import tts
+        s = self.session
+        say_id = s.new_say_id()
+        s.current_say_id = say_id
+        started = {"v": False}
+
+        async def emit(msg: dict) -> None:
+            if s.current_say_id != say_id:
+                return  # barge-in or a newer turn took over
+            if not started["v"]:
+                started["v"] = True
+                s.speaking = True
+                await s.set_status("speaking")
+            await s.broadcast(msg)
+
+        spoken = ""
+        try:
+            spoken = (await tts.speak_text(text, say_id, emit) or "").strip()
+            if spoken and s.current_say_id == say_id:
+                await s.add_line(config.TWIN_NAME, spoken)
+        finally:
+            if s.current_say_id == say_id:
+                s.current_say_id = None
+                s.speaking = False
+                await s.set_status("listening")
+        return spoken
+
     async def on_reset(self, session) -> None:
+        self._visual_turn = None
+        self._shape_labels = []
         try:
             await self._clear_ghost()
         except Exception:  # noqa: BLE001

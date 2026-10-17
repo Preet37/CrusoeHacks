@@ -641,8 +641,22 @@ class Session:
             await self.screen_frame(ws, user, msg)
         elif t == "screen_stop":
             await self.screen_stop(ws, user)
+        elif t == "ticket_action":
+            await self.ticket_action(ws, protocol.dump(msg))
         else:
             await self.send_to(ws, Error(message=f"unexpected message type {t!r}", recoverable=True))
+
+    async def ticket_action(self, ws, data: dict) -> None:
+        """PC-23: approve | push_jira | dismiss a draft ticket; everyone sees the update."""
+        import integrations
+        ticket_id, action = str(data.get("id") or ""), str(data.get("action") or "")
+        try:
+            ticket, _ = await integrations.apply_action(
+                ticket_id, action, workspace=getattr(self, "workspace", None), room=self.room)
+        except integrations.TicketError as e:
+            await self.send_to(ws, Error(message=str(e)[:500], recoverable=True))
+            return
+        await self.broadcast(integrations.wire(ticket))
 
     def debug_state(self) -> dict:
         return {

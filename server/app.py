@@ -17,6 +17,62 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("twin.app")
 
 app = FastAPI(title="Twin")
+
+
+# ---------------------------------------------------------------- PC-23 integrations + tickets
+# Registered before the persistence router so GET /tickets also includes live drafts
+# (same {"tickets": [...]} shape and the same workspace+code auth).
+def _ticket_scope(workspace: str, code: str, room: str) -> str | None:
+    from fastapi import HTTPException
+    if workspace:
+        trusted, error = check_workspace(workspace, code)
+        if error or not trusted:
+            raise HTTPException(403, error or "Wrong invite code")
+        return trusted
+    if not room:
+        raise HTTPException(401, "Workspace and invite code are required")
+    if room_owner(room):
+        raise HTTPException(403, f"Room {room} belongs to a workspace: invite code required")
+    return None
+
+
+@app.get("/integrations")
+async def integrations_status(workspace: str = "", code: str = ""):
+    from integrations import jira
+    github = None
+    trusted, error = check_workspace(workspace, code) if workspace else (None, None)
+    if trusted and not error:
+        try:
+            from brain.workspace_store import get_workspace
+            repo = get_workspace(trusted).get("repo_url")
+            github = {"connected": bool(repo), "repo_url": repo}
+        except Exception:  # noqa: BLE001
+            log.exception("workspace repo lookup failed")
+    return {"jira": await jira.status(), "github": github,
+            "slack": {"connected": bool(os.getenv("SLACK_WEBHOOK_URL"))}}
+
+
+@app.get("/tickets")
+async def tickets_list(workspace: str = "", code: str = "", room: str = ""):
+    import integrations
+    return {"tickets": integrations.list_tickets(_ticket_scope(workspace, code, room), room or None)}
+
+
+@app.post("/tickets/{ticket_id}/push_jira")
+async def tickets_push_jira(ticket_id: str, workspace: str = "", code: str = "", room: str = ""):
+    from fastapi.responses import JSONResponse
+    import integrations
+    trusted = _ticket_scope(workspace, code, room)
+    try:
+        ticket, session = await integrations.apply_action(ticket_id, "push_jira",
+                                                          workspace=trusted, room=room or None)
+    except integrations.TicketError as e:
+        return JSONResponse({"error": str(e)}, status_code=e.status)
+    if session is not None:
+        await session.broadcast(integrations.wire(ticket))
+    return ticket
+
+
 from brain.persistence_api import router as persistence_router
 app.include_router(persistence_router)
 # Two-laptop demo: any origin (LAN IP, cloudflared tunnel) may call the API.
@@ -36,7 +92,7 @@ async def _prewarm_acks() -> None:
 
     async def run() -> None:
         try:
-            n = await tts.prewarm(list(responder.ACKS) + [mouth.SKETCH_ACK])
+            n = await tts.prewarm(list(responder.ACKS) + list(mouth.PREWARM_PHRASES))
             log.info("prewarmed %d ack phrases", n)
         except Exception:  # noqa: BLE001
             log.exception("ack prewarm failed")
@@ -85,6 +141,19 @@ async def metrics_refresh(room: str = "demo"):
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+
+@app.get("/cad/{model_id}.glb")
+async def cad_model(model_id: str):
+    """GLB built by server/cad (rough-then-refine 3D). 404 for unknown ids."""
+    from fastapi import HTTPException, Response
+    from cad.pipeline import get_glb
+
+    data = get_glb(model_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="unknown model")
+    return Response(content=data, media_type="model/gltf-binary",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/state")
@@ -184,6 +253,11 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
             except Exception:  # noqa: BLE001
                 log.exception("brain re-attach for workspace failed")
     mouth.attach(session)
+    try:
+        from cad import attach as cad_attach
+        cad_attach(session)  # add_3d primitives -> real CAD GLB, swapped in place
+    except Exception:  # noqa: BLE001 - the meeting must work without CAD
+        log.exception("cad attach failed")
     session.add_socket(ws, user)
     log.info("[%s] %s connected (%d sockets)", room, user, len(session.sockets))
     try:
@@ -199,6 +273,14 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
             raw = frame.get("text") if frame.get("text") is not None else frame.get("bytes")
             if raw is None:
                 continue
+            if isinstance(raw, str) and '"ticket_action"' in raw:
+                try:
+                    data = json.loads(raw)
+                except ValueError:
+                    data = None
+                if isinstance(data, dict) and data.get("type") == "ticket_action":
+                    await session.ticket_action(ws, data)  # PC-23 (v2.2 proposed message)
+                    continue
             try:
                 msg = protocol.parse(raw)
             except ValueError as e:
