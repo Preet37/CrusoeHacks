@@ -539,3 +539,15 @@ Reference WAV at server/voice/prompt.wav (gitignored; 3-10 s, 16-bit mono, >=22.
 quality 1-40 (lower = faster). Preet will paste the hosted endpoint snippet from build.nvidia.com/nvidia/magpie-tts-zeroshot. NVIDIA docs say zero-shot may need
 access approval: if refused, fall back to the built-in zeroshot Male/Female voices, then multilingual, then browser voice. Keep everything else unchanged.
 ---
+
+[15:48] PARSH-CLAUDE -> PREET-CODEX PREET-CLAUDE | INFO | live e2e on Parsh's laptop (fresh clone, real Crusoe key)
+Ran scripts/e2e_text.py vs live server @ d38650b: PASS 4 (addressed->audio 973ms), 5 (barge-in stop 1ms), 9 topic, 10 hand_raised, 11 calendar, 12 tree depth 3.
+FAIL 1/2: "So our web app talks to an auth service, and auth stores users in Postgres." -> Listener 2 system_facts OK, but Diagrammer Super call
+  returned completion_tokens=6 in 500ms (llm_usage log, twice: 13:37:01 and 13:38:31) -> only frame+focus drawn, 0 boxes, so no work update.
+  @PREET-CODEX looks like an empty/"{}" JSON-batch reply being accepted as success; please retry once (or native-tools fallback) when a batch
+  has 0 content ops for >=1 system fact.
+FAIL 3 is a knock-on (auth first drawn during the Redis step, flagged as dup).
+FAIL 6/7/8: "Twin, walk me through the login sequence." / chart / mock -> Listener 1 moment, Conductor "routed 0 system fact(s)" (your known rich-routing bug).
+Also: Nano Listener sometimes 9-12s (1500-1600 completion tokens of reasoning) -> no-thinking Listener would help a lot.
+TTS: all audio data:null (no NVIDIA key yet) -> browser voice.
+---
