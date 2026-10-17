@@ -292,6 +292,10 @@ const sketchColors: Record<string, string> = {
   black: '#1d2430', red: '#e5484d', blue: ACCENT, green: '#30a46c', orange: '#f76b15', violet: '#8e4ec6', purple: '#8e4ec6', grey: '#8b95a3', gray: '#8b95a3', yellow: '#e2b203',
 }
 
+/** Human edits carry `by`; Twin's ops say "Twin". */
+const isHuman = (shape: Shape) => typeof shape.by === 'string' && !!shape.by && shape.by.toLowerCase() !== 'twin'
+const HUMAN_KIND = { fill: '#fff3e8', stroke: '#f5b88a', ink: '#d9690f', label: 'Service' }
+
 function KindIcon({ kind, x, y, color }: { kind: string; x: number; y: number; color: string }) {
   const common = { fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   return <g transform={`translate(${x} ${y})`}>
@@ -460,7 +464,7 @@ function ThreeDShape({ shape, rect, report }: { shape: Shape; rect: FrameRect; r
 
 function BoxShape({ shape, rect, highlighted }: { shape: Shape; rect: FrameRect; highlighted: boolean }) {
   const kind = kinds[string(shape.kind, 'service')] ? string(shape.kind, 'service') : 'service'
-  const color = kinds[kind]
+  const color = isHuman(shape) ? { ...HUMAN_KIND, label: kinds[kind].label } : kinds[kind]
   const full = string(shape.label, shape.id)
   const { primary, secondary } = humanize(full)
   const textX = rect.x + 78, textW = rect.w - 78 - 18
@@ -524,7 +528,7 @@ function NativeShape({ shape, rect, highlighted, report, source }: { shape: Shap
       }
       case 'sketch': {
         const color = sketchColors[string(shape.color, 'black').toLowerCase()] ?? sketchColors.black
-        return <g fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
+        return <g fill="none" stroke={color} strokeWidth={shape.hl ? 16 : 4} strokeLinecap="round" strokeLinejoin="round" opacity={shape.hl ? 0.4 : 0.85}>
           {sketchStrokes(shape, source).map((points, index) => <path key={index} d={smoothPath(points)} />)}
         </g>
       }
@@ -559,11 +563,48 @@ function Edge({ edge, from, to, highlighted }: { edge: Shape; from: FrameRect; t
   </g>
 }
 
+type Tool = 'select' | 'pen' | 'highlighter' | 'sticky' | 'text' | 'box' | 'arrow' | 'eraser'
+const TOOLS: { id: Tool; label: string; icon: string }[] = [
+  { id: 'select', label: 'Select / pan', icon: '↖' },
+  { id: 'pen', label: 'Pen', icon: '✎' },
+  { id: 'highlighter', label: 'Highlighter', icon: '░' },
+  { id: 'sticky', label: 'Sticky note', icon: '▤' },
+  { id: 'text', label: 'Text', icon: 'T' },
+  { id: 'box', label: 'Box', icon: '□' },
+  { id: 'arrow', label: 'Arrow (click two boxes)', icon: '↗' },
+  { id: 'eraser', label: 'Eraser', icon: '⌫' },
+]
+type Pending = { kind: 'sticky' | 'text' | 'box'; sx: number; sy: number; bx: number; by: number }
+const clampGrid = (value: number) => Math.max(0, Math.min(1000, Math.round(value)))
+const AUTO_FIT_PAUSE_MS = 5000
+
+function AnnotateToolbar({ tool, onTool }: { tool: Tool; onTool: (tool: Tool) => void }) {
+  return <div data-testid="board-annotate-toolbar" onPointerDown={event => event.stopPropagation()}
+    style={{
+      position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', zIndex: 400,
+      display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: 999,
+      border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)',
+      backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+    }}>
+    {TOOLS.map(t => {
+      const on = tool === t.id
+      return <button key={t.id} data-tool={t.id} title={t.label} aria-label={t.label} aria-pressed={on} onClick={() => onTool(t.id)}
+        style={{
+          width: 28, height: 28, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer',
+          background: on ? ACCENT : 'transparent', color: on ? '#fff' : '#1d1d1f',
+          font: '600 14px -apple-system, BlinkMacSystemFont, system-ui, sans-serif', lineHeight: '28px',
+        }}>{t.icon}</button>
+    })}
+  </div>
+}
+
 export default function NativeWhiteboard({ client, onHasContent }: { client: TwinClient; onHasContent?: (has: boolean) => void }) {
   const [board, setBoard] = useState<Board>(EMPTY)
   const [view3d, setView3d] = useState(() => new URLSearchParams(location.search).get('view') === '3d')
   const contentRef = useRef(onHasContent)
   const svgRef = useRef<SVGSVGElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const reported = useRef(new Set<string>())
   useEffect(() => { contentRef.current = onHasContent }, [onHasContent])
   useEffect(() => client.onBoard(message => setBoard(previous => apply(previous, message))), [client])
@@ -576,12 +617,31 @@ export default function NativeWhiteboard({ client, onHasContent }: { client: Twi
     try { client.send({ type: 'draw_error', id, op, error: error.slice(0, 300) }) } catch { /* ignore */ }
   }, [client])
   const { shapeRects, frames, fit } = useMemo(() => geometry(board), [board])
-  // Pan/zoom: a user view that resets to fit whenever the board changes.
+  // Pan/zoom: a user view that resets to fit whenever the board changes,
+  // except while a human is marking up the board (then it resumes 5 s later).
   const [view, setView] = useState<FrameRect | null>(null)
-  useEffect(() => { setView(null) }, [board])
+  const pausedUntil = useRef(0)
+  const fitDirty = useRef(false)
+  const pauseTimer = useRef<number | undefined>(undefined)
+  const drawing = useRef(false)
+  useEffect(() => {
+    if (Date.now() < pausedUntil.current || drawing.current) fitDirty.current = true
+    else setView(null)
+  }, [board])
   const vb = view ?? fit
   const vbRef = useRef(vb)
   vbRef.current = vb
+  const pauseFit = useCallback(() => {
+    pausedUntil.current = Date.now() + AUTO_FIT_PAUSE_MS
+    setView(current => current ?? vbRef.current)
+    window.clearTimeout(pauseTimer.current)
+    const resume = () => {
+      if (drawing.current || Date.now() < pausedUntil.current - 50) { pauseTimer.current = window.setTimeout(resume, 500); return }
+      if (fitDirty.current) { fitDirty.current = false; setView(null) }
+    }
+    pauseTimer.current = window.setTimeout(resume, AUTO_FIT_PAUSE_MS)
+  }, [])
+  useEffect(() => () => window.clearTimeout(pauseTimer.current), [])
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
@@ -600,30 +660,171 @@ export default function NativeWhiteboard({ client, onHasContent }: { client: Twi
     return () => svg.removeEventListener('wheel', onWheel)
   }, [])
   const drag = useRef<{ x: number; y: number; view: FrameRect; scale: number } | null>(null)
+
+  // ---- Human markup tools ----
+  const [tool, setToolState] = useState<Tool>('select')
+  const [live, setLive] = useState<[number, number][] | null>(null)
+  const stroke = useRef<[number, number][]>([])
+  const [pending, setPending] = useState<Pending | null>(null)
+  const [pendingText, setPendingText] = useState('')
+  const [arrowFrom, setArrowFrom] = useState<string | null>(null)
+  const [hover, setHover] = useState<string | null>(null)
+  const seq = useRef(0)
+  const setTool = (next: Tool) => { setToolState(next); setArrowFrom(null); setPending(null); setLive(null); drawing.current = false }
+  const user = client.user || 'guest'
+  const newId = () => {
+    let slug = user.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'guest'
+    if (!/^[a-z]/.test(slug)) slug = 'u' + slug
+    return `h_${slug.slice(0, 24)}_${Date.now().toString(36)}${(seq.current++).toString(36)}`
+  }
+  /** Screen -> board units, using the SVG's live view transform (viewBox + meet letterboxing). */
+  const toBoard = (clientX: number, clientY: number): [number, number] | null => {
+    const svg = svgRef.current
+    const ctm = svg?.getScreenCTM()
+    if (!svg || !ctm) return null
+    const point = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse())
+    return [point.x, point.y]
+  }
+  /** Innermost frame that contains the rect, or the root page. */
+  const frameFor = (rect: FrameRect): { id?: string; src: FrameRect } => {
+    let best: { id?: string; src: FrameRect } = { src: { x: 0, y: 0, w: PAGE_W, h: PAGE_H } }
+    let bestArea = Infinity
+    for (const [id, f] of frames)
+      if (rect.x >= f.x && rect.y >= f.y && rect.x + rect.w <= f.x + f.w && rect.y + rect.h <= f.y + f.h && f.w * f.h < bestArea) {
+        best = { id, src: f }; bestArea = f.w * f.h
+      }
+    return best
+  }
+  const toGrid = (x: number, y: number, src: FrameRect): [number, number] =>
+    [clampGrid((x - src.x) / src.w * 1000), clampGrid((y - src.y) / src.h * 1000)]
+  const sendDraw = (op: Op, local: Record<string, unknown> = {}) => {
+    const message = { type: 'draw', ...op, by: user }
+    try { client.send(message) } catch { /* ignore */ }
+    // Optimistic: the server relays to everyone except the sender, so render it now.
+    const creates = op.op !== 'remove' && op.op !== 'connect'
+    setBoard(previous => apply(previous, { ...message, ...(creates && !op.frame ? { frame: '' } : {}), ...local } as AnyServerMessage))
+  }
+  const finishStroke = () => {
+    const points = stroke.current
+    drawing.current = false
+    stroke.current = []
+    setLive(null)
+    if (!points.length) return
+    const xs = points.map(p => p[0]), ys = points.map(p => p[1])
+    const bbox = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+    const { id: frame, src } = frameFor(bbox)
+    const step = Math.max(1, Math.ceil(points.length / 480))
+    const sampled = points.filter((_, index) => index % step === 0 || index === points.length - 1)
+    const gridPoints = sampled.map(([x, y]) => toGrid(x, y, src))
+    if (gridPoints.length === 1) gridPoints.push([...gridPoints[0]] as [number, number])
+    const highlighter = tool === 'highlighter'
+    sendDraw({ op: 'sketch', id: newId(), strokes: [gridPoints], color: highlighter ? 'orange' : 'blue', ...(frame ? { frame } : {}) },
+      highlighter ? { hl: true } : {})
+    pauseFit()
+  }
+  const submitPending = () => {
+    const item = pending
+    const text = pendingText.trim()
+    setPending(null); setPendingText('')
+    if (!item || !text) return
+    const probe = frameFor({ x: item.bx, y: item.by, w: 1, h: 1 })
+    const src = probe.src
+    let x = item.bx, y = item.by
+    if (item.kind === 'box') { x -= BOX_W / 2; y -= BOX_H / 2 }
+    else if (item.kind === 'sticky') { x -= Math.max(180, 0.28 * src.w) / 2; y -= Math.max(80, 0.18 * src.h) / 2 }
+    else y -= 24
+    const [gx, gy] = toGrid(x, y, src)
+    const frame = probe.id ? { frame: probe.id } : {}
+    const id = newId()
+    if (item.kind === 'sticky') sendDraw({ op: 'add_sticky', id, text, color: 'yellow', x: gx, y: gy, ...frame })
+    else if (item.kind === 'text') sendDraw({ op: 'add_text', id, text, size: 'm', x: gx, y: gy, ...frame })
+    else sendDraw({ op: 'add_box', id, label: text, kind: 'service', x: gx, y: gy, ...frame })
+    pauseFit()
+  }
+  const targetOf = (element: EventTarget | null) => {
+    const node = element instanceof Element ? element.closest('[data-id]') : null
+    return node ? { id: node.getAttribute('data-id') ?? '', kind: node.getAttribute('data-testid') ?? '' } : null
+  }
+  const onBoardClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (tool === 'sticky' || tool === 'text' || tool === 'box') {
+      const point = toBoard(event.clientX, event.clientY)
+      const wrap = wrapRef.current?.getBoundingClientRect()
+      if (!point || !wrap) return
+      pauseFit()
+      setPendingText('')
+      setPending({ kind: tool, sx: event.clientX - wrap.left, sy: event.clientY - wrap.top, bx: point[0], by: point[1] })
+      return
+    }
+    const target = targetOf(event.target)
+    if (tool === 'eraser') {
+      if (!target || !target.id || target.kind === 'native-frame') return
+      pauseFit()
+      sendDraw({ op: 'remove', id: target.id })
+      return
+    }
+    if (tool === 'arrow') {
+      if (!target || target.kind !== 'native-box') { setArrowFrom(null); return }
+      pauseFit()
+      if (!arrowFrom || arrowFrom === target.id) { setArrowFrom(target.id); return }
+      sendDraw({ op: 'connect', id: newId(), from_id: arrowFrom, to_id: target.id })
+      setArrowFrom(null)
+    }
+  }
+  const hoverShape = hover ? board.shapes.get(hover) : undefined
+  const hoverRect = hoverShape && isHuman(hoverShape) ? shapeRects.get(hoverShape.id) : undefined
+  const unitsPerPx = (() => {
+    const box = svgRef.current?.getBoundingClientRect()
+    return box && box.width > 0 ? Math.max(vb.w / box.width, vb.h / box.height) : 1.5
+  })()
+  const arrowRect = arrowFrom ? shapeRects.get(arrowFrom) : undefined
+  const cursor = tool === 'select' ? 'grab' : tool === 'pen' || tool === 'highlighter' ? 'crosshair' : tool === 'text' ? 'text' : tool === 'eraser' ? 'not-allowed' : 'copy'
+
   const frameShapes = [...board.shapes.values()].filter(shape => shape.op === 'frame')
   const otherShapes = [...board.shapes.values()].filter(shape => shape.op !== 'frame')
   const renderShape = (shape: Shape) => {
     const rect = shapeRects.get(shape.id)
     return rect && <NativeShape key={shape.id} shape={shape} rect={rect} highlighted={board.highlighted.has(shape.id)} report={report} source={frameSource(board, frames, shape)} />
   }
-  return <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-    <svg ref={svgRef} data-testid="native-board" role="img" aria-label="Live meeting whiteboard" viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+  return <div ref={wrapRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <svg ref={svgRef} data-testid="native-board" data-tool={tool} role="img" aria-label="Live meeting whiteboard" viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       preserveAspectRatio="xMidYMid meet" fontFamily={FONT}
       onPointerDown={event => {
         if (event.button !== 0) return
+        if (tool === 'pen' || tool === 'highlighter') {
+          const point = toBoard(event.clientX, event.clientY)
+          if (!point) return
+          pauseFit()
+          drawing.current = true
+          stroke.current = [point]
+          setLive([point])
+          event.currentTarget.setPointerCapture(event.pointerId)
+          return
+        }
+        if (tool !== 'select') return
         const box = event.currentTarget.getBoundingClientRect()
         drag.current = { x: event.clientX, y: event.clientY, view: vb, scale: Math.max(vb.w / box.width, vb.h / box.height) }
         event.currentTarget.setPointerCapture(event.pointerId)
       }}
       onPointerMove={event => {
+        if (drawing.current) {
+          const point = toBoard(event.clientX, event.clientY)
+          const last = stroke.current[stroke.current.length - 1]
+          if (!point || (last && Math.hypot(point[0] - last[0], point[1] - last[1]) < unitsPerPx * 2)) return
+          stroke.current = [...stroke.current, point]
+          setLive(stroke.current)
+          return
+        }
         const start = drag.current
         if (!start) return
         setView({ ...start.view, x: start.view.x - (event.clientX - start.x) * start.scale, y: start.view.y - (event.clientY - start.y) * start.scale })
       }}
-      onPointerUp={() => { drag.current = null }}
-      onPointerCancel={() => { drag.current = null }}
-      onDoubleClick={() => setView(null)}
-      style={{ width: '100%', height: '100%', display: 'block', background: '#fcfcfd', borderRadius: 16, touchAction: 'none', cursor: drag.current ? 'grabbing' : 'grab', userSelect: 'none' }}>
+      onPointerUp={() => { drag.current = null; if (drawing.current) finishStroke() }}
+      onPointerCancel={() => { drag.current = null; if (drawing.current) finishStroke() }}
+      onPointerOver={event => { const target = targetOf(event.target); setHover(target?.id ?? null) }}
+      onPointerLeave={() => setHover(null)}
+      onClick={onBoardClick}
+      onDoubleClick={() => { if (tool === 'select') setView(null) }}
+      style={{ width: '100%', height: '100%', display: 'block', background: '#fcfcfd', borderRadius: 16, touchAction: 'none', cursor: tool === 'select' && drag.current ? 'grabbing' : cursor, userSelect: 'none' }}>
       <defs>
         <pattern id="native-dots" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.4" fill="#e3e6eb" /></pattern>
         <marker id="native-arrowhead" viewBox="0 0 12 12" markerWidth="22" markerHeight="22" refX="9" refY="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
@@ -647,7 +848,34 @@ export default function NativeWhiteboard({ client, onHasContent }: { client: Twi
         return <Edge key={edge.id} edge={edge} from={from} to={to} highlighted={board.highlighted.has(edge.id)} />
       })}
       {otherShapes.map(renderShape)}
+      {arrowRect && <rect x={arrowRect.x - 8} y={arrowRect.y - 8} width={arrowRect.w + 16} height={arrowRect.h + 16} rx="18"
+        fill="none" stroke="#f76b15" strokeWidth={3} strokeDasharray="10 7" pointerEvents="none" />}
+      {live && <path data-testid="native-live-stroke" d={smoothPath(live)} fill="none" pointerEvents="none"
+        stroke={tool === 'highlighter' ? sketchColors.orange : sketchColors.blue} strokeWidth={tool === 'highlighter' ? 16 : 4}
+        strokeOpacity={tool === 'highlighter' ? 0.4 : 0.85} strokeLinecap="round" strokeLinejoin="round" />}
+      {hoverRect && hoverShape && (() => {
+        const size = 12 * unitsPerPx
+        const label = string(hoverShape.by)
+        const w = textWidth(label, size) + size * 1.4
+        return <g data-testid="native-author-tag" pointerEvents="none">
+          <rect x={hoverRect.x} y={hoverRect.y - size * 2.1} width={w} height={size * 1.7} rx={size * 0.85} fill="#f76b15" />
+          <text x={hoverRect.x + size * 0.7} y={hoverRect.y - size * 0.82} fontSize={size} fontWeight="600" fill="#fff" fontFamily={FONT}>{label}</text>
+        </g>
+      })()}
     </svg>
+    {!view3d && <AnnotateToolbar tool={tool} onTool={setTool} />}
+    {pending && <input data-testid="board-inline-input" autoFocus value={pendingText}
+      placeholder={pending.kind === 'box' ? 'Box label, Enter' : pending.kind === 'sticky' ? 'Sticky note, Enter' : 'Text, Enter'}
+      onChange={event => { setPendingText(event.target.value); pauseFit() }}
+      onKeyDown={event => {
+        if (event.key === 'Enter') { event.preventDefault(); submitPending() }
+        else if (event.key === 'Escape') { setPending(null); setPendingText('') }
+      }}
+      onBlur={() => { setPending(null); setPendingText('') }}
+      style={{ position: 'absolute', left: pending.sx, top: pending.sy - 16, zIndex: 450, width: 200, height: 32, padding: '0 10px',
+        borderRadius: 8, border: `1.5px solid ${pending.kind === 'sticky' ? '#e2b203' : ACCENT}`,
+        background: pending.kind === 'sticky' ? '#fff4bf' : '#fff', color: '#1d2430', font: `500 14px ${FONT}`,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.14)', outline: 'none' }} />}
     {view3d && <div style={{ position: 'absolute', inset: 0, background: '#fff' }}><Board3D client={client} onClose={() => setView3d(false)} /></div>}
     <button data-testid="board-3d-toggle" onClick={() => setView3d(value => !value)}
       title={view3d ? 'Back to 2D board' : '3D view of the architecture'}
