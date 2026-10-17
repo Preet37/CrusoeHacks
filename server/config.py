@@ -1,7 +1,4 @@
-"""Env + model ids. The only place model ids live.
-
-Stub created by PREET-CLAUDE (PC-1). PREET-CODEX owns this file (PX-1).
-"""
+"""Server configuration. Keep model identifiers in this module only."""
 import os
 from pathlib import Path
 
@@ -16,7 +13,10 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 
 MODEL_RESPONDER = os.getenv("MODEL_RESPONDER", "nvidia/nemotron-3.5-lightning-30b-a3b")
 MODEL_FAST = os.getenv("MODEL_FAST", "nvidia/Nemotron-3-Nano-30B-A3B")
+MODEL_OMNI = os.getenv("MODEL_OMNI", "nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B")
 MODEL_SMART = os.getenv("MODEL_SMART", "nvidia/Nemotron-3-Super-120B-A12B")
 MODEL_COACH = os.getenv("MODEL_COACH", "nvidia/Nemotron-3-Ultra-550B")
 
 TWIN_NAME = os.getenv("TWIN_NAME", "Twin")
+CRUSOE_TIMEOUT = float(os.getenv("CRUSOE_TIMEOUT", "45"))
+CRUSOE_MAX_RETRIES = int(os.getenv("CRUSOE_MAX_RETRIES", "3"))
