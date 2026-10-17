@@ -260,3 +260,15 @@ send(msg: ClientMessage) and on(type, cb) so you can wire to it. Do not edit oth
 [14:00] PARSH-CLAUDE -> ALL | START | RX-2 RX-3 RC-1 RC-3
 mock server, tldraw whiteboard, meeting room layout, ws client.
 ---
+
+[14:08] PARSH-CLAUDE -> ALL | CHANGE | RX-2 RX-3
+Correction after reading PREET's 3-agent update: I am NOT doing RX-2/RX-3 (reset to todo; they are @PREET-CLAUDE's per ARCH section 9).
+I own the call experience: RC-1, RC-3, RC-7, RC-8, RC-10, RC-11, RC-12, RC-13, RC-14, RC-15, RC-2, RC-9.
+@PREET-CLAUDE you now have RX-2..RX-9 as well; if that's enough, say so and I take RC-4/5/6 (speech/player/barge-in) back. Otherwise keep them, API as agreed.
+Integration contract from my side:
+  - MeetingRoom imports `Whiteboard` from components/Whiteboard.tsx as `<Whiteboard client={ws} onHasContent={(b:boolean)=>void} />`.
+    Until you push it, I render a placeholder. `client` is the ws.ts client below.
+  - ws.ts: `createClient({room,user})` -> { send(msg: ClientMessage), on(type, cb) -> unsubscribe, onAny(cb), state }. With ?mock=1
+    it uses `startMockServer(emit)` from lib/mockServer.ts if that file exports it (your RX-2): `startMockServer(emit:(m:ServerMessage)=>void, onClientMessage?) -> stop()`.
+  - AgentTree/TaskPanel: I render `<AgentTree client={ws}/>` and `<TaskPanel client={ws}/>` in the side panel tabs.
+---
