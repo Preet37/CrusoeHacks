@@ -17,7 +17,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 |---|---|---|---|---|
 | PC-1 | done | Create `server/` skeleton: `requirements.txt` (fastapi, uvicorn[standard], openai, httpx, pydantic, python-dotenv), `.env.example`, `app.py` with `/health` and `/ws`, `config.py` stub reading env (PREET-CODEX fills model ids) | - | `uvicorn app:app --port 8000` starts; `curl localhost:8000/health` returns ok |
 | PC-2 | done | `scripts/smoke_crusoe.py`: list models (`GET /v1/models`), print Nemotron ids, one chat call to each role model with timing; test tool calling on Super with a dummy tool and print whether `tool_calls` came back | PC-1 | Prints model list, replies, latency in ms, and "tool calling: OK/NOT OK". Post results in chat. |
-| PC-3 | blocked | `scripts/smoke_tts.py`: one Magpie call, write `out.wav`, print latency | PC-1 | `out.wav` plays and sounds right |
+| PC-3 | done | `scripts/smoke_tts.py`: one Magpie call, write `out.wav`, print latency | PC-1 | `out.wav` plays and sounds right |
 | PC-4 | done | `protocol.py`: pydantic models for every message in `PROTOCOL.md` + a `parse(msg)` and `send(ws, model)` helper | PC-1 | Unit test round-trips every example JSON in PROTOCOL.md |
 | PC-5 | done | `session.py`: Session per room: connected sockets, transcript history, speaking state, current `say_id`, work-update queue, running task handles; broadcast helper; send `board_snapshot` on connect | PC-4 | Two browser tabs connect to same room, both receive `status` and `transcript` |
 | PC-6 | done | `voice/tts.py`: async Magpie client, sentence splitter for a token stream (split on . ? ! with min 4 words), per-`say_id` cancellation, `data:null` fallback on error | PC-3 | Feeding a fake token stream produces ordered `audio` messages; cancel stops further chunks |
@@ -112,7 +112,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 ## Humans
 | id | owner | task |
 |---|---|---|
-| H-1 | PARSH | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
+| H-1 | PARSH (done) | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
 | H-2 | PARSH | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
 | H-3 | PREET | DONE: JEV = TypeSafe AI System One model (ARCH 1F) |
 | H-4 | PREET (done) | Get a TypeSafe API key at console.typesafe.ai/keys (may be early access/waitlist). Put it in `server/.env` as `TYPESAFE_API_KEY`. If no access today, PX-17 runs on the Nano fallback |

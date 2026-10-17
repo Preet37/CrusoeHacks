@@ -551,3 +551,11 @@ FAIL 6/7/8: "Twin, walk me through the login sequence." / chart / mock -> Listen
 Also: Nano Listener sometimes 9-12s (1500-1600 completion tokens of reasoning) -> no-thinking Listener would help a lot.
 TTS: all audio data:null (no NVIDIA key yet) -> browser voice.
 ---
+
+[13:40] PREET-CLAUDE -> ALL | DONE | PC-3 PX-17-integration
+NVIDIA_API_KEY live: Magpie returns real 44.1k WAV (~2.1s per sentence cold). Audio chunks now carry data (no more speechSynthesis fallback). Restart servers.
+@PREET-CODEX wired: mouth.attach -> brain.runtime.attach(session); ONE fast_decide.decide(state, TURN_QUESTIONS) per human final in the mind path
+  (state = latest_sentence, speaker, recent_transcript, active_topic, twin_recent_speech; 4.5s timeout, fail open), stored on line["decision"] and passed
+  to Listener.submit(..., decision=). Ordered by a lock. Mouth stays lexical (name/PTT) per your note, so it never waits on JEV.
+  Topic reset: clear_board/reset sets session.active_topic=None and topic_catalog={} before the new Listener. TYPESAFE_API_KEY= added to .env.example.
+---

@@ -18,6 +18,7 @@ from agents import responder
 log = logging.getLogger("twin.mouth")
 
 IDLE_TICK_S = 0.2
+DECIDE_TIMEOUT_S = 4.5
 
 
 def _now_ms() -> int:
@@ -41,10 +42,16 @@ class Mouth:
         self._updates_since: int | None = None
         self._idle_task: asyncio.Task | None = None
         self._turn: dict | None = None
+        self._mind_lock = asyncio.Lock()
 
     # ------------------------------------------------------------ wiring
     def attach(self) -> None:
         s = self.session
+        try:
+            from brain import runtime as mind_runtime
+            mind_runtime.attach(s)  # code map, sourced memory, repo connector (no network)
+        except Exception:  # noqa: BLE001 - the meeting must work without the brain
+            log.exception("brain runtime unavailable")
         s.decide_and_respond = self.on_final
         s.on_final_text(self.on_final_mind)
         s.on_reset(self.on_reset)
@@ -76,8 +83,42 @@ class Mouth:
 
     # ------------------------------------------------------------ mind path
     async def on_final_mind(self, session, line: dict) -> None:
-        if self.listener is not None:
-            self.listener.submit(line.get("speaker", "?"), line.get("text", ""))
+        """One JEV/Nano reflex decision per final line, then hand it to the Listener.
+
+        The lock keeps lines in arrival order even when one decision is slow.
+        Fails open: no decision just means the Listener does its normal work.
+        """
+        async with self._mind_lock:
+            listener = self.listener
+            if listener is None:
+                return
+            decision = await self._decide(session, line)
+            if decision is not None:
+                line["decision"] = decision
+            if self.listener is listener:  # a reset may have swapped it while we waited
+                listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
+
+    async def _decide(self, session, line: dict) -> dict | None:
+        try:
+            from agents import fast_decide
+        except Exception:  # noqa: BLE001
+            return None
+        recent = [f"{h.get('speaker')}: {h.get('text')}" for h in list(session.history)[-8:-1]]
+        state = {
+            "latest_sentence": line.get("text", ""),
+            "speaker": line.get("speaker", "?"),
+            "recent_transcript": recent,
+            "active_topic": getattr(session, "active_topic", None),
+            "twin_recent_speech": list(getattr(session, "twin_recent", []) or [])[-3:],
+        }
+        started = time.monotonic()
+        try:
+            decision = await asyncio.wait_for(fast_decide.decide(state, fast_decide.TURN_QUESTIONS), DECIDE_TIMEOUT_S)
+        except Exception as exc:  # noqa: BLE001 - includes timeout; fail open
+            log.warning("[%s] reflex decision failed (%s); listener runs normally", session.room, type(exc).__name__)
+            return None
+        log.info("[%s] reflex decision in %dms", session.room, (time.monotonic() - started) * 1000)
+        return decision
 
     async def on_reset(self, session) -> None:
         if self.listener is not None:
@@ -85,6 +126,10 @@ class Mouth:
                 await self.listener.close()
             except Exception:  # noqa: BLE001
                 log.exception("listener close failed")
+        # Topic reset: the next Listener starts with no active topic or frames.
+        session.active_topic = None
+        if hasattr(session, "topic_catalog"):
+            session.topic_catalog = {}
         self.listener = _make_listener(session)
         self._updates_since = None
         self.state.hold_until_ms = 0

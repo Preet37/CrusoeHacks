@@ -91,3 +91,40 @@ async def test_started_turn_is_not_restarted(monkeypatch):
     await asyncio.sleep(0)
     assert calls == ["name"]
     await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_mind_gets_one_decision_in_order_and_fails_open(monkeypatch):
+    submitted = []
+
+    class L:
+        def __init__(self, s):
+            pass
+
+        def submit(self, speaker, text, *, decision=None):
+            submitted.append((text, decision))
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(mouth, "_make_listener", lambda s: L(s))
+    from agents import fast_decide
+
+    async def fake_decide(state, questions):
+        if "slow" in state["latest_sentence"]:
+            await asyncio.sleep(0.05)
+        if "boom" in state["latest_sentence"]:
+            raise RuntimeError("down")
+        return {"kind": {"choice": "system_fact", "confidence": 0.9}}
+
+    monkeypatch.setattr(fast_decide, "decide", fake_decide)
+    s = Session("jev")
+    m = mouth.attach(s)
+    t1 = asyncio.create_task(m.on_final_mind(s, {"speaker": "P", "text": "slow one"}))
+    await asyncio.sleep(0)
+    t2 = asyncio.create_task(m.on_final_mind(s, {"speaker": "P", "text": "boom two"}))
+    await asyncio.gather(t1, t2)
+    assert [t for t, _ in submitted] == ["slow one", "boom two"]
+    assert submitted[0][1]["kind"]["choice"] == "system_fact"
+    assert submitted[1][1] is None
+    await mouth.detach(s)
