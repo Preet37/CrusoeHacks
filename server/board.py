@@ -48,6 +48,9 @@ class BoardState:
         self.boxes: dict[str, dict[str, Any]] = {}
         self.edges: dict[str, dict[str, str]] = {}
         self.highlighted: set[str] = set()
+        # Not part of the wire snapshot: used to reject model output based on
+        # a board that changed while the model was thinking.
+        self.revision = 0
 
     def apply(self, op: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(op, Mapping):
@@ -147,6 +150,7 @@ class BoardState:
             self.edges.clear()
             self.highlighted.clear()
 
+        self.revision += 1
         return draw
 
     def summary(self) -> str:

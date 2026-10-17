@@ -17,10 +17,34 @@ class BoardStateTests(unittest.TestCase):
     def assert_rejected_without_change(self, op: dict) -> None:
         before = self.board.snapshot()
         highlights = self.board.highlighted.copy()
+        revision = self.board.revision
         with self.assertRaises(ValueError):
             self.board.apply(op)
         self.assertEqual(self.board.snapshot(), before)
         self.assertEqual(self.board.highlighted, highlights)
+        self.assertEqual(self.board.revision, revision)
+
+    def test_revision_advances_for_every_accepted_operation(self) -> None:
+        self.assertEqual(self.board.revision, 0)
+        operations = [
+            {"op": "clear"},  # Even an empty clear invalidates old work.
+            box("auth"),
+            box("db"),
+            {"op": "connect", "id": "e_auth_db", "from_id": "auth", "to_id": "db"},
+            {"op": "rename", "id": "auth", "label": "Auth service"},
+            {"op": "highlight", "ids": [], "on": True},  # A valid no-op still advances.
+            {"op": "remove", "id": "e_auth_db"},
+            {"op": "remove", "id": "db"},
+            {"op": "clear"},
+        ]
+        for expected_revision, operation in enumerate(operations, start=1):
+            self.board.apply(operation)
+            self.assertEqual(self.board.revision, expected_revision)
+        self.assert_rejected_without_change({"op": "remove", "id": "auth"})
+        self.assertEqual(self.board.revision, len(operations))
+        self.board.apply({"op": "clear"})
+        self.assertEqual(self.board.revision, len(operations) + 1)
+        self.assertEqual(set(self.board.snapshot()), {"type", "boxes", "edges"})
 
     def test_add_connect_snapshot_and_summary(self) -> None:
         self.assertEqual(self.board.summary(), "Board empty.")
