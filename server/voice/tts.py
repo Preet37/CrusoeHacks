@@ -11,10 +11,13 @@ import base64
 import logging
 import os
 from collections import OrderedDict
+from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 import re
 import struct
 import time
 from typing import AsyncIterator, Awaitable, Callable, Optional
+from weakref import WeakKeyDictionary
 
 import httpx
 
@@ -26,8 +29,11 @@ MAGPIE_BASE = "https://877104f7-e885-42b9-8de8-f6e4c6303969.invocation.api.nvcf.
 MAGPIE_SYNTH_URL = f"{MAGPIE_BASE}/v1/audio/synthesize"
 MAGPIE_VOICES_URL = f"{MAGPIE_BASE}/v1/audio/list_voices"
 VOICE = os.getenv("TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")
-# Free-tier Magpie rate-limits bursts (HTTP 429): retry briefly, then fall back to data:null.
-RETRY_429_BACKOFF_S: tuple[float, ...] = (0.4,)
+# All rooms and prewarming share the provider pace, including retries.
+RETRY_429_BACKOFF_S: tuple[float, ...] = (1.0, 2.0)
+PROVIDER_INTERVAL_S = 1.0
+MAX_RETRY_AFTER_S = 3.0
+SYNTH_BUDGET_S = 8.0  # includes queueing; then use the existing browser voice fallback
 CACHE_SIZE = 64  # repeated phrases (acks, greetings) skip the network
 _CACHE: "OrderedDict[tuple[str, str], bytes]" = OrderedDict()
 LANGUAGE = "en-US"
@@ -39,6 +45,37 @@ Emit = Callable[[dict], Awaitable[None]]
 Synth = Callable[[str], Awaitable[Optional[bytes]]]
 
 _client: httpx.AsyncClient | None = None
+
+
+@dataclass
+class _ProviderGate:
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    next_request_at: float = 0.0
+
+
+# Async primitives must not be reused across event loops (notably in tests).
+_PROVIDER_GATES: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _provider_gate() -> _ProviderGate:
+    loop = asyncio.get_running_loop()
+    gate = _PROVIDER_GATES.get(loop)
+    if gate is None:
+        gate = _ProviderGate()
+        _PROVIDER_GATES[loop] = gate
+    return gate
+
+
+def _retry_delay(response, fallback: float) -> float:
+    value = getattr(response, "headers", {}).get("Retry-After")
+    try:
+        delay = float(value)
+    except (TypeError, ValueError):
+        try:
+            delay = parsedate_to_datetime(value).timestamp() - time.time()
+        except (TypeError, ValueError, OverflowError):
+            delay = fallback
+    return min(MAX_RETRY_AFTER_S, max(fallback, delay))
 
 
 def _now_ms() -> float:
@@ -77,13 +114,12 @@ def ensure_wav(data: bytes) -> bytes:
 
 
 async def synthesize(text: str, client: httpx.AsyncClient | None = None) -> bytes | None:
-    """One Magpie call. Returns WAV bytes (RIFF), or None on any error / missing key."""
+    """Paced Magpie synthesis with bounded retries; None keeps browser fallback."""
     text = (text or "").strip()
     if not text or not config.NVIDIA_API_KEY:
         if not config.NVIDIA_API_KEY:
             log.debug("NVIDIA_API_KEY not set; skipping TTS")
         return None
-    c = client or get_client()
     form = {
         "text": text,
         "language": LANGUAGE,
@@ -96,36 +132,57 @@ async def synthesize(text: str, client: httpx.AsyncClient | None = None) -> byte
     if cached is not None:
         _CACHE.move_to_end(key)
         return cached
-    r = None
-    for attempt, backoff in enumerate(RETRY_429_BACKOFF_S + (None,)):
-        try:
-            # (None, value) tuples force multipart/form-data with plain fields
-            r = await c.post(
-                MAGPIE_SYNTH_URL,
-                files={k: (None, v) for k, v in form.items()},
-                headers={"Authorization": f"Bearer {config.NVIDIA_API_KEY}"},
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:  # network, timeout
-            log.warning("Magpie TTS request failed: %s: %s", type(e).__name__, e)
-            return None
-        if r.status_code == 429 and backoff is not None:
-            log.info("Magpie TTS 429, retry %d in %.1fs", attempt + 1, backoff)
-            await asyncio.sleep(backoff)
-            continue
-        break
-    if r.status_code != 200:
-        log.warning("Magpie TTS HTTP %s: %s", r.status_code, r.text[:300])
+    c = client or get_client()
+    gate = _provider_gate()
+    loop = asyncio.get_running_loop()
+
+    async def request() -> bytes | None:
+        # Keep the gate across retries: the provider's cooldown applies to every
+        # room, rather than allowing all waiting sentences to retry together.
+        async with gate.lock:
+            existing = _CACHE.get(key)
+            if existing is not None:
+                _CACHE.move_to_end(key)
+                return existing
+            r = None
+            for attempt, backoff in enumerate(RETRY_429_BACKOFF_S + (None,)):
+                delay = gate.next_request_at - loop.time()
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                # Reserve spacing before awaiting, so cancellation cannot erase it.
+                gate.next_request_at = loop.time() + PROVIDER_INTERVAL_S
+                # (None, value) tuples force multipart/form-data with plain fields
+                r = await c.post(
+                    MAGPIE_SYNTH_URL,
+                    files={k: (None, v) for k, v in form.items()},
+                    headers={"Authorization": f"Bearer {config.NVIDIA_API_KEY}"},
+                )
+                if r.status_code == 429:
+                    cooldown = _retry_delay(r, backoff if backoff is not None else MAX_RETRY_AFTER_S)
+                    gate.next_request_at = max(gate.next_request_at, loop.time() + cooldown)
+                    if backoff is not None:
+                        log.info("Magpie TTS 429, retry %d in %.1fs", attempt + 1, cooldown)
+                        continue
+                break
+            if r.status_code != 200:
+                log.warning("Magpie TTS HTTP %s: %s", r.status_code, r.text[:300])
+                return None
+            if not r.content:
+                log.warning("Magpie TTS returned empty body")
+                return None
+            wav = ensure_wav(r.content)
+            _CACHE[key] = wav
+            while len(_CACHE) > CACHE_SIZE:
+                _CACHE.popitem(last=False)
+            return wav
+
+    try:
+        return await asyncio.wait_for(request(), timeout=SYNTH_BUDGET_S)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:  # network, timeout, bounded queue wait
+        log.warning("Magpie TTS request failed: %s: %s", type(e).__name__, e)
         return None
-    if not r.content:
-        log.warning("Magpie TTS returned empty body")
-        return None
-    wav = ensure_wav(r.content)
-    _CACHE[key] = wav
-    while len(_CACHE) > CACHE_SIZE:
-        _CACHE.popitem(last=False)
-    return wav
 
 
 def cached(text: str) -> bytes | None:
