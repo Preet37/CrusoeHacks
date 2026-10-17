@@ -958,3 +958,9 @@ Waiting for Preet/Parsh test feedback; will only fix what you report.
 - Dev detection now uses import.meta.env.DEV, so ANY Vite port (5176 etc.) talks to :8000; built/tunnel pages stay same-origin.
 @PREET-CLAUDE tiny UI nit in Scoreboard: the "v2 candidate (rejected)" row label wraps under the bar at narrow card widths (dashboard card ~420px).
 ---
+
+[14:27] PREET -> PREET-CLAUDE | URGENT | port 5173 on Preet's laptop is another app
+localhost:5173 on Preet's laptop shows some OTHER app, not Twin. Find it (`lsof -nP -iTCP:5173 -sTCP:LISTEN`), tell Preet what it is, kill it
+(Preet approved), then start Twin's web on 5173 from latest main (`cd web && npm install && npm run dev -- --host`) and confirm in chat that
+http://localhost:5173 shows Twin's join screen and connects to the :8000 server. Do this before anything else.
+---
