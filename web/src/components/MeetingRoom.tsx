@@ -61,6 +61,23 @@ export default function MeetingRoom({
     return client.onState((st) => st === 'open' && send())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client])
+  // "Paste a spec": a paragraph -> Twin draws a deep, layered diagram in one go.
+  const [specOpen, setSpecOpen] = useState(false)
+  const [spec, setSpec] = useState('')
+  const sendSpec = () => {
+    const text = spec.trim().replace(/\s+/g, ' ')
+    if (!text) return
+    client.send({
+      type: 'user_text',
+      speaker: user,
+      text: `Twin, draw this spec as a detailed layered architecture diagram: ${text}`,
+      final: true,
+      ts: Date.now(),
+    })
+    setSpec('')
+    setSpecOpen(false)
+    setBoardPinned(true)
+  }
   const [myScreen, setMyScreen] = useState<MediaStream | null>(null)
   const [stageTab, setStageTab] = useState<'board' | 'screen'>('board')
   const [screenErr, setScreenErr] = useState<string | null>(null)
@@ -304,6 +321,25 @@ export default function MeetingRoom({
             </div>
           )}
           {toast && <div className="toast glass">{toast}</div>}
+          {specOpen && (
+            <div className="spec glass">
+              <div className="dash-title">Paste a spec</div>
+              <div className="hint">One paragraph describing a system. Twin draws it as a layered diagram.</div>
+              <textarea
+                className="field"
+                autoFocus
+                rows={6}
+                placeholder="e.g. A mobile app calls an API gateway, which routes to auth, orders and payments services..."
+                value={spec}
+                onChange={(e) => setSpec(e.target.value)}
+                onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && sendSpec()}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="pill small" onClick={() => setSpecOpen(false)}>Cancel</button>
+                <button className="pill small on" disabled={!spec.trim()} onClick={sendSpec}>Draw it (⌘↵)</button>
+              </div>
+            </div>
+          )}
         </div>
         {/* Always mounted so AgentTree/TaskPanel/Scoreboard collect events even while closed. */}
         <SidePanel
@@ -325,6 +361,8 @@ export default function MeetingRoom({
         boardOn={boardPresenting && (!screenActive || tab === 'board')}
         sharing={!!myScreen}
         twinMode={twinMode}
+        specOpen={specOpen}
+        onSpec={() => setSpecOpen((o) => !o)}
         onTwinMode={setTwinMode}
         onShare={() => (myScreen ? stopShare() : void startShare())}
         boardHasContent={boardHasContent}

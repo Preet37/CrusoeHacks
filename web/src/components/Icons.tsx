@@ -89,3 +89,9 @@ export const ShareIcon = () => (
     <path d="M12 14V8M9 10.5 12 7.5l3 3M8 21h8" />
   </I>
 )
+export const SpecIcon = () => (
+  <I>
+    <path d="M7 3h7l4 4v14H7z" />
+    <path d="M14 3v4h4M10 12h5M10 15h5M10 18h3" />
+  </I>
+)

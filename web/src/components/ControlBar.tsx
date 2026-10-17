@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { SideTab } from './SidePanel'
 import {
   BoardIcon, CamIcon, CamOffIcon, CaptionsIcon, HandIcon, LeaveIcon, MicIcon, MicOffIcon,
-  PeopleIcon, ShareIcon, SparkIcon, SpeakerIcon, SpeakerOffIcon, TalkIcon,
+  PeopleIcon, ShareIcon, SpecIcon, SparkIcon, SpeakerIcon, SpeakerOffIcon, TalkIcon,
 } from './Icons'
 
 export type TwinMode = 'off' | 'on_request' | 'proactive'
@@ -21,6 +21,8 @@ export interface ControlBarProps {
   boardHasContent: boolean
   sharing: boolean
   twinMode: TwinMode
+  specOpen: boolean
+  onSpec(): void
   onTwinMode(m: TwinMode): void
   onShare(): void
   handUp: boolean
@@ -93,6 +95,9 @@ export default function ControlBar(p: ControlBarProps) {
           onClick={p.onBoard}
         >
           <BoardIcon />
+        </button>
+        <button className={`pill icon ${p.specOpen ? 'on' : ''}`} title="Paste a spec: Twin draws a deep diagram" onClick={p.onSpec}>
+          <SpecIcon />
         </button>
         <button className={`pill icon ${p.captionsOn ? 'on' : ''}`} title="Captions" onClick={p.onCaptions}>
           <CaptionsIcon />
