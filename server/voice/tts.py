@@ -128,6 +128,20 @@ async def synthesize(text: str, client: httpx.AsyncClient | None = None) -> byte
     return wav
 
 
+def cached(text: str) -> bytes | None:
+    """WAV for text if it was synthesized before (current voice), else None. No network."""
+    return _CACHE.get((VOICE, (text or "").strip()))
+
+
+async def prewarm(texts: list[str]) -> int:
+    """Synthesize phrases into the cache, one at a time (gentle on the 429 limit)."""
+    n = 0
+    for t in texts:
+        if cached(t) is None and await synthesize(t):
+            n += 1
+    return n
+
+
 # ---------------------------------------------------------------- splitting
 
 _ABBREVIATIONS = {

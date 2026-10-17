@@ -18,6 +18,27 @@ app = FastAPI(title="Twin")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+@app.on_event("startup")
+async def _prewarm_acks() -> None:
+    """Cache Twin's short acknowledgments so the first sound of a reply is instant."""
+    import asyncio
+    import sys
+
+    if "pytest" in sys.modules:
+        return  # never touch the network from tests
+    from agents import responder
+    from voice import tts
+
+    async def run() -> None:
+        try:
+            n = await tts.prewarm(responder.ACKS)
+            log.info("prewarmed %d ack phrases", n)
+        except Exception:  # noqa: BLE001
+            log.exception("ack prewarm failed")
+
+    asyncio.get_running_loop().create_task(run())
+
+
 @app.get("/health")
 async def health():
     return {"ok": True}

@@ -24,7 +24,28 @@ MAX_TOKENS = 120
 LATENCY_LOG = Path(__file__).resolve().parent.parent / "learning" / "runs" / "latency.jsonl"
 NO_THINK = {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
 
-_think_flag_ok: bool | None = None  # learned at runtime: does Crusoe accept the no-think flag?
+_think_flag_ok: bool | None = None
+
+# Instant acknowledgment (ARCH 1E.5 rule 5): pre-synthesized at startup, played the
+# moment Twin is addressed so the call never sits in silence while TTS works.
+ACKS = ["Yeah, one sec.", "Mm-hm, good question.", "Sure, let me check."]
+ACK_REASONS = {"name", "push_to_talk"}
+_ack_i = 0
+
+
+def pick_ack() -> tuple[str, bytes] | None:
+    global _ack_i
+    try:
+        from voice import tts
+    except Exception:  # noqa: BLE001
+        return None
+    for _ in range(len(ACKS)):
+        text = ACKS[_ack_i % len(ACKS)]
+        _ack_i += 1
+        wav = tts.cached(text)
+        if wav:
+            return text, wav
+    return None  # learned at runtime: does Crusoe accept the no-think flag?
 
 
 def _now_ms() -> int:
@@ -204,10 +225,29 @@ async def respond(session, reason: str, *, trigger_ts: int | None = None,
             await session.set_status("speaking")
         await session.broadcast(msg)
 
+    # Instant ack as seq 0; the real answer follows as seq 1..n.
+    ack = pick_ack() if reason in ACK_REASONS else None
+    seq_offset = 0
+    if ack is not None:
+        import base64
+        await emit({"type": "audio", "say_id": say_id, "seq": 0, "format": "wav", "sample_rate": 44100,
+                    "text": ack[0], "data": base64.b64encode(ack[1]).decode("ascii"), "last": False})
+        seq_offset = 1
+
+    async def emit_after_ack(msg: dict) -> None:
+        if seq_offset and msg.get("type") == "audio":
+            msg = {**msg, "seq": msg.get("seq", 0) + seq_offset}
+        await emit(msg)
+
     spoken = ""
     try:
-        spoken = await speak(strip_prefix(clean_stream(model_stream(messages, stream))), say_id, emit, timings=timings)
+        spoken = await speak(strip_prefix(clean_stream(model_stream(messages, stream))), say_id, emit_after_ack, timings=timings)
         spoken = (spoken or "").strip()
+        if ack is not None and session.current_say_id == say_id:
+            if not spoken:  # close the turn so the player is not left waiting
+                await emit({"type": "audio", "say_id": say_id, "seq": 1, "format": "wav", "sample_rate": 44100,
+                            "text": "", "data": None, "last": True})
+            spoken = f"{ack[0]} {spoken}".strip()
         if spoken and session.current_say_id == say_id:
             await session.add_line(config.TWIN_NAME, spoken)
     except Exception as exc:  # noqa: BLE001

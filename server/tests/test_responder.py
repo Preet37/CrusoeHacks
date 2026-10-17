@@ -135,3 +135,31 @@ async def test_strips_twin_here(chunks):
 
     out = await responder.respond(FakeSession(), "addressed", stream=labelled, speak=fake_speak)
     assert out == "Looks right."
+
+
+@pytest.mark.asyncio
+async def test_instant_ack_plays_first_and_shifts_seq(monkeypatch):
+    monkeypatch.setattr(responder, "pick_ack", lambda: ("Yeah, one sec.", b"RIFFxx"))
+
+    async def speak_two(deltas, say_id, emit, timings=None):
+        text = ""
+        async for d in deltas:
+            text += d
+        await emit({"type": "audio", "say_id": say_id, "seq": 0, "text": text, "data": None, "last": True})
+        return text
+
+    s = FakeSession()
+    out = await responder.respond(s, "name", stream=fake_stream, speak=speak_two)
+    audio = [m for m in s.sent if m["type"] == "audio"]
+    assert [a["seq"] for a in audio] == [0, 1]
+    assert audio[0]["text"] == "Yeah, one sec." and audio[0]["data"] and not audio[0]["last"]
+    assert audio[1]["last"] is True
+    assert out.startswith("Yeah, one sec.")
+
+
+@pytest.mark.asyncio
+async def test_no_ack_for_work_updates(monkeypatch):
+    monkeypatch.setattr(responder, "pick_ack", lambda: ("Yeah, one sec.", b"RIFFxx"))
+    s = FakeSession()
+    out = await responder.respond(s, "work update", stream=fake_stream, speak=fake_speak)
+    assert not out.startswith("Yeah")
