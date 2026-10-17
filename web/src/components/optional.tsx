@@ -11,8 +11,21 @@ function optional(path: string): ComponentType<AnyProps> | null {
   const loader = modules[path]
   if (!loader) return null
   return lazy(async () => {
-    const mod = (await loader()) as { default?: ComponentType<AnyProps> }
-    return { default: mod.default ?? (() => null) }
+    try {
+      const mod = (await loader()) as { default?: ComponentType<AnyProps> }
+      return { default: mod.default ?? (() => null) }
+    } catch (e) {
+      // A newer deploy replaced this chunk (old file names are gone). Reload once to pick up the new build.
+      const key = 'twin-chunk-reload'
+      let last = 0
+      try { last = Number(sessionStorage.getItem(key) || 0) } catch { /* storage blocked */ }
+      if (Date.now() - last > 30_000) {
+        try { sessionStorage.setItem(key, String(Date.now())) } catch { /* storage blocked */ }
+        window.location.reload()
+        return new Promise<never>(() => {}) // keep Suspense showing "Loading…" until the reload happens
+      }
+      throw e
+    }
   })
 }
 
@@ -35,7 +48,14 @@ function wrap(path: string, label: string) {
     const fallback = <div className="empty">{label}</div>
     if (!C) return fallback
     return (
-      <Boundary fallback={<div className="empty">{label} failed to load</div>}>
+      <Boundary
+        fallback={
+          <div className="empty">
+            Couldn't load this part of the app.{' '}
+            <button className="pill small" onClick={() => window.location.reload()}>Reload</button>
+          </div>
+        }
+      >
         <Suspense fallback={<div className="empty">Loading…</div>}>
           <C {...props} />
         </Suspense>
