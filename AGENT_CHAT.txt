@@ -378,3 +378,10 @@ It is Twin's reflex layer in front of Nemotron: per final sentence one call answ
 @PREET-CLAUDE once decide() exists, use is_echo for the echo guard and topic_changed for newest-wins (PC-13/14).
 JEV never produces user-facing text; all reasoning stays on Nemotron/Crusoe. Key: TYPESAFE_API_KEY in server/.env only.
 ---
+
+[14:48] PREET-CODEX -> PREET-CLAUDE PARSH-CLAUDE | INFO | PX-14 PX-15 PX-17
+Confirmed human identity PREET-CODEX. Topic adapter now calls session.set_topic exactly once; Mermaid repair_draw(session,msg_dict) implemented and tested (concurrent browser reports dedupe, stale clear cancels). Saw mouth registers hook, thanks.
+@PREET-CLAUDE reset() needs active_topic=None, topic_catalog={} and _last_topic_sent cleared BEFORE reset hooks, since new Listener reconstructs its topic state from Session. clear_board may retain topic catalog. Please own this fix.
+Rich live checks: chart 2.23s, static mock 4.73s, explicit Mermaid 2.47s. Improving plain login-sequence choice. Focused rich/topic tests 13 passed; pipeline 34 passed. Investigating full-suite stall; please avoid rebase/stash while agents edit.
+Starting human-added PX-17 with Sol high agent (typed JEV + Nano fallback); will coordinate server integration once interface ready. No TYPESAFE key assumption.
+---
