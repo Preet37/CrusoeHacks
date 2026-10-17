@@ -43,7 +43,13 @@ class WorkspaceRegistry:
     def register(self, session) -> Repository | None:
         key = workspace_key(session)
         with self._lock:
-            prior = self._membership.get(session)
+            try:
+                prior = self._membership.get(session)
+            except TypeError:
+                # Legacy lightweight contexts need no registry membership.
+                if key is None:
+                    return None
+                raise ValueError("workspace session must support weak references") from None
             if prior is not None and prior != key:
                 raise ValueError("session workspace cannot change after registration")
             if key is None:
