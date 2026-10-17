@@ -117,3 +117,23 @@ async def test_ghost_removed_on_reset(room):
     assert gid in [r["id"] for r in _ghosts(sent, "remove")]
     assert m._ghost is None
     await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_sketch_ack_spoken_once_when_idle(monkeypatch):
+    import mouth
+    from session import Session
+    s = Session("b3")
+    sent = []
+
+    async def bc(m):
+        sent.append(m if isinstance(m, dict) else m.model_dump())
+
+    monkeypatch.setattr(s, "broadcast", bc)
+    m = mouth.Mouth(s)
+    await m._say_cached(s, mouth.SKETCH_ACK)
+    audio = [x for x in sent if x.get("type") == "audio"]
+    assert len(audio) == 1 and audio[0]["text"] == mouth.SKETCH_ACK and audio[0]["last"] is True
+    s.speaking = True
+    await m._say_cached(s, mouth.SKETCH_ACK)
+    assert len([x for x in sent if x.get("type") == "audio"]) == 1  # busy: stays quiet

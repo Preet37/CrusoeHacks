@@ -9,12 +9,14 @@ attach(session) is idempotent. It:
 from __future__ import annotations
 
 import asyncio
+import re
 import itertools
 import json
 import logging
 import time
 from pathlib import Path
 
+import config
 import turn_taking
 from agents import responder
 
@@ -22,10 +24,33 @@ log = logging.getLogger("twin.mouth")
 
 IDLE_TICK_S = 0.2
 DECIDE_TIMEOUT_S = 4.5
+SKETCH_ACK = "Got it, sketching that now."
 UNNAMED_PAUSE_MS = 1200      # answer an unnamed question after this much silence
 MID_SENTENCE_GAP_MS = 600    # a human counts as mid-sentence until this gap
 QUIET_AFTER_HOLD_MS = 2000   # after "not now", a held update may come out once quiet this long
 _QUESTION_START = ("what", "how", "why", "should", "could", "can", "do ", "does", "is ", "are ", "would", "which", "who", "any thoughts")
+
+
+_DRAW_CLAIM = re.compile(r"\b(drew|drawn|draw|built|build|sketch\w*|added|put|placed|diagram|board)\b", re.I)
+
+
+def board_is_empty(session) -> bool:
+    board = getattr(session, "board", None)
+    try:
+        snap = board.snapshot() if board is not None else {}
+    except Exception:  # noqa: BLE001
+        return False
+    return not (snap.get("boxes") or snap.get("edges") or snap.get("shapes"))
+
+
+def drop_false_draw_claims(session, updates: list[str]) -> list[str]:
+    """B2: never say "here's what I built" when nothing is on the board (e.g. a rejected drawing)."""
+    if not updates or not board_is_empty(session):
+        return updates
+    kept = [u for u in updates if not _DRAW_CLAIM.search(u)]
+    if len(kept) != len(updates):
+        log.info("[%s] dropped %d draw-claim update(s) on an empty board", getattr(session, "room", "?"), len(updates) - len(kept))
+    return kept
 
 
 def addressed_without_name(decision: dict, text: str) -> bool:
@@ -171,6 +196,10 @@ class Mouth:
                         await self._show_ghost(session, line)
                     except Exception:  # noqa: BLE001 - the ghost is cosmetic
                         log.exception("ghost card failed")
+                    try:
+                        await self._say_cached(session, SKETCH_ACK)  # B3: never silent while drawing
+                    except Exception:  # noqa: BLE001
+                        log.exception("sketch ack failed")
             if self.listener is listener:  # a reset may have swapped it while we waited
                 listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
         if decision is not None and addressed_without_name(decision, line.get("text", "")):
@@ -196,6 +225,21 @@ class Mouth:
             return
         log.info("[%s] answering unnamed question: %r", session.room, line.get("text", "")[:80])
         self.speak("asked a question without saying your name", trigger_ts=_now_ms(), updates=session.pop_updates())
+
+    async def _say_cached(self, session, text: str) -> None:
+        """Speak a short pre-synthesized line right now, unless Twin is busy, muted or holding."""
+        if session.muted or _now_ms() < self.state.hold_until_ms or self._turn_running():
+            return
+        if _now_ms() - (session.last_human_speech_ts or 0) < 300 and session.last_human_speech_ts:
+            pass  # the line just ended; fine to acknowledge
+        import base64
+        from voice import tts
+        wav = tts.cached(text)
+        say_id = session.new_say_id()
+        await session.broadcast({"type": "audio", "say_id": say_id, "seq": 0, "format": "wav", "sample_rate": 44100,
+                                 "text": text, "data": base64.b64encode(wav).decode("ascii") if wav else None,
+                                 "last": True})
+        await session.add_line(config.TWIN_NAME, text)
 
     def _turn_running(self) -> bool:
         t = self.session._tasks.get("responder") if hasattr(self.session, "_tasks") else None
@@ -376,8 +420,10 @@ class Mouth:
                 self.state.hold_until_ms = now  # room went quiet: the held thought may come out now
         d = turn_taking.check_idle(self.state, now, has, age, urgent=bool(getattr(s, "urgent_updates", False)))
         if d.action == "deliver_update":
-            turn_taking.mark_interjection(self.state, now)
-            self.speak("work update", trigger_ts=now, updates=s.pop_updates())
+            updates = drop_false_draw_claims(s, s.pop_updates())
+            if updates:
+                turn_taking.mark_interjection(self.state, now)
+                self.speak("work update", trigger_ts=now, updates=updates)
         elif d.action == "none" and d.reason == "stale":
             dropped = s.pop_updates()
             self._updates_since = None

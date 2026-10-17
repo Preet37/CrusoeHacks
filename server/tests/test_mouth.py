@@ -178,3 +178,11 @@ async def test_waits_while_human_mid_sentence(monkeypatch):
     await asyncio.sleep(0.4)
     assert started
     await mouth.detach(s)
+
+
+def test_draw_claims_dropped_on_empty_board():
+    s = Session("b2")
+    assert mouth.drop_false_draw_claims(s, ["Here's what I built: an airplane."]) == []
+    assert mouth.drop_false_draw_claims(s, ["Avery owns auth/login.py."]) == ["Avery owns auth/login.py."]
+    s.board.apply({"op": "add_box", "id": "web", "label": "Web", "x": 100, "y": 100, "kind": "client"})
+    assert mouth.drop_false_draw_claims(s, ["I drew the web box."]) == ["I drew the web box."]
