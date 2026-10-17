@@ -167,3 +167,47 @@ def test_evidence_overview_selects_indexed_non_test_entrypoint():
     session.active_topic = None
     excerpts, _ = _evidence(session, [{'text': 'Describe repository architecture'}], {})
     assert excerpts[0]['path'] == 'auth/login.py'
+
+
+def test_deep_source_window_uses_absolute_citation_lines_and_rejects_outside_range():
+    from agents.contributor import _evidence, _fallback, _validated
+
+    class DeepMap:
+        files = {'lib/geometryPlan.ts': {'imports': [], 'imported_by': []}}
+        def resolve(self, query):
+            return ['lib/geometryPlan.ts'] if 'geometry' in query else []
+        def read_file(self, path, max_chars=16000):
+            lines = ['const ordinary = 1;' for _ in range(180)]
+            lines += ['export function validateGeometryPlan() {',
+                      '  rejectDisconnectedParts();',
+                      '  return errors;',
+                      '}']
+            return '\n'.join(lines)
+
+    session = Session(DeepMap())
+    session.active_topic = None
+    excerpts, _ = _evidence(session, [{'text': 'What does geometry validation reject?'}], {})
+    excerpt = excerpts[0]
+    assert excerpt['path'] == 'lib/geometryPlan.ts'
+    assert excerpt['start'] > 1 and excerpt['end'] >= 182
+    assert excerpt['end'] - excerpt['start'] < 30
+    fallback = _fallback([], None)
+    grounded = _validated({'current': 'validateGeometryPlan rejects disconnected parts.',
+                           'sources': ['lib/geometryPlan.ts:181-182'],
+                           'show': 'Validation flow', 'impact': [], 'risks': [],
+                           'question': 'Keep validation?'}, excerpts, [], fallback)
+    assert grounded['sources'] == ['lib/geometryPlan.ts:181-182']
+    outside = _validated({'current': 'validateGeometryPlan rejects disconnected parts.',
+                          'sources': ['lib/geometryPlan.ts:1-60']}, excerpts, [], fallback)
+    assert outside['current'].startswith('Current repo entry points include')
+
+
+def test_long_grounded_current_keeps_complete_clause():
+    from agents.contributor import _current_sentence
+    text = ('lib/geometryPlan.ts defines geometry plan primitives and PlanPart, and imports '
+            'geminiGenerate and SpecSheet from ./specSheet, while app/api/geometry-render/route.ts '
+            'imports planToOpenScad and researchGeometryPlan from lib/specToCad.ts and applies '
+            'several additional checks before rendering into a saved model.')
+    current = _current_sentence(text)
+    assert current.endswith('SpecSheet from ./specSheet.')
+    assert len(current) <= 260
