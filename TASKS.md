@@ -32,8 +32,8 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
-| PX-1 | todo | `config.py` model ids from env with defaults from ARCHITECTURE.md section 4; `llm.py`: async OpenAI client to Crusoe, `chat()`, `stream_chat()`, `run_tools()` (section 8), JSON-ops fallback, retries with backoff, token usage logging | PC-1 | Small script calls each function successfully |
-| PX-2 | todo | `board.py`: BoardState (boxes, edges), validate + apply each draw op, `summary()` compact text for prompts, `snapshot()` for `board_snapshot` | - | Unit tests: add, connect, rename, remove (removes edges), highlight, clear, rejects bad ids and out-of-range coords |
+| PX-1 | doing | `config.py` model ids from env with defaults from ARCHITECTURE.md section 4; `llm.py`: async OpenAI client to Crusoe, `chat()`, `stream_chat()`, `run_tools()` (section 8), JSON-ops fallback, retries with backoff, token usage logging | PC-1 | Small script calls each function successfully |
+| PX-2 | doing | `board.py`: BoardState (boxes, edges), validate + apply each draw op, `summary()` compact text for prompts, `snapshot()` for `board_snapshot` | - | Unit tests: add, connect, rename, remove (removes edges), highlight, clear, rejects bad ids and out-of-range coords |
 | PX-3 | todo | `agents/listener.py` + `prompts/listener.md`: transcript lines -> moments JSON on MODEL_FAST; debounced, one call in flight | PX-1 | Given "the app talks to an auth service which uses Postgres" returns system_fact moments with entities |
 | PX-4 | todo | `agents/diagrammer.py` + `prompts/diagrammer.md`: tool loop on MODEL_SMART with draw tools; applies via board.py; broadcasts `draw` via session; pushes one work update after changes | PX-2, PX-3, PC-5 | Speaking a system description draws it; a follow-up change renames or adds without duplicates |
 | PX-5 | todo | `agents/conductor.py`: M1 plain routing (system_fact -> diagrammer). Emit `agent_event` for every job (started/done) with parent ids | PX-4 | UI agent tree shows listener -> conductor -> diagrammer events |
