@@ -1,0 +1,478 @@
+{
+  "selected_version": "v1",
+  "accepted": false,
+  "reason": "validation overall score did not improve",
+  "proposal": {
+    "target": "prep",
+    "append": "Never predict a migration as complete if the sourced facts only state it is planned, proposed, or decided; phrase it as a possible discussion, not an accomplished change.",
+    "reason": "Examples 03 and 08 had low scores because prep predicted JWT-to-Redis migration and SQLite replacement as already done, contradicting sourced facts showing they were only decisions or false claims."
+  },
+  "train": {
+    "version": "v1",
+    "split": "train",
+    "metrics": {
+      "latency_ms": 3372.5,
+      "prediction_score": 0.65,
+      "tokens": 634.5,
+      "overall_score": 0.65
+    },
+    "cases": [
+      {
+        "id": "01_login_impact",
+        "metrics": {
+          "prediction_score": 0.8,
+          "latency_ms": 5393.0,
+          "tokens": 612.0
+        }
+      },
+      {
+        "id": "02_redis_false_claim",
+        "metrics": {
+          "prediction_score": 0.8,
+          "latency_ms": 2233.0,
+          "tokens": 620.0
+        }
+      },
+      {
+        "id": "03_redis_decision",
+        "metrics": {
+          "prediction_score": 0.4,
+          "latency_ms": 3233.0,
+          "tokens": 666.0
+        }
+      },
+      {
+        "id": "04_web_auth_database",
+        "metrics": {
+          "prediction_score": 0.8,
+          "latency_ms": 4390.0,
+          "tokens": 651.0
+        }
+      },
+      {
+        "id": "05_latency_chart",
+        "metrics": {
+          "prediction_score": 0.4,
+          "latency_ms": 3758.0,
+          "tokens": 679.0
+        }
+      },
+      {
+        "id": "06_login_mock",
+        "metrics": {
+          "prediction_score": 0.8,
+          "latency_ms": 3109.0,
+          "tokens": 607.0
+        }
+      },
+      {
+        "id": "07_jwt_impact",
+        "metrics": {
+          "prediction_score": 0.8,
+          "latency_ms": 3060.0,
+          "tokens": 624.0
+        }
+      },
+      {
+        "id": "08_postgres_false_claim",
+        "metrics": {
+          "prediction_score": 0.4,
+          "latency_ms": 1804.0,
+          "tokens": 617.0
+        }
+      }
+    ],
+    "metric_messages": [
+      {
+        "type": "metric",
+        "version": "v1",
+        "split": "train",
+        "name": "latency_ms",
+        "value": 3372.5
+      },
+      {
+        "type": "metric",
+        "version": "v1",
+        "split": "train",
+        "name": "overall_score",
+        "value": 0.65
+      },
+      {
+        "type": "metric",
+        "version": "v1",
+        "split": "train",
+        "name": "prediction_score",
+        "value": 0.65
+      },
+      {
+        "type": "metric",
+        "version": "v1",
+        "split": "train",
+        "name": "tokens",
+        "value": 634.5
+      }
+    ]
+  },
+  "validation": {
+    "v1": {
+      "version": "v1",
+      "split": "validation",
+      "metrics": {
+        "latency_ms": 3232.5,
+        "prediction_score": 0.4,
+        "tokens": 620.0,
+        "overall_score": 0.4
+      },
+      "cases": [
+        {
+          "id": "09_notifications_impact",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3201.0,
+            "tokens": 628.0
+          }
+        },
+        {
+          "id": "10_login_decision",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3264.0,
+            "tokens": 612.0
+          }
+        }
+      ],
+      "metric_messages": [
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "validation",
+          "name": "latency_ms",
+          "value": 3232.5
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "validation",
+          "name": "overall_score",
+          "value": 0.4
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "validation",
+          "name": "prediction_score",
+          "value": 0.4
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "validation",
+          "name": "tokens",
+          "value": 620.0
+        }
+      ]
+    },
+    "v2": {
+      "version": "v2",
+      "split": "validation",
+      "metrics": {
+        "latency_ms": 2628.5,
+        "prediction_score": 0.4,
+        "tokens": 671.0,
+        "overall_score": 0.4
+      },
+      "cases": [
+        {
+          "id": "09_notifications_impact",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 2029.0,
+            "tokens": 662.0
+          }
+        },
+        {
+          "id": "10_login_decision",
+          "metrics": {
+            "prediction_score": 0.4,
+            "latency_ms": 3228.0,
+            "tokens": 680.0
+          }
+        }
+      ],
+      "metric_messages": [
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "validation",
+          "name": "latency_ms",
+          "value": 2628.5
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "validation",
+          "name": "overall_score",
+          "value": 0.4
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "validation",
+          "name": "prediction_score",
+          "value": 0.4
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "validation",
+          "name": "tokens",
+          "value": 671.0
+        }
+      ]
+    }
+  },
+  "locked": {
+    "v1": {
+      "version": "v1",
+      "split": "locked_test",
+      "metrics": {
+        "latency_ms": 2866.0,
+        "prediction_score": 0.8,
+        "tokens": 627.5,
+        "overall_score": 0.8
+      },
+      "cases": [
+        {
+          "id": "11_billing_impact",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 3521.0,
+            "tokens": 639.0
+          }
+        },
+        {
+          "id": "12_login_correction_and_plan",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 2211.0,
+            "tokens": 616.0
+          }
+        }
+      ],
+      "metric_messages": [
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "latency_ms",
+          "value": 2866.0
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "overall_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "prediction_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "tokens",
+          "value": 627.5
+        }
+      ]
+    },
+    "candidate": {
+      "version": "v2",
+      "split": "locked_test",
+      "metrics": {
+        "latency_ms": 2306.0,
+        "prediction_score": 0.8,
+        "tokens": 654.0,
+        "overall_score": 0.8
+      },
+      "cases": [
+        {
+          "id": "11_billing_impact",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 2857.0,
+            "tokens": 662.0
+          }
+        },
+        {
+          "id": "12_login_correction_and_plan",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 1755.0,
+            "tokens": 646.0
+          }
+        }
+      ],
+      "metric_messages": [
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "locked_test",
+          "name": "latency_ms",
+          "value": 2306.0
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "locked_test",
+          "name": "overall_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "locked_test",
+          "name": "prediction_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v2",
+          "split": "locked_test",
+          "name": "tokens",
+          "value": 654.0
+        }
+      ]
+    },
+    "selected": {
+      "version": "v1",
+      "split": "locked_test",
+      "metrics": {
+        "latency_ms": 2866.0,
+        "prediction_score": 0.8,
+        "tokens": 627.5,
+        "overall_score": 0.8
+      },
+      "cases": [
+        {
+          "id": "11_billing_impact",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 3521.0,
+            "tokens": 639.0
+          }
+        },
+        {
+          "id": "12_login_correction_and_plan",
+          "metrics": {
+            "prediction_score": 0.8,
+            "latency_ms": 2211.0,
+            "tokens": 616.0
+          }
+        }
+      ],
+      "metric_messages": [
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "latency_ms",
+          "value": 2866.0
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "overall_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "prediction_score",
+          "value": 0.8
+        },
+        {
+          "type": "metric",
+          "version": "v1",
+          "split": "locked_test",
+          "name": "tokens",
+          "value": 627.5
+        }
+      ]
+    }
+  },
+  "metric_messages": [
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "latency_ms",
+      "value": 2866.0
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "overall_score",
+      "value": 0.8
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "prediction_score",
+      "value": 0.8
+    },
+    {
+      "type": "metric",
+      "version": "v1",
+      "split": "locked_test",
+      "name": "tokens",
+      "value": 627.5
+    },
+    {
+      "type": "metric",
+      "version": "v2 candidate (rejected)",
+      "split": "locked_test",
+      "name": "latency_ms",
+      "value": 2306.0
+    },
+    {
+      "type": "metric",
+      "version": "v2 candidate (rejected)",
+      "split": "locked_test",
+      "name": "overall_score",
+      "value": 0.8
+    },
+    {
+      "type": "metric",
+      "version": "v2 candidate (rejected)",
+      "split": "locked_test",
+      "name": "prediction_score",
+      "value": 0.8
+    },
+    {
+      "type": "metric",
+      "version": "v2 candidate (rejected)",
+      "split": "locked_test",
+      "name": "tokens",
+      "value": 654.0
+    },
+    {
+      "type": "metric",
+      "version": "v2",
+      "split": "rejected",
+      "name": "rejected: validation overall score did not improve; kept v1",
+      "value": 0,
+      "status": "rejected",
+      "reason": "validation overall score did not improve",
+      "selected_version": "v1"
+    }
+  ]
+}

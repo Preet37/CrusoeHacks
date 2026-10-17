@@ -39,3 +39,7 @@ The [20-call smoke raw responses](server/bench/results/smoke_20261017.json) cove
 ## Interpretation
 
 The full run found Nano the only valid three-joint scene (1/1); Lightning and Super-VL each generated invalid geometry (0/1), while Super returned no response within the bound. Super also lost four of 12 extraction calls to availability or the eight-second bound. Its 0.530 extraction F1 therefore describes only eight scored cases, not all 12. All returned fact-check responses cited the exact source, but Super completed only one of two cases. Paragraph scores are one case per model; all responded models recovered all 11 named components, while Nano missed one of 10 stated edges. These are probe measurements, not estimates of production reliability.
+
+## Version N+1: additional Coach trials
+
+Two additional real, independent Prep-only trials each proposed one prompt change. Both tied their baseline on validation (0.4 versus 0.4), so both candidates were rejected and v1 remained active. Locked-test scores were 0.8 for baseline and candidate in each trial; locked results did not drive selection. One initial attempt failed with HTTP 503 before scoring and its single retry completed. These runs demonstrate the rejection guard, not an improvement claim. [Trial summary and raw result filenames](server/learning/results/coach_prep_additional_trials_20261017.md).

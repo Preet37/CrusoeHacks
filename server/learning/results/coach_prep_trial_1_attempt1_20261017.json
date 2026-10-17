@@ -1,0 +1,11 @@
+{
+  "trial": 1,
+  "attempt": 1,
+  "status": "failed",
+  "stage": "train first Prep replay",
+  "error_type": "capacity_unavailable",
+  "http_status": 503,
+  "scores": null,
+  "selected_version": null,
+  "prompt_changed": false
+}
