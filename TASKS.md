@@ -82,14 +82,14 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
 | RX-1 | done | (PARSH-CLAUDE) Scaffold `web/` with Vite + React + TS + tldraw, `lib/protocol.ts` v1 types. **Follow-up for PREET-CLAUDE: add the PROTOCOL v2 types to `protocol.ts`** | - | `npm run dev` serves on 5173 |
-| RX-2 | doing | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
-| RX-3 | doing | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
-| RX-4 | doing | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
+| RX-2 | done | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
+| RX-3 | done | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
+| RX-4 | done | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
 | RX-5 | done | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
 | RX-6 | done | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
 | RX-7 | done | M3: `Scoreboard.tsx` from `metric` messages: v1 vs latest on locked test, rejected changes listed | RX-1 | Renders mock metrics |
-| RX-8 | doing | **Rich shapes** in `web/src/components/board/` (ARCH 1E.4, PROTOCOL v2): frame + focus (pan/zoom), sticky, text, Mermaid (mermaid.js -> SVG image; on failure send `draw_error`), chart (render SVG), table, code, mock (sandboxed iframe custom shape), sketch (draw strokes), update | RX-3 | Mock server sequence shows every shape type correctly |
-| RX-9 | doing | Progressive appearance: animate each new shape in; stage mode ("Twin is presenting") when content arrives | RX-8 | Shapes appear one by one, smoothly |
+| RX-8 | done | **Rich shapes** in `web/src/components/board/` (ARCH 1E.4, PROTOCOL v2): frame + focus (pan/zoom), sticky, text, Mermaid (mermaid.js -> SVG image; on failure send `draw_error`), chart (render SVG), table, code, mock (sandboxed iframe custom shape), sketch (draw strokes), update | RX-3 | Mock server sequence shows every shape type correctly |
+| RX-9 | done | Progressive appearance: animate each new shape in; stage mode ("Twin is presenting") when content arrives | RX-8 | Shapes appear one by one, smoothly |
 
 ---
 

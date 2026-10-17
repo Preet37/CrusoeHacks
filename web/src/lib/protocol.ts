@@ -1,7 +1,7 @@
-// TypeScript mirror of PROTOCOL.md (v1). Server mirror: server/protocol.py.
+// TypeScript mirror of PROTOCOL.md (v1 + v2 additions). Server mirror: server/protocol.py.
 // Change only with agreement in AGENT_CHAT.txt, and bump PROTOCOL_VERSION.
 
-export const PROTOCOL_VERSION = 1
+export const PROTOCOL_VERSION = 2
 
 // ---------------------------------------------------------------- browser -> server
 
@@ -39,7 +39,34 @@ export interface Control {
   action: ControlAction
 }
 
-export type ClientMessage = Hello | UserText | BargeIn | PushToTalk | Control
+// v2
+export interface DrawError {
+  type: 'draw_error'
+  id: string
+  op: string
+  error: string
+}
+
+export interface CalendarJoin {
+  type: 'calendar_join'
+  meeting: string
+  scheduled?: string
+}
+
+export interface ConnectRepo {
+  type: 'connect_repo'
+  url: string
+}
+
+export type ClientMessage =
+  | Hello
+  | UserText
+  | BargeIn
+  | PushToTalk
+  | Control
+  | DrawError
+  | CalendarJoin
+  | ConnectRepo
 
 // ---------------------------------------------------------------- server -> browser
 
@@ -78,6 +105,7 @@ export interface StopAudio {
 export type BoxKind = 'service' | 'datastore' | 'client' | 'external' | 'note'
 
 export interface AddBoxOp {
+  frame?: string
   op: 'add_box'
   id: string
   label: string
@@ -86,6 +114,7 @@ export interface AddBoxOp {
   kind: BoxKind
 }
 export interface ConnectOp {
+  frame?: string
   op: 'connect'
   id: string
   from_id: string
@@ -93,24 +122,162 @@ export interface ConnectOp {
   label?: string
 }
 export interface RenameOp {
+  frame?: string
   op: 'rename'
   id: string
   label: string
 }
 export interface RemoveOp {
+  frame?: string
   op: 'remove'
   id: string
 }
 export interface HighlightOp {
+  frame?: string
   op: 'highlight'
   ids: string[]
   on: boolean
 }
 export interface ClearOp {
   op: 'clear'
+  frame?: string
 }
 
-export type DrawOp = AddBoxOp | ConnectOp | RenameOp | RemoveOp | HighlightOp | ClearOp
+// ---- v2 draw ops. Every op may carry `frame` (topic id); x/y/w/h are on the 0-1000 grid.
+export interface FrameOp {
+  op: 'frame'
+  id: string
+  title: string
+  x: number
+  y: number
+  w: number
+  h: number
+  frame?: string
+}
+export interface FocusOp {
+  op: 'focus'
+  id: string
+  frame?: string
+}
+export type StickyColor = 'yellow' | 'blue' | 'green' | 'pink' | 'orange'
+export interface AddStickyOp {
+  op: 'add_sticky'
+  id: string
+  text: string
+  color?: StickyColor
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export interface AddTextOp {
+  op: 'add_text'
+  id: string
+  text: string
+  x: number
+  y: number
+  size?: 's' | 'm' | 'l' | 'xl'
+  w?: number
+  h?: number
+  frame?: string
+}
+export interface AddMermaidOp {
+  op: 'add_mermaid'
+  id: string
+  code: string
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export type ChartKind = 'bar' | 'line' | 'pie' | 'scatter'
+export interface ChartSeries {
+  name: string
+  /** numbers, or [x, y] pairs for scatter */
+  values: number[] | [number, number][]
+}
+export interface AddChartOp {
+  op: 'add_chart'
+  id: string
+  chart: ChartKind
+  title?: string
+  labels?: string[]
+  series: ChartSeries[]
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export interface AddTableOp {
+  op: 'add_table'
+  id: string
+  columns: string[]
+  rows: string[][]
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export interface AddCodeOp {
+  op: 'add_code'
+  id: string
+  language?: string
+  code: string
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export interface AddMockOp {
+  op: 'add_mock'
+  id: string
+  title?: string
+  html: string
+  x: number
+  y: number
+  w?: number
+  h?: number
+  frame?: string
+}
+export type SketchColor = 'black' | 'red' | 'blue' | 'green' | 'orange' | 'violet'
+export interface SketchOp {
+  op: 'sketch'
+  id: string
+  strokes: [number, number][][]
+  color?: SketchColor
+  frame?: string
+}
+/** Partial update of an existing rich shape (e.g. new Mermaid code). */
+export interface UpdateOp {
+  op: 'update'
+  id: string
+  frame?: string
+  [k: string]: unknown
+}
+
+export type DrawOp =
+  | AddBoxOp
+  | ConnectOp
+  | RenameOp
+  | RemoveOp
+  | HighlightOp
+  | ClearOp
+  | FrameOp
+  | FocusOp
+  | AddStickyOp
+  | AddTextOp
+  | AddMermaidOp
+  | AddChartOp
+  | AddTableOp
+  | AddCodeOp
+  | AddMockOp
+  | SketchOp
+  | UpdateOp
 export type Draw = { type: 'draw' } & DrawOp
 
 export interface Box {
@@ -119,6 +286,7 @@ export interface Box {
   x: number
   y: number
   kind: BoxKind
+  frame?: string
 }
 
 export interface Edge {
@@ -126,12 +294,16 @@ export interface Edge {
   from_id: string
   to_id: string
   label?: string
+  frame?: string
 }
 
 export interface BoardSnapshot {
   type: 'board_snapshot'
   boxes: Box[]
   edges: Edge[]
+  /** v2: every other shape (frames first), replayed as draw ops. */
+  shapes?: Draw[]
+  active_frame?: string
 }
 
 export type AgentState = 'started' | 'done' | 'failed' | 'cancelled'
@@ -139,7 +311,7 @@ export type AgentState = 'started' | 'done' | 'failed' | 'cancelled'
 export interface AgentEvent {
   type: 'agent_event'
   event_id: string
-  parent_id?: string
+  parent_id?: string | null
   agent: string
   model?: string
   state: AgentState
@@ -169,7 +341,37 @@ export interface ErrorMsg {
   recoverable: boolean
 }
 
+// v2
+export interface Topic {
+  type: 'topic'
+  topic_id: string
+  title: string
+  active: boolean
+  changed?: boolean
+}
+
+export interface Participant {
+  name: string
+  kind: 'human' | 'ai'
+  speaking: boolean
+}
+
+export interface Participants {
+  type: 'participants'
+  people: Participant[]
+}
+
+export interface Brief {
+  type: 'brief'
+  title: string
+  predictions: string[]
+  ts?: number
+}
+
 export type ServerMessage =
+  | Topic
+  | Participants
+  | Brief
   | Status
   | Transcript
   | Audio
@@ -186,7 +388,7 @@ export type ServerMessageOf<T extends ServerMessageType> = Extract<ServerMessage
 
 const SERVER_TYPES: ReadonlySet<string> = new Set<ServerMessageType>([
   'status', 'transcript', 'audio', 'stop_audio', 'draw', 'board_snapshot',
-  'agent_event', 'task', 'metric', 'error',
+  'agent_event', 'task', 'metric', 'error', 'topic', 'participants', 'brief',
 ])
 
 /** Parse one wire frame. Returns null for anything that isn't a known server message. */
