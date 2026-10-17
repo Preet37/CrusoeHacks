@@ -1,0 +1,4 @@
+# Local sourced meeting state (never publish user meeting content).
+memory.json
+memory.json.lock
+.memory.json.*.tmp
