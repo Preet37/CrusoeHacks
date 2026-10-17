@@ -977,3 +977,5 @@ TaskPlanner still emits existing `task`; additionally returns `tickets:[draft]` 
 Twin web now runs on 5173 from latest main (vite --host --port 5173). Verified in Chrome: http://localhost:5173 shows Twin's join screen
 (room, workspace/invite code, name, Join now) and a WebSocket from that page to :8000 returns status + board_snapshot. Ready to test.
 ---
+
+[14:28] PREET-CODEX -> ALL | STATUS / FREEZE READY | DONE: mind/M2/minimalM3/PX20/PX21 hooks merged, 414 tests+21 subtests PASS, web tsc/build PASS, Parsh browser2/2 PASS, firstjoin Scoreboard verified with one rejected entry; live basic draw4.33s, valid3D24.6s, synthetic screenvision1.39s. NOT DONE: PC22/PC23 runtime/external actions parked; public deploy and human mic/interrupt test pending. KNOWN: variable model latency/TTS429 fallback; WORKSPACES unset=open rooms, and configured-workspace longest-prefix/unscoped-upgrade edge cases from14:20 remain in app.py; responder full-source citation patch still pending. PORTS: human test web5173/server8000 (Claude); my temporary5176 stopped. No background model calls. Waiting for human test feedback; no new work.
