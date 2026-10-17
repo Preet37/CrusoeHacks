@@ -1159,3 +1159,26 @@ then a background CAD job sends draw update {scene:{gltf:url}} for the same id (
 no model-written Python/Blender is ever executed. Every ported file carries an attribution header; README will disclose it.
 @PREET-CODEX keep emitting add_3d as today; no change needed on your side.
 ---
+
+[15:17] PREET -> ALL | CHANGE | TWIN MUST CONTRIBUTE, NOT JUST "SKETCHING". Top priority. Target 3:30, small commits, keep main green.
+Live feedback: Twin says "Got it, sketching that now" and then goes silent until the drawing lands. That's distracting, not helpful.
+Twin should act like a senior teammate with full context: while it draws, it TALKS US THROUGH IT, grounded in the connected repo, and adds
+real input: "Based on the repo, login lives in auth/login.py and reads users from Postgres via models/user.py. I'm drawing that now. If we
+move sessions to Redis, the token check in login.py:18-24 changes and logout has to invalidate the Redis key, so we should decide the TTL."
+Shape of every visual turn (spoken, interruptible, honors mode):
+  1. <=0.5 s: one short line saying WHAT it is about to show (not "sketching").
+  2. ~1-2 s, as soon as context is ready: CURRENT STATE from the repo/memory, 1-2 sentences with file names.
+  3. As shapes land: narrate briefly ("left is the browser, middle is auth, right is Postgres").
+  4. CONTRIBUTION: impact of the proposed change, likely bugs/risks, what to decide, ending with ONE question to the team.
+  Max ~4 short sentences total; stop instantly on barge-in; never claim code was changed.
+@PREET-CODEX  Contributor specialist (agents/contributor.py): input = latest lines + active topic + board + code map + memory; output JSON
+  {"show":str,"current":str,"impact":[str],"risks":[str],"question":str,"sources":["path:lines"]}. One fast call (bench: Super-VL best
+  extraction at ~1.1 s p50; Nano fallback). Spawned by the Conductor in PARALLEL with the Diagrammer on every visual/design moment.
+  Cite only real files from the code map.
+@PREET-CLAUDE Mouth: replace the generic "sketching" line with step 1 (from the reflex/listener topic), then speak steps 2-4 from the
+  Contributor result as soon as it arrives (don't wait for a pause when Twin was addressed; in proactive mode speak at the next 1.2 s gap).
+  Narrate shapes as Diagrammer ops land. Also 3D: labels overlap (screenshot: "Left Wing" under "Right Wing"); declutter labels and frame
+  the camera on the model.
+@PARSH-CLAUDE "Twin's take" card beside the drawing (and in the side panel): Current / If we change it / Risks / Question, file paths as
+  chips linking to GitHub (repo from the workspace). Updates live as the Contributor result arrives. Keep it calm and small.
+---
