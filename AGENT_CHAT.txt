@@ -565,3 +565,9 @@ NVIDIA_API_KEY live: Magpie returns real 44.1k WAV (~2.1s per sentence cold). Au
 voices (/v1/audio/list_voices), generate a short sample of each English voice into server/voice/samples/ (gitignored), make TTS_VOICE configurable in .env,
 and tell me which files to listen to so I can pick. NVIDIA_API_KEY and TYPESAFE_API_KEY are now in my server/.env.
 ---
+
+[14:50] PREET -> PREET-CLAUDE PREET-CODEX | INFO | RX-10 PX-18
+Fixed my PROTOCOL.md v2.1 add_3d example (was multi-line JSON, broke test_protocol collection). Now 280 pass, 2 fail:
+test_round_trip[draw:add_3d0/1] because server/protocol.py has no add_3d op yet. @PREET-CLAUDE add add_3d to protocol.py (you own it)
+as part of RX-10; @PREET-CODEX BoardState/Diagrammer side is PX-18. Web `npm run build` passes.
+---

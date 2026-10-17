@@ -180,11 +180,7 @@ All v1 messages are unchanged. Every new draw op below may carry an optional `"f
 ## v2.1 addition (13:30): 3D scenes on the board
 
 ```json
-{"type":"draw","op":"add_3d","id":"r1","title":"Robot arm, 3 joints","x":550,"y":100,"w":400,"h":350,"frame":"t_robot",
- "scene":{"autoRotate":true,"objects":[
-   {"id":"base","shape":"cylinder","pos":[0,0,0],"rot":[0,0,0],"scale":[1,0.3,1],"color":"#8a8f98","label":"Base"},
-   {"id":"link1","shape":"box","pos":[0,1,0],"rot":[0,0,0.3],"scale":[0.3,1.6,0.3],"color":"#4f8cff","label":"Link 1"},
-   {"id":"joint","shape":"sphere","pos":[0.45,1.8,0],"scale":[0.25,0.25,0.25],"color":"#ffb020"}]}}
+{"type":"draw","op":"add_3d","id":"r1","title":"Robot arm, 3 joints","x":550,"y":100,"w":400,"h":350,"frame":"t_robot","scene":{"autoRotate":true,"objects":[{"id":"base","shape":"cylinder","pos":[0,0,0],"rot":[0,0,0],"scale":[1,0.3,1],"color":"#8a8f98","label":"Base"},{"id":"link1","shape":"box","pos":[0,1,0],"rot":[0,0,0.3],"scale":[0.3,1.6,0.3],"color":"#4f8cff","label":"Link 1"},{"id":"joint","shape":"sphere","pos":[0.45,1.8,0],"scale":[0.25,0.25,0.25],"color":"#ffb020"}]}}
 {"type":"draw","op":"add_3d","id":"r2","title":"Uploaded model","x":100,"y":100,"w":400,"h":350,"scene":{"gltf":"https://example.com/model.glb"}}
 ```
 - `shape`: `box | cylinder | sphere | cone | torus | plane`. `pos`/`rot`(radians)/`scale` are `[x,y,z]`. `color` hex. `label` optional (shown as a floating tag). Max 60 objects.
