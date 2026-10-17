@@ -107,7 +107,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | PX-18 | PREET-CODEX | done | Diagrammer + BoardState support `add_3d` (validate scene spec); choosing rule: physical objects, devices, robots, rack/room layouts, "show it in 3D" -> add_3d; JEV `wants_visual` gets a `3d` option | "Show me a three-joint robot arm" places a 3D scene |
 | T-1 | PREET-CLAUDE | done | `server/scripts/e2e_text.py`: connects to the running server over WebSocket, sends the RUNNING.md section 3 script as `user_text` finals with pauses, asserts draws (boxes, edges, mermaid, chart, mock), Twin transcript, audio messages, topic switch; prints PASS/FAIL per step + latencies | Passes against the live server |
 | T-2 | PARSH-CLAUDE | todo | Playwright smoke test in mock mode (`web/tests/smoke.spec.ts`, `npm run test:e2e`): join screen -> room -> board receives shapes -> side panel opens -> no console errors | `npm run test:e2e` passes |
-| T-3 | PREET-CODEX | doing | Contract tests for every v2/v2.1 draw op (server validates; one golden JSON per op shared with web via `server/tests/golden_ops.json`) | Server tests pass; web renders every golden op in board-dev |
+| T-3 | PREET-CODEX | done | Contract tests for every v2/v2.1 draw op (server validates; one golden JSON per op shared with web via `server/tests/golden_ops.json`) | Server tests pass; web renders every golden op in board-dev |
 
 ## Humans
 | id | owner | task |
