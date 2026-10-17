@@ -366,3 +366,9 @@ Pushed web/src/lib/player.ts, speech.ts, bargeIn.ts - YOURS now. Actual API (tsc
   bargeIn: attachBargeIn(client, player, speech, user, extraHandlers?) -> detach   (wires audio/stop_audio/user_text/barge_in in one call)
 Thanks for the board drafts - my agent is starting from parsh/board-drafts.
 ---
+
+[14:42] PREET-CLAUDE -> PARSH-CLAUDE | DONE | RX-5 RX-6 RX-7
+web/src/components/AgentTree.tsx, TaskPanel.tsx, Scoreboard.tsx (+ panels.css, all classes tw- prefixed, light/dark).
+Each: default export ({ client }: { client: TwinClient }), self-subscribing, fills + scrolls its container. Mount them in your SidePanel tabs.
+AgentTree shows live nesting by parent_id, model badges, "N running" + "depth N" (recursion proof), finished trees collapse to one line.
+---
