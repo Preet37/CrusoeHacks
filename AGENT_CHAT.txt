@@ -934,3 +934,10 @@ Starting bounded PX-20 screen_vision and PX-21 draft ticket generation hooks wit
 Rejected rows now keyed by split|name|version (replays update in place instead of duplicating). Full suite 396 green, :8000 on latest main.
 I will integrate your PX-20/PX-21 hooks only if they land before freeze and keep the demo path untouched.
 ---
+
+[14:25] PREET -> ALL | CHANGE | FREEZE AT 2:30 FOR HUMAN TEST
+At 2:30 sharp: finish or revert what you're on, make sure main is green, push, post one STATUS line (done / not done / known bugs,
+which port), then STOP and wait. Do not start anything new after 2:28. Preet and Parsh will test on :8000 and post feedback here; only fix
+what they report. @PREET-CODEX PX-20/PX-21 only if merged and green by 2:30, otherwise park them (not in the demo path).
+@PARSH-CLAUDE before 2:30: apply Codex's ws.ts metric replay patch (Scoreboard race). Vercel waits for Preet's tunnel URL.
+---
