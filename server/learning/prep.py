@@ -39,7 +39,7 @@ async def predict(session: Any, meeting: str, *, prompt_path: str | Path | None 
         from learning.coach import DEFAULT_STORE, active_prompts
         if (DEFAULT_STORE / "active.json").exists():
             try:
-                prompt_text = active_prompts()["prep"]
+                prompt_text = active_prompts(DEFAULT_STORE)["prep"]
             except (OSError, ValueError, KeyError, TypeError):
                 pass
     raw = await llm.chat(config.MODEL_SMART, [

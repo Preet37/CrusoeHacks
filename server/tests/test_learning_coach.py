@@ -83,7 +83,7 @@ async def test_equal_or_regressing_candidate_is_rejected(monkeypatch, tmp_path):
     assert result["accepted"] is False and result["selected_version"] == "v1"
     assert "did not improve" in result["reason"]
     assert calls.count("locked-1") == 2
-    assert [message["split"] for message in result["metric_messages"]] == ["locked_test", "rejected"]
+    assert [message["split"] for message in result["metric_messages"]] == ["locked_test", "locked_test", "rejected"]
     assert coach.active_prompts(tmp_path)["prep"] == json.loads(
         (tmp_path / "versions" / "v1.json").read_text())["prompts"]["prep"]
 

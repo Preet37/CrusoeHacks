@@ -203,9 +203,14 @@ async def run_iteration(
         if accepted:
             messages.extend(locked_candidate.get("metric_messages", []))
         else:
-            messages.extend({**message, "split": "rejected", "status": "rejected",
-                             "reason": reason} for message in
-                            locked_candidate.get("metric_messages", []))
+            # Display the measured candidate beside v1 without presenting it
+            # as the selected runtime version, and retain a rejection card.
+            messages.extend({**message, "version": "v2 candidate (rejected)"}
+                            for message in locked_candidate.get("metric_messages", []))
+            messages.append({"type": "metric", "version": "v2", "split": "rejected",
+                             "name": f"rejected: {reason}; kept v1", "value": 0,
+                             "status": "rejected", "reason": reason,
+                             "selected_version": "v1"})
     if metrics_path is not None:
         _write_json(Path(metrics_path), messages)
     result = {
