@@ -58,8 +58,22 @@ def _check_size(root: Path) -> None:
                 raise ValueError('Repository exceeds the demo limit (50 MiB or 6000 files).')
 
 
+def _auth_url(url: str) -> str:
+    """Clone URL carrying the workspace's GitHub token (private repos); the URL is never logged."""
+    try:
+        from integrations import credentials
+        token = credentials.github_token()
+    except Exception:  # noqa: BLE001 - public clone still works
+        token = None
+    if token and url.startswith('https://github.com/') and re.fullmatch(r'[A-Za-z0-9_.\-]+', token):
+        return 'https://x-access-token:' + token + '@github.com/' + url[len('https://github.com/'):]
+    return url
+
+
 async def _clone(url: str, target: Path) -> None:
     # Do not use this machine's Git credentials, URL rewrites, hooks or prompts.
+    # A token comes only from the workspace's own GitHub connection (or GITHUB_TOKEN).
+    url = _auth_url(url)
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
     env.update(GIT_TERMINAL_PROMPT='0', GIT_CONFIG_NOSYSTEM='1',
                GIT_CONFIG_GLOBAL=os.devnull, GIT_ASKPASS='false')
@@ -94,6 +108,9 @@ async def connect_repo(session, url: str, *, restore_generation: object | None =
 
     temporary = None
     workspace = workspace_key(session)
+    if workspace is not None:
+        from integrations import credentials
+        credentials.set_workspace(workspace)  # private clones use this workspace's GitHub token
     if workspace is not None:
         REGISTRY.register(session)
         generation = restore_generation if restore_generation is not None else REGISTRY.claim(workspace)

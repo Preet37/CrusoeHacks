@@ -27,7 +27,7 @@ def slack_env(monkeypatch, tmp_path):
     monkeypatch.setattr(slack, "_RECENT", {})
     monkeypatch.setattr(slack, "POLL_S", 0.01)
     monkeypatch.setattr(slack, "WAIT_S", 0.3)
-    monkeypatch.setattr(jira, "configured", lambda: True)
+    monkeypatch.setattr(jira, "configured", lambda *a, **k: True)
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -146,12 +146,13 @@ def test_errors_never_leak_secrets(slack_env, monkeypatch):
     assert out["ok"] is False and "404" in out["error"] and "secret" not in json.dumps(out)
 
 
-def test_llm_timeout_falls_back_to_first_lines(slack_env, monkeypatch):
+def test_llm_timeout_falls_back_to_template_not_transcript(slack_env, monkeypatch):
     async def slow(*a, **k):
         await asyncio.sleep(5)
     monkeypatch.setattr(llm, "chat", slow)
     monkeypatch.setattr(slack, "SUMMARY_TIMEOUT_S", 0.05)
-    assert asyncio.run(slack.summarize(_meeting([]))) == "Avery: we decided to add retries"
+    out = asyncio.run(slack.summarize(_meeting([])))
+    assert "Avery:" not in out and out.startswith("The team discussed Retries plan.")
 
 
 def test_routes_integrations_and_manual_repost(slack_env):
@@ -163,7 +164,7 @@ def test_routes_integrations_and_manual_repost(slack_env):
     saved = save_meeting(session)
     client = TestClient(app.app)
     params = {"workspace": "acme", "code": "invite"}
-    assert client.get("/integrations", params=params).json()["slack"] == {"connected": True}
+    assert client.get("/integrations", params=params).json()["slack"]["connected"] is True
     assert client.post(f"/meetings/{saved['id']}/post_slack",
                        params={**params, "code": "bad"}).status_code == 403
     assert client.post(f"/meetings/{saved['id']}/post_slack", params=params).json() == {"ok": True}

@@ -134,6 +134,9 @@ async def run(ticket_id: str, workspace: str | None, room: str | None = None) ->
 
     ticket, session, meeting = integrations.find_ticket(ticket_id, workspace, room)
     key = ticket.get("jira_key")
+    from integrations import credentials
+    # This task's Jira / GitHub calls use the workspace's own connection (env is the fallback).
+    credentials.set_workspace(workspace or getattr(session, "workspace", None) or (meeting or {}).get("workspace"))
 
     # 1. Jira issue + attachments
     step("reading_jira")
@@ -192,7 +195,7 @@ async def run(ticket_id: str, workspace: str | None, room: str | None = None) ->
         # 6. deliver
         step("delivering")
         pr_url, pr_error, jira_status = None, None, None
-        if changed and os.getenv("GITHUB_TOKEN"):
+        if changed and credentials.github_token():
             try:
                 pr_url = await _open_pr(repo_url, key or ticket_id, ticket, result, repo, changed)
             except Exception as e:  # noqa: BLE001 - the patch is still delivered via Jira
@@ -389,7 +392,8 @@ async def _open_pr(repo_url: str, key: str, ticket: dict, result: dict, repo: Pa
         raise RuntimeError("not a GitHub repository URL")
     owner, name = m.groups()
     api = f"https://api.github.com/repos/{owner}/{name}"
-    headers = {"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}", "Accept": "application/vnd.github+json"}
+    from integrations import credentials
+    headers = {"Authorization": f"Bearer {credentials.github_token()}", "Accept": "application/vnd.github+json"}
     branch = f"twin/{re.sub(r'[^A-Za-z0-9._-]+', '-', key.lower())}-{int(time.time())}"
     async with httpx.AsyncClient(headers=headers, timeout=30) as gh:
         meta = (await gh.get(api)).raise_for_status().json()

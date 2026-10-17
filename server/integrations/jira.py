@@ -1,6 +1,8 @@
 """Jira Cloud REST v3 client for Twin's ticket pipeline (PC-23).
 
-Env (server/.env): JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEY.
+Credentials: the workspace's stored connection (integrations/credentials.py: API token
+or Atlassian OAuth 3LO via api.atlassian.com/ex/jira/<cloudid>) first, else env
+(server/.env): JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEY.
 The API token is only ever passed to httpx basic auth; it never appears in
 logs, errors or return values.
 """
@@ -17,6 +19,7 @@ import config  # noqa: F401 - loads server/.env
 log = logging.getLogger("twin.jira")
 
 TIMEOUT_S = 15.0
+ATLASSIAN_API = "https://api.atlassian.com"
 STATUS_TTL_S = 60.0
 # Tests swap in an httpx.MockTransport; production uses the default transport.
 _TRANSPORT: httpx.AsyncBaseTransport | None = None
@@ -33,15 +36,55 @@ def _env() -> tuple[str, str, str, str]:
             os.getenv("JIRA_API_TOKEN", "").strip(), os.getenv("JIRA_PROJECT_KEY", "").strip())
 
 
-def configured() -> bool:
-    return all(_env())
+def _creds(workspace: str | None = None) -> dict:
+    """Credentials for the current workspace: stored (token or OAuth) first, then env.
+
+    Keys: via ("token"|"oauth"|"env"), api (REST base), site (browse base), project,
+    auth (email, token) for basic or None, bearer (OAuth access token) or None.
+    """
+    from integrations import credentials
+    stored = credentials.current("jira", workspace)
+    if stored and stored.get("via") == "oauth" and stored.get("cloudid") and stored.get("access_token"):
+        return {"via": "oauth", "api": f"{ATLASSIAN_API}/ex/jira/{stored['cloudid']}",
+                "site": str(stored.get("site") or "").rstrip("/"), "project": str(stored.get("project") or ""),
+                "auth": None, "bearer": stored["access_token"], "email": stored.get("account") or "",
+                "stored": stored, "workspace": workspace or credentials.current_workspace()}
+    if stored and stored.get("site") and stored.get("email") and stored.get("api_token"):
+        site = str(stored["site"]).rstrip("/")
+        return {"via": "token", "api": site, "site": site, "project": str(stored.get("project") or ""),
+                "auth": (stored["email"], stored["api_token"]), "bearer": None, "email": stored["email"]}
+    base, email, token, project = _env()
+    return {"via": "env", "api": base, "site": base, "project": project,
+            "auth": (email, token) if email and token else None, "bearer": None, "email": email}
 
 
-def _client() -> httpx.AsyncClient:
-    base, email, token, _ = _env()
-    return httpx.AsyncClient(base_url=base, auth=(email, token), timeout=TIMEOUT_S,
-                             transport=_TRANSPORT,
-                             headers={"Accept": "application/json"})
+def configured(workspace: str | None = None) -> bool:
+    c = _creds(workspace)
+    return bool(c["api"] and c["project"] and (c["auth"] or c["bearer"]))
+
+
+async def _fresh(workspace: str | None = None) -> dict:
+    """_creds(), refreshing an expiring Atlassian OAuth access token first."""
+    c = _creds(workspace)
+    stored = c.get("stored")
+    if c["via"] == "oauth" and stored and float(stored.get("expires_at") or 0) < time.time() + 60 \
+            and stored.get("refresh_token") and c.get("workspace"):
+        from integrations import oauth
+        try:
+            await oauth.refresh_atlassian(c["workspace"], stored)
+            c = _creds(workspace)
+        except Exception as e:  # noqa: BLE001 - try the old token; Jira will answer 401 if it is dead
+            log.info("Atlassian token refresh failed: %s", type(e).__name__)
+    return c
+
+
+def _client(c: dict | None = None) -> httpx.AsyncClient:
+    c = c or _creds()
+    headers = {"Accept": "application/json"}
+    if c.get("bearer"):
+        headers["Authorization"] = f"Bearer {c['bearer']}"
+    return httpx.AsyncClient(base_url=c["api"], auth=c.get("auth"), timeout=TIMEOUT_S,
+                             transport=_TRANSPORT, headers=headers)
 
 
 def _error_text(resp: httpx.Response) -> str:
@@ -69,20 +112,21 @@ async def _request(client: httpx.AsyncClient, method: str, path: str, **kw) -> h
     return resp
 
 
-async def status() -> dict:
+async def status(workspace: str | None = None) -> dict:
     """Connection status for the dashboard; cached for 60 s per configuration."""
-    base, email, _token, project = _env()
+    c = await _fresh(workspace)
+    base, project = c["site"], c["project"]
     out = {"connected": False, "site": base or None, "project": project or None,
-           "account": None, "error": None}
-    if not configured():
+           "account": None, "error": None, "via": c["via"]}
+    if not configured(workspace):
         out["error"] = "Jira not configured (set JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEY)"
         return out
-    key = (base, email, project)
+    key = (c["via"], c["api"], c["email"], project)
     now = time.monotonic()
     if _status_cache["key"] == key and now - _status_cache["at"] < STATUS_TTL_S:
         return dict(_status_cache["value"])
     try:
-        async with _client() as client:
+        async with _client(c) as client:
             me = (await _request(client, "GET", "/rest/api/3/myself")).json()
             proj = (await _request(client, "GET", f"/rest/api/3/project/{project}")).json()
         out["account"] = me.get("displayName") if isinstance(me, dict) else None
@@ -160,7 +204,8 @@ async def create_issue(title: str, body: str, owner: str | None = None,
     """
     if not configured():
         raise JiraError("connect Jira")
-    base, _email, _token, project = _env()
+    c = await _fresh()
+    base, project = c["site"], c["project"]
     title = " ".join((title or "").split())[:250] or "Untitled ticket from Twin"
     footer = f"Created by Twin from meeting {meeting or 'session'}"
     fields: dict = {"project": {"key": project}, "summary": title,
@@ -168,7 +213,7 @@ async def create_issue(title: str, body: str, owner: str | None = None,
                     "description": (doc([*description.get("content", []), paragraph(_text(footer))])
                                     if isinstance(description, dict) else _adf(body, footer)),
                     "labels": [str(l).replace(" ", "-") for l in (labels or ["twin"])]}
-    async with _client() as client:
+    async with _client(c) as client:
         account = None
         for name in (owner, fallback_assignee):
             if account is None and isinstance(name, str) and name.strip():
@@ -187,7 +232,7 @@ async def attach_files(key: str, files: list[tuple[str, bytes, str]]) -> list[st
     """Attach [(filename, data, mime)] to an issue; returns the attached filenames. Raises JiraError."""
     if not configured() or not files:
         return []
-    async with _client() as client:
+    async with _client(await _fresh()) as client:
         resp = await _request(client, "POST", f"/rest/api/3/issue/{key}/attachments",
                               headers={"X-Atlassian-Token": "no-check"},
                               files=[("file", (name, data, mime)) for name, data, mime in files])
@@ -203,8 +248,9 @@ def _person(value) -> str | None:
 
 async def get_issue(key: str) -> dict:
     """Issue fields Twin needs: summary, description (ADF), people, status, attachments. Raises JiraError."""
-    base, _email, _token, _project = _env()
-    async with _client() as client:
+    c = await _fresh()
+    base = c["site"]
+    async with _client(c) as client:
         resp = await _request(client, "GET", f"/rest/api/3/issue/{key}",
                               params={"fields": "summary,description,assignee,reporter,status,attachment,labels"})
     try:
@@ -223,7 +269,10 @@ async def get_issue(key: str) -> dict:
 
 async def download(url: str, max_bytes: int = 2_000_000) -> bytes:
     """Download one attachment's content (Jira redirects to its media store)."""
-    async with _client() as client:
+    c = await _fresh()
+    if c["via"] == "oauth" and c["site"] and url.startswith(c["site"] + "/"):
+        url = c["api"] + url[len(c["site"]):]  # OAuth tokens only work on api.atlassian.com
+    async with _client(c) as client:
         resp = await _request(client, "GET", url, follow_redirects=True)
     data = resp.content
     if len(data) > max_bytes:
@@ -232,13 +281,13 @@ async def download(url: str, max_bytes: int = 2_000_000) -> bytes:
 
 
 async def add_comment(key: str, content: list[dict]) -> None:
-    async with _client() as client:
+    async with _client(await _fresh()) as client:
         await _request(client, "POST", f"/rest/api/3/issue/{key}/comment", json={"body": doc(content)})
 
 
 async def transition(key: str, prefer: tuple[str, ...] = ("review", "progress")) -> str | None:
     """Move the issue to the first available status whose name contains one of `prefer`. Returns the new status."""
-    async with _client() as client:
+    async with _client(await _fresh()) as client:
         resp = await _request(client, "GET", f"/rest/api/3/issue/{key}/transitions")
         try:
             options = resp.json().get("transitions") or []

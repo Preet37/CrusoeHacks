@@ -305,10 +305,18 @@ def build_jira_description(ticket: dict, session=None, meeting: dict | None = No
 async def apply_action(ticket_id: str, action: str, *, workspace: str | None,
                        room: str | None = None) -> tuple[dict, object | None]:
     """Run one ticket action; returns (updated ticket, live session or None)."""
-    from integrations import jira
+    from integrations import credentials
     if action not in ACTIONS:
         raise TicketError(f"Unsupported ticket action {action!r}")
     ticket, session, meeting = find_ticket(ticket_id, workspace, room)
+    scope = workspace or getattr(session, "workspace", None) or (meeting or {}).get("workspace")
+    with credentials.use_workspace(scope):  # Jira calls use this workspace's connection
+        return await _apply_action(ticket, session, meeting, action, workspace, room)
+
+
+async def _apply_action(ticket: dict, session, meeting, action: str, workspace: str | None,
+                        room: str | None) -> tuple[dict, object | None]:
+    from integrations import jira
     if action != "dismiss" and ticket_permission(session, workspace) == "off":
         raise TicketError(TICKETS_OFF, 403)
     if action == "dismiss":
@@ -378,7 +386,7 @@ async def auto_push_meeting(meeting: dict | None) -> list[str]:
 
     Skips dismissed/already-pushed tickets and workspaces whose 'Create tickets' permission is off."""
     from integrations import jira
-    if not isinstance(meeting, dict) or not jira.configured():
+    if not isinstance(meeting, dict) or not jira.configured(meeting.get("workspace")):
         return []
     workspace, room = meeting.get("workspace"), meeting.get("room")
     if ticket_permission(None, workspace) == "off":

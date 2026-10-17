@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { meetingHistory, scopedRoom, signOut, slug, type WorkspaceSession } from '../lib/workspace'
 import { createClient, serverHttpBase, type TwinClient } from '../lib/ws'
 import { Scoreboard } from './optional'
+import IntegrationsCard from './IntegrationsCard'
 import PermissionsCard from './PermissionsCard'
 import TicketsBoard from './TicketsBoard'
 import { TwinAvatar } from './ParticipantTile'
@@ -342,22 +343,7 @@ export default function Dashboard({
             {repoStatus && <div className="hint" style={{ marginTop: 6 }}>{repoStatus}</div>}
           </section>
 
-          <section className="dash-card glass">
-            <h2>Integrations</h2>
-            {(['github', 'jira', 'slack'] as const).map((k) => {
-              const v = integ?.[k]
-              const connected = k === 'github' ? !!(v?.connected ?? info?.repo_url) : !!v?.connected
-              const detail = String(v?.project ?? v?.repo_url ?? v?.base_url ?? (k === 'github' ? (info?.repo_url ?? '') : ''))
-              return (
-                <div key={k} className="perm-row">
-                  <span className="dash-title" style={{ width: 70, textTransform: 'capitalize' }}>{k === 'github' ? 'GitHub' : k}</span>
-                  <span className="hint ellipsis" style={{ flex: 1 }}>{detail.replace('https://github.com/', '').replace(/\.git$/, '')}</span>
-                  <span className={`tag ${connected ? 'live' : ''}`}>{connected ? 'CONNECTED' : integ ? 'NOT CONNECTED' : '—'}</span>
-                </div>
-              )
-            })}
-            {!integ && <div className="hint">Integration status appears when the server exposes it.</div>}
-          </section>
+          <IntegrationsCard session={session} integ={integ} repoUrl={info?.repo_url} onChange={refresh} />
 
           <PermissionsCard session={session} />
 

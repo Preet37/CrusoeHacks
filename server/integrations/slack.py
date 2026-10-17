@@ -1,11 +1,13 @@
 """End-of-meeting Slack recap to #standup (Block Kit).
 
-Env (server/.env), either:
+Credentials: the workspace's stored bot token + channel (integrations/credentials.py,
+connected from the dashboard) first, else env (server/.env), either:
   SLACK_WEBHOOK_URL                 Incoming Webhook bound to #standup, or
   SLACK_BOT_TOKEN + SLACK_CHANNEL   chat.postMessage (channel default "standup").
 PUBLIC_WEB_URL  dashboard link in the footer (default https://crusoehacks.vercel.app).
 
-When the room empties and the meeting is saved, app.py calls `schedule_meeting_recap`.
+When the room empties, integrations/meeting_end.py summarizes, ensures tickets, pushes them
+to Jira, then awaits `recap_now`.
 A background task waits (up to WAIT_S, every POLL_S) for the auto Jira push to fill
 ticket links, then posts ONE message per meeting id. The webhook URL and token are
 only handed to httpx; they never appear in logs, errors or return values.
@@ -26,7 +28,7 @@ log = logging.getLogger("twin.slack")
 
 WAIT_S = 45.0
 POLL_S = 3.0
-SUMMARY_TIMEOUT_S = 10.0
+SUMMARY_TIMEOUT_S = 30.0
 HTTP_TIMEOUT_S = 10.0
 DEFAULT_WEB_URL = "https://crusoehacks.vercel.app"
 CHAT_POST_URL = "https://slack.com/api/chat.postMessage"
@@ -41,17 +43,35 @@ _RECENT: dict[str, dict] = {}   # meeting id -> payload (for manual repost of no
 
 # ------------------------------------------------------------------ config
 
-def _webhook() -> str:
+def _stored(workspace: str | None = None) -> dict | None:
+    from integrations import credentials
+    stored = credentials.current("slack", workspace)
+    return stored if stored and stored.get("bot_token") else None
+
+
+def _webhook(workspace: str | None = None) -> str:
+    if _stored(workspace):
+        return ""  # the workspace's own bot wins over the env webhook
     return os.getenv("SLACK_WEBHOOK_URL", "").strip()
 
 
-def _bot() -> tuple[str, str]:
+def _bot(workspace: str | None = None) -> tuple[str, str]:
+    stored = _stored(workspace)
+    if stored:
+        return str(stored["bot_token"]), str(stored.get("channel_id") or stored.get("channel") or "standup")
     channel = os.getenv("SLACK_CHANNEL", "").strip() or "standup"
     return os.getenv("SLACK_BOT_TOKEN", "").strip(), channel
 
 
-def configured() -> bool:
-    return bool(_webhook() or _bot()[0])
+def configured(workspace: str | None = None) -> bool:
+    return bool(_webhook(workspace) or _bot(workspace)[0])
+
+
+def via(workspace: str | None = None) -> str | None:
+    stored = _stored(workspace)
+    if stored:
+        return str(stored.get("via") or "token")
+    return "env" if configured(workspace) else None
 
 
 def _offline_test() -> bool:
@@ -119,46 +139,54 @@ def _jira_expected() -> bool:
 
 
 def _fallback_summary(meeting: dict) -> str:
-    notes = [n for n in meeting.get("notes") or [] if isinstance(n, dict) and n.get("text")]
-    if notes:
-        return " ".join(f"{n.get('speaker') or 'Participant'}: {str(n['text']).strip()}"
-                        for n in notes[:3])[:600]
-    return str(meeting.get("summary") or "").strip()[:600] or "No discussion was captured."
+    """Template summary (topics, board, Twin's take); never raw transcript lines."""
+    from integrations import meeting_end
+    return meeting_end.fallback_summary(meeting)
 
 
 async def summarize(meeting: dict) -> str:
-    """2-4 sentence summary. Uses an LLM summary when the meeting only has raw notes."""
+    """2-4 sentence summary of what was discussed/decided; never a transcript."""
+    from integrations import meeting_end
     for key in ("ai_summary", "llm_summary", "recap"):
-        if str(meeting.get(key) or "").strip():
-            return str(meeting[key]).strip()[:900]
-    notes = [n for n in meeting.get("notes") or [] if isinstance(n, dict) and n.get("text")]
-    if not notes:
-        return _fallback_summary(meeting)
-    transcript = "\n".join(f"{n.get('speaker') or 'Participant'}: {str(n['text']).strip()}"
-                           for n in notes[:80])[:8000]
-    try:
-        import llm
-        from config import MODEL_FAST
-        text = await asyncio.wait_for(llm.chat(MODEL_FAST, [
-            {"role": "system", "content": "You write crisp standup recaps. Reply with exactly 3 plain "
-                                          "sentences summarizing what the meeting discussed and decided. "
-                                          "No preamble, no bullets, no markdown."},
-            {"role": "user", "content": f"Meeting: {meeting.get('title') or meeting.get('room')}\n"
-                                        f"Transcript:\n{transcript}"},
-        ], max_tokens=220, temperature=0.2), timeout=SUMMARY_TIMEOUT_S)
-        text = " ".join(str(text or "").split())
-        if text:
+        text = str(meeting.get(key) or "").strip()
+        if text and not meeting_end.looks_like_transcript(text, meeting):
             return text[:900]
-    except Exception:  # noqa: BLE001 - timeout / no key / model error -> extractive fallback
-        log.info("slack recap: LLM summary unavailable, using first lines")
+    if not [n for n in meeting.get("notes") or [] if isinstance(n, dict) and n.get("text")]:
+        stored = str(meeting.get("summary") or "").strip()
+        if stored and not meeting_end.looks_like_transcript(stored, meeting):
+            return stored[:900]
+        return _fallback_summary(meeting)
+    try:
+        result = await asyncio.wait_for(meeting_end.summarize(meeting), timeout=SUMMARY_TIMEOUT_S)
+        if result.get("action_items") and not meeting.get("action_items"):
+            meeting["action_items"] = result["action_items"]
+        return str(result.get("summary") or "").strip()[:900] or _fallback_summary(meeting)
+    except Exception:  # noqa: BLE001 - timeout / no key / model error -> template fallback
+        log.info("slack recap: LLM summary unavailable, using template summary")
     return _fallback_summary(meeting)
+
+
+def _assignee(ticket: dict) -> str:
+    jira_info = ticket.get("jira") if isinstance(ticket.get("jira"), dict) else {}
+    who = jira_info.get("assignee") or ticket.get("owner")
+    if isinstance(who, dict):
+        who = who.get("displayName") or who.get("name")
+    return str(who or "").strip()
+
+
+def _display_name(meeting: dict) -> str:
+    from integrations import meeting_end
+    if meeting_end._title_is_topic(meeting):
+        return str(meeting.get("title"))
+    found = meeting_end.topics(meeting)
+    return found[0] if found else str(meeting.get("room") or "meeting")
 
 
 # ------------------------------------------------------------------ message
 
 def build_blocks(meeting: dict, summary: str, *, pending_note: bool = True) -> tuple[list[dict], str]:
     """(Block Kit blocks, plain-text fallback) for one meeting."""
-    name = meeting.get("title") or meeting.get("room") or "meeting"
+    name = _display_name(meeting)
     header = f"Twin recap: {name} · {_when(meeting)}"
     blocks: list[dict] = [
         {"type": "header", "text": {"type": "plain_text", "text": header[:150], "emoji": True}},
@@ -168,6 +196,13 @@ def build_blocks(meeting: dict, summary: str, *, pending_note: bool = True) -> t
     if decisions:
         text = "*Decisions*\n" + "\n".join(f"• {_esc(d)[:300]}" for d in decisions[:10])
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text[:2900]}})
+    items = [i for i in meeting.get("action_items") or [] if isinstance(i, dict) and i.get("title")]
+    if items:
+        lines = ["*Action items*"]
+        for i in items[:10]:
+            owner = f" — {_esc(i['owner'])}" if i.get("owner") else ""
+            lines.append(f"• {_esc(i['title'])[:200]}{owner}")
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)[:2900]}})
 
     tickets = _active(meeting.get("tickets") or [])
     if tickets:
@@ -182,7 +217,8 @@ def build_blocks(meeting: dict, summary: str, *, pending_note: bool = True) -> t
 
         tlines = ["*Tickets*"]
         for t in tickets[:20]:
-            tlines.append(f"• {_ticket_label(t, pending_note)}")
+            who = _assignee(t)
+            tlines.append(f"• {_ticket_label(t, pending_note)}" + (f" — assignee: {_esc(who)}" if who else ""))
         for t in tickets:
             if _agent_status(t) in AGENT_RUNNING:
                 tag = _esc(t.get("jira_key") or t.get("title") or t.get("id"))
@@ -244,7 +280,7 @@ def _merge_fresh(meeting: dict, session) -> dict:
             stored = next((m for m in list_meetings(meeting["workspace"]) if m.get("id") == meeting["id"]), None)
             if stored:
                 sources.append(stored.get("tickets") or [])
-                for key in ("summary", "decisions", "title", "ai_summary"):
+                for key in ("summary", "decisions", "title", "ai_summary", "action_items"):
                     if stored.get(key) and not meeting.get(key):
                         meeting[key] = stored[key]
         except Exception:  # noqa: BLE001
@@ -267,6 +303,8 @@ def _links_ready(meeting: dict) -> bool:
 async def post_meeting_recap(meeting: dict, session=None, *, wait: bool = True,
                              force: bool = False) -> dict:
     """Wait for Jira links (if Jira is connected), then post the recap once per meeting id."""
+    from integrations import credentials
+    credentials.set_workspace(meeting.get("workspace") or getattr(session, "workspace", None))
     if not configured():
         return {"ok": False, "error": "Slack is not connected"}
     mid = str(meeting.get("id") or "")
@@ -311,25 +349,45 @@ def _session_payload(session) -> dict | None:
     title = str(topic.get("title") or "") if isinstance(topic, dict) else ""
     return {"id": mid, "workspace": None, "room": room, "title": title or room,
             "ended_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "summary": " ".join(l["text"] for l in lines[:3])[:600],
+            "summary": "", "contribution": getattr(session, "latest_contribution", None),
             "notes": lines[:100], "decisions": decisions[:30], "tickets": tickets}
+
+
+def _prepare(session, payload: dict | None) -> dict | None:
+    """The meeting to recap (remembered for manual repost), or None when there is nothing to post."""
+    if _offline_test():
+        return None
+    meeting = payload if isinstance(payload, dict) else _session_payload(session)
+    if not meeting or not configured(meeting.get("workspace") or getattr(session, "workspace", None)):
+        return None
+    mid = str(meeting.get("id") or "")
+    if mid:
+        _RECENT[mid] = meeting
+        while len(_RECENT) > 50:
+            _RECENT.pop(next(iter(_RECENT)))
+        if mid in _POSTED:
+            return None
+    return meeting
+
+
+async def recap_now(session, payload: dict | None) -> dict | None:
+    """Awaitable recap for the end-of-meeting pipeline (integrations/meeting_end.py); never raises."""
+    try:
+        meeting = _prepare(session, payload)
+        if not meeting:
+            return None
+        return await post_meeting_recap(dict(meeting), session)
+    except Exception:  # noqa: BLE001
+        log.exception("slack recap failed")
+        return {"ok": False, "error": "Slack recap failed"}
 
 
 def schedule_meeting_recap(session, payload: dict | None) -> asyncio.Task | None:
     """Fire-and-forget from the ws `finally`; never raises."""
     try:
-        if not configured() or _offline_test():
-            return None
-        meeting = payload if isinstance(payload, dict) else _session_payload(session)
+        meeting = _prepare(session, payload)
         if not meeting:
             return None
-        mid = str(meeting.get("id") or "")
-        if mid:
-            _RECENT[mid] = meeting
-            while len(_RECENT) > 50:
-                _RECENT.pop(next(iter(_RECENT)))
-            if mid in _POSTED:
-                return None
         task = asyncio.get_running_loop().create_task(post_meeting_recap(dict(meeting), session))
         _TASKS.add(task)
         task.add_done_callback(_TASKS.discard)

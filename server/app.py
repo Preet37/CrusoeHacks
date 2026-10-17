@@ -6,7 +6,7 @@ import os
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 import protocol
@@ -39,18 +39,133 @@ def _ticket_scope(workspace: str, code: str, room: str) -> str | None:
 
 @app.get("/integrations")
 async def integrations_status(workspace: str = "", code: str = ""):
-    from integrations import jira
-    github = None
+    """Per provider: connected, via (oauth|token|env), oauth_available, stored (workspace's own
+    connection, so the dashboard shows Disconnect) and public details. Never a secret."""
+    from integrations import credentials, jira, oauth, slack
     trusted, error = check_workspace(workspace, code) if workspace else (None, None)
-    if trusted and not error:
+    ws = trusted if trusted and not error else None
+    stored = {p: credentials.public_view(credentials.get(ws, p)) if ws else {"connected": False}
+              for p in credentials.PROVIDERS}
+
+    jira_out = await jira.status(ws)
+    for k, v in stored["jira"].items():
+        if k not in ("connected", "via"):
+            jira_out.setdefault(k, v)
+    if not jira_out.get("connected") and not jira.configured(ws):
+        jira_out["via"] = None
+
+    slack_on = slack.configured(ws)
+    slack_out = {**stored["slack"], "connected": slack_on, "via": slack.via(ws)}
+    if slack_on and not stored["slack"]["connected"] and os.getenv("SLACK_BOT_TOKEN"):
+        slack_out["channel"] = slack._bot(ws)[1]
+
+    repo = None
+    if ws:
         try:
             from brain.workspace_store import get_workspace
-            repo = get_workspace(trusted).get("repo_url")
-            github = {"connected": bool(repo), "repo_url": repo}
+            repo = get_workspace(ws).get("repo_url")
         except Exception:  # noqa: BLE001
             log.exception("workspace repo lookup failed")
-    return {"jira": await jira.status(), "github": github,
-            "slack": {"connected": bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))}}
+    gh_token = bool(stored["github"]["connected"] or os.getenv("GITHUB_TOKEN", "").strip())
+    github_out = {**stored["github"], "connected": bool(repo) or gh_token, "repo_url": repo,
+                  "via": stored["github"].get("via") if stored["github"]["connected"] else ("env" if gh_token else None)}
+
+    out = {"jira": jira_out, "slack": slack_out, "github": github_out}
+    for p, v in out.items():
+        v["oauth_available"] = oauth.oauth_available(p)
+        v["stored"] = bool(stored[p]["connected"])
+    return out
+
+
+def _require_workspace(workspace: str, code: str) -> str:
+    from fastapi import HTTPException
+    trusted, error = check_workspace(workspace, code)
+    if error or not trusted:
+        raise HTTPException(403, error or "Workspace and invite code are required")
+    return trusted
+
+
+def _provider(provider: str) -> str:
+    from fastapi import HTTPException
+    from integrations import credentials
+    if provider not in credentials.PROVIDERS:
+        raise HTTPException(404, f"Unknown integration {provider}")
+    return provider
+
+
+@app.post("/integrations/{provider}/connect")
+async def integrations_connect(provider: str, request: Request, workspace: str = "", code: str = ""):
+    """Token connect: verify the pasted credentials with the provider, then store them for the workspace."""
+    from fastapi.responses import JSONResponse
+    from integrations import jira, oauth
+    trusted = _require_workspace(workspace, code)
+    _provider(provider)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    try:
+        view = await oauth.connect_token(provider, trusted, body if isinstance(body, dict) else {})
+    except oauth.ConnectError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+    jira._status_cache.update(key=None)
+    log.info("workspace %s connected %s via token", trusted, provider)
+    return {"ok": True, provider: view}
+
+
+@app.post("/integrations/{provider}/disconnect")
+async def integrations_disconnect(provider: str, workspace: str = "", code: str = ""):
+    from integrations import credentials, jira
+    trusted = _require_workspace(workspace, code)
+    removed = credentials.delete(trusted, _provider(provider))
+    jira._status_cache.update(key=None)
+    return {"ok": True, "removed": removed}
+
+
+def _server_base(request: Request) -> str:
+    return (os.getenv("PUBLIC_SERVER_URL", "").strip() or str(request.base_url)).rstrip("/")
+
+
+def _redirect_uri(request: Request, provider: str) -> str:
+    return f"{_server_base(request)}/oauth/{provider}/callback"
+
+
+@app.get("/oauth/{provider}/start")
+async def oauth_start(provider: str, request: Request, workspace: str = "", code: str = "",
+                      channel: str = "", project_key: str = ""):
+    from fastapi import HTTPException
+    from fastapi.responses import RedirectResponse
+    from integrations import oauth
+    trusted = _require_workspace(workspace, code)
+    _provider(provider)
+    if not oauth.oauth_available(provider):
+        raise HTTPException(404, f"{provider} OAuth is not configured on this server")
+    extra = {k: v.strip()[:80] for k, v in (("channel", channel), ("project_key", project_key)) if v.strip()}
+    return RedirectResponse(oauth.authorize_url(provider, trusted, _redirect_uri(request, provider), extra),
+                            status_code=302)
+
+
+@app.get("/oauth/{provider}/callback")
+async def oauth_callback(provider: str, request: Request, code: str = "", state: str = "", error: str = ""):
+    from fastapi.responses import RedirectResponse
+    from urllib.parse import urlencode
+    from integrations import jira, oauth, slack
+    _provider(provider)
+    back = f"{slack.web_url()}/dashboard"
+    try:
+        if error:
+            raise oauth.ConnectError(f"{provider} authorization was cancelled ({error[:40]})")
+        workspace = await oauth.finish_oauth(provider, code, state, _redirect_uri(request, provider))
+    except oauth.ConnectError as e:
+        log.info("oauth %s failed: %s", provider, e)
+        if str(e).startswith("Invalid OAuth state"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+        return RedirectResponse(f"{back}?{urlencode({'connect_error': provider, 'reason': str(e)[:200]})}",
+                                status_code=302)
+    jira._status_cache.update(key=None)
+    log.info("workspace %s connected %s via oauth", workspace, provider)
+    return RedirectResponse(f"{back}?{urlencode({'connected': provider})}", status_code=302)
 
 
 @app.post("/meetings/{meeting_id}/post_slack")
@@ -387,17 +502,15 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
                 try:
                     from brain.meeting_store import save_meeting
                     saved = save_meeting(session)
-                    # Meeting ended: tickets go to Jira automatically (and their Ticket Agents start).
-                    if saved and saved.get("tickets"):
-                        import integrations
-                        asyncio.create_task(integrations.auto_push_meeting(saved))
                 except Exception:
                     log.exception('[%s] could not save meeting summary', room)
-                try:  # end-of-meeting #standup recap (background; waits for auto Jira links)
-                    from integrations import slack
-                    slack.schedule_meeting_recap(session, saved)
+                # Meeting ended, one background coroutine in order: crisp summary + tickets
+                # (always) -> auto Jira push (Ticket Agents start) -> #standup recap with links.
+                try:
+                    from integrations import meeting_end
+                    meeting_end.schedule(session, saved)
                 except Exception:  # noqa: BLE001
-                    log.exception('[%s] could not schedule slack recap', room)
+                    log.exception('[%s] could not schedule end-of-meeting pipeline', room)
                 # Nobody left: the next join is a brand-new meeting (fresh history, board, topic).
                 # The summary is already saved; the workspace repo/memory reload on join.
                 if not session.sockets and SESSIONS.get(room) is session:

@@ -132,7 +132,8 @@ def test_routes_push_live_ticket(jira_env):
     from brain.meeting_store import list_tickets
     assert list_tickets("acme")[0]["links"]["jira"].endswith("SCRUM-7")
     integ = client.get("/integrations", params=params).json()
-    assert integ["jira"]["connected"] and integ["github"] == {"connected": False, "repo_url": None}
+    assert integ["jira"]["connected"] and integ["github"]["connected"] is False \
+        and integ["github"]["repo_url"] is None
     assert "slack" in integ
 
 
