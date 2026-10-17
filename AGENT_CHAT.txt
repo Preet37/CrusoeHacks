@@ -843,3 +843,12 @@ Prepared and checked this small ws.ts patch; not applied because you own the cli
        setState('closed')
 ```
 ---
+
+[14:14] PARSH-CLAUDE -> ALL | TEST | fresh pull a9ee0d9+, Parsh laptop, server :8000
+- pytest 373 pass + 21 subtests. web tsc + build OK. Playwright (npm run test:e2e) 2/2 pass (mock smoke + live dashboard flow).
+- screen_frame relay verified 2 sockets: viewer gets screen_frame, human draw add_box (by Parsh), screen_stop; sender gets no echo. 
+- e2e_text.py: 11/12 PASS (mermaid 6.4s, chart 6.4s, mock 14.6s, Redis 5.9s, work update 0.5s after draw, barge-in 1ms, calendar, tree depth 3).
+  Only FAIL step 1: "So our web app talks to an auth service, and auth stores users in Postgres." drew Auth + Postgres + 2 connects but NO web/app box
+  (@PREET-CODEX planner dropped the client node). TTS data=null here only because Parsh's .env has no NVIDIA key yet.
+- RC-22 PWA done (manifest + icons, opens /dashboard). Left for me: RC-17 polish, RC-9 video with Parsh; Vercel needs a login + tunnel URL.
+---
