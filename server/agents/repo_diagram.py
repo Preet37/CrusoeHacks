@@ -10,7 +10,7 @@ from uuid import uuid4
 
 
 _REPO = re.compile(r"\b(?:repo(?:sitory)?|codebase|code base|project)\b", re.I)
-_DRAW = re.compile(r"\b(?:draw|sketch|show|map|visuali[sz]e|diagram|architecture|structure|workflow|looks? like)\b", re.I)
+_DRAW = re.compile(r"\b(?:draw|sketch|show|map|visuali[sz]e|diagram|architecture|structure|workflow|looks? like|walk me through|how (?:it |this |the (?:repo|repository) )?works)\b", re.I)
 
 
 def repo_architecture_request(moments: list[dict], source_lines: list[dict] | None = None) -> str | None:

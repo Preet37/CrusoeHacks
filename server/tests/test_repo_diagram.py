@@ -17,6 +17,7 @@ def code_map(count=12):
 
 def test_request_recognizes_live_repo_question():
     assert repo_architecture_request([], [{"text": "Twin sketch what the repo looks like, its architecture and workflow"}])
+    assert repo_architecture_request([{"text": "walk me through the repository and how it works"}])
     assert repo_architecture_request([{"text": "draw a robot arm"}]) is None
 
 
