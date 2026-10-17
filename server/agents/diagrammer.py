@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "diagrammer.md"
 MAX_OPS = 8
 FAST_MAX_TOKENS = 850
+PLAN_TIMEOUT_S = 8.0
 _RICH_SHAPES = {"add_mermaid", "add_chart", "add_mock", "add_table", "add_code", "add_3d", "sketch"}
 _RICH_CUES = re.compile(
     r"\b(?:sequence|step|then|first|chart|graph|plot|table|screen|mockup|wireframe|"
@@ -162,6 +163,12 @@ def _sketch_strokes(raw):
 
 class StaleBoardError(RuntimeError):
     """The user cleared or reset the board while a model job was in flight."""
+
+
+def _capacity_error(exc: Exception) -> bool:
+    return (isinstance(exc, (TimeoutError, llm.APITimeoutError))
+            or getattr(exc, "status_code", None) == 503
+            or "capacity_unavailable" in str(exc).lower())
 
 
 async def emit_event(session, agent: str, model: str, state: str, detail: str,
@@ -533,7 +540,29 @@ class Diagrammer:
             }, separators=(",", ":"))},
         ]
 
-        async def json_plan(model, plan_messages, tools, max_tokens):
+        plan_model = config.MODEL_SMART
+        unavailable_models = set()
+
+        async def capacity_call(primary, call, phase):
+            nonlocal plan_model
+            models = [model for model in dict.fromkeys((primary, config.MODEL_COACH, config.MODEL_FAST))
+                      if model not in unavailable_models]
+            for index, model in enumerate(models):
+                plan_model = model
+                try:
+                    return await asyncio.wait_for(call(model), timeout=PLAN_TIMEOUT_S)
+                except Exception as exc:
+                    # Tool execution is not transactional. Never replay after a
+                    # handler was even attempted, including a failed broadcast.
+                    if attempts or not _capacity_error(exc) or index + 1 == len(models):
+                        raise
+                    unavailable_models.add(model)
+                    if session.board is not board or board.revision != expected_revision:
+                        raise StaleBoardError("board changed during capacity fallback") from exc
+                    log.warning("diagrammer_capacity_fallback phase=%s from=%s to=%s error=%s",
+                                phase, model, models[index + 1], type(exc).__name__)
+
+        async def json_plan_once(model, plan_messages, tools, max_tokens):
             started = time.monotonic()
             try:
                 result = await llm.run_json_ops(
@@ -551,6 +580,10 @@ class Diagrammer:
             log.info("diagrammer_plan model=%s elapsed_ms=%d ok=true",
                      model, round((time.monotonic() - started) * 1000))
             return result
+
+        async def json_plan(model, plan_messages, tools, max_tokens):
+            return await capacity_call(model, lambda selected: json_plan_once(
+                selected, plan_messages, tools, max_tokens), "json_plan")
 
         try:
             # Try the compact Nano planner only for component facts. All JSON
@@ -585,9 +618,9 @@ class Diagrammer:
                 # after any attempted operation could duplicate side effects.
                 if attempts:
                     raise
-                await llm.run_tools(config.MODEL_SMART, messages, DRAW_TOOLS,
-                                    handlers, max_steps=MAX_OPS, max_tokens=1800,
-                                    extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+                await capacity_call(plan_model, lambda model: llm.run_tools(
+                    model, messages, DRAW_TOOLS, handlers, max_steps=MAX_OPS, max_tokens=1800,
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}}), "native_tools")
             # Native fallback can return prose/no calls. Do not report a fact
             # as drawn if no content operation was accepted by the board.
             if factual_burst and content_applied == 0:
