@@ -474,17 +474,17 @@ Draw tool schemas (also in `PROTOCOL.md` as draw ops):
 
 ## 9. Who does what (3 coding agents, 2 humans)
 
-**Update 14:10: there are only THREE coding agents (Parsh has no Codex; `PARSH-CODEX` does not exist). The split below is the one the agents agreed in AGENT_CHAT.txt at 14:00; it overrides earlier versions of this section.**
+**FINAL split (14:15, set by Preet; overrides every earlier version and chat message). Three agents, split by AREA so nobody waits on anybody: Parsh's agent = the whole call (UI + audio + video). Preet's Claude = the server + the whole whiteboard. Preet's Codex = the mind.**
 
-| Agent id | Human | Tool | Owns | Focus |
+| Agent id | Human | Tool | Owns | Tasks |
 |---|---|---|---|---|
-| `PREET-CLAUDE` | Preet | Claude Code | Server core: `server/app.py`, `session.py`, `mouth.py`, `protocol.py`, `turn_taking.py`, `server/voice/`, `server/agents/responder.py` + its prompt, `server/scripts/`. Browser audio: `web/src/lib/player.ts`, `speech.ts`, `bargeIn.ts`, `echoGuard.ts`. Board extras: `web/src/components/board/` (rich shape renderers), `AgentTree.tsx`, `Scoreboard.tsx`, `TaskPanel.tsx`; v2 types in `web/src/lib/protocol.ts` | Server, audio in the browser (RC-4/5/6/13), rich shapes (RX-8), agent tree (RX-5), tasks (RX-6), scoreboard (RX-7) |
-| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `config.py`, `board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | The mind: Listener, Conductor, Diagrammer (one call per burst, topics, rich drawing choices), Brain (M2), Learning (M3) |
-| `PARSH-CLAUDE` | Parsh | Claude Code | Web scaffold (`package.json`, `vite.config.ts`, `index.html`, `main.tsx`), `App.tsx`, `JoinScreen.tsx`, `MeetingRoom.tsx`, `ParticipantTile.tsx`, `ControlBar.tsx`, `SidePanel.tsx`, `Captions.tsx`, `ConnectionsPanel.tsx`, `Whiteboard.tsx` (tldraw, box/arrow ops, frames, focus), `web/src/lib/ws.ts`, `media.ts`, `mockServer.ts`, `web/src/styles/` | Meet/Zoom-like app, Mac-native look, camera tiles, ws client, mock server, whiteboard core (RX-1/2/3/4/9, RC-1/2/3/7/8/10/11/12/14/15) |
+| `PARSH-CLAUDE` | Parsh | Claude Code | Everything in `web/` EXCEPT the board files listed for PREET-CLAUDE: scaffold, `App.tsx`, `JoinScreen.tsx`, `MeetingRoom.tsx`, `ParticipantTile.tsx`, `ControlBar.tsx`, `SidePanel.tsx`, `Captions.tsx`, `ConnectionsPanel.tsx`, `web/src/lib/ws.ts`, `media.ts`, `speech.ts`, `player.ts`, `bargeIn.ts`, `echoGuard.ts`, `web/src/styles/` | All RC tasks (RC-1 to RC-15), RX-1 (done) |
+| `PREET-CLAUDE` | Preet | Claude Code | Server core (`server/app.py`, `session.py`, `mouth.py`, `protocol.py`, `turn_taking.py`, `server/voice/`, `server/agents/responder.py` + prompt, `server/scripts/`) and the whole board: `web/src/components/Whiteboard.tsx`, `web/src/components/board/`, `AgentTree.tsx`, `TaskPanel.tsx`, `Scoreboard.tsx`, `web/src/lib/mockServer.ts`, v2 types in `web/src/lib/protocol.ts` | PC tasks, RX-2 to RX-9 |
+| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `config.py`, `board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | PX tasks |
 
-**How rich shapes plug in:** PREET-CLAUDE exports `renderRichOp(editor, op, ctx)` from `web/src/components/board/index.ts` (handles add_mermaid, add_chart, add_table, add_code, add_mock, add_sticky, add_text, sketch, update). PARSH-CLAUDE's `Whiteboard.tsx` handles box/arrow/frame/focus/remove/highlight/clear itself and calls `renderRichOp` for everything else.
+**Integration contract (from PARSH-CLAUDE's 14:08 message, keep it):** MeetingRoom renders `<Whiteboard client={ws} onHasContent={(b)=>void} />`, `<AgentTree client={ws}/>`, `<TaskPanel client={ws}/>`. `ws.ts` exports `createClient({room,user})` -> `{ send(msg), on(type, cb) -> unsubscribe, onAny(cb), state }`. With `?mock=1`, ws.ts uses `startMockServer(emit, onClientMessage?) -> stop()` from `lib/mockServer.ts`.
 
-Shared files: `PROTOCOL.md` (change only with agreement in chat from PREET-CLAUDE and PARSH-CLAUDE), `requirements.txt` (PREET-CLAUDE owns), `web/package.json` (PARSH-CLAUDE owns; PREET-CLAUDE may add `mermaid` and a chart library and posts a CHANGE when it does).
+Shared files: `PROTOCOL.md` (agreement from PREET-CLAUDE and PARSH-CLAUDE), `requirements.txt` (PREET-CLAUDE), `web/package.json` (PARSH-CLAUDE; PREET-CLAUDE may add `mermaid` and a chart library and posts a CHANGE).
 
 ### Humans
 - **Parsh:** gets all API keys and credits working first (Crusoe org + API key, $50 credit form, NVIDIA build.nvidia.com key for Magpie), shares keys with Preet privately (NOT in the repo, NOT in chat files), asks Crusoe in Discord #crusoe about VoiceChat once. Then drives the web agents.

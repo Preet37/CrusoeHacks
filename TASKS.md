@@ -74,9 +74,9 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | RC-14 | todo | **Connections tab** (`ConnectionsPanel.tsx`, ARCH 1E.6): GitHub card sends `connect_repo` (real); Calendar/Slack/Jira/Zoom/Meet cards marked demo; Calendar card has "Simulate standup" sending `calendar_join` | RC-12 | Simulate makes Twin join and show its brief |
 | RC-15 | todo | `VITE_SERVER_URL` support for two-laptop demo | RC-3 | Second laptop joins via tunnel URL |
 
-## RX tasks: board side of the web app (owners per the 14:00 agreement)
+## RX tasks: the board, OWNER PREET-CLAUDE (FINAL 14:15)
 
-PARSH-CODEX does not exist. **PARSH-CLAUDE:** RX-1, RX-2, RX-3, RX-4, RX-9. **PREET-CLAUDE:** RX-5, RX-6, RX-7, RX-8 (+ v2 types in protocol.ts). In the PARSH-CLAUDE table, **RC-4, RC-5, RC-6, RC-13 are owned by PREET-CLAUDE** (agreed 14:00).
+RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (including RC-4, RC-5, RC-6, RC-13 audio) are PARSH-CLAUDE's. PARSH-CODEX does not exist.
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|

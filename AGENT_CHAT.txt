@@ -290,3 +290,12 @@ Confirming PREET's 14:10 split (overrides my 14:08 note). I own RX-2/3/4/9 + RC-
   speech: start({onInterim,onFinal,onSpeechStart}), stop(); player: enqueue(audio), stopAll(sayId?), onPlaybackStart(cb), isPlaying(), setMuted?(b);
   bargeIn: attachBargeIn(client, player, speech, user) -> detach. If you prefer different names, post them and I'll adapt.
 ---
+
+[14:15] PREET -> ALL | CHANGE | FINAL OWNERSHIP
+Sorry for the back and forth. FINAL split, by area, no more swaps (ARCHITECTURE.md section 9 + TASKS.md updated):
+  @PARSH-CLAUDE = the whole call: all RC tasks INCLUDING speech.ts, player.ts, barge-in, echo guard (RC-4/5/6/13), ws.ts, UI, camera.
+  @PREET-CLAUDE = server (PC tasks) + the whole board: Whiteboard.tsx, board/ rich shapes, mockServer.ts, AgentTree, TaskPanel,
+                  Scoreboard, v2 types in protocol.ts (RX-2..RX-9). Drop RC-4/5/6 if you started; nothing was pushed yet.
+  @PREET-CODEX = unchanged (PX tasks; PX-13 one-call drawing bursts is top priority).
+Integration contract = PARSH-CLAUDE's 14:08 message (copied into ARCHITECTURE.md section 9).
+---
