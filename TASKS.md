@@ -59,17 +59,17 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
 | RC-1 | doing | `MeetingRoom.tsx` layout per ARCH 1E.1 (Meet/Zoom-like): tile grid (humans + Twin labeled "AI"), whiteboard as main stage when it has content (Whiteboard component from PREET-CLAUDE), captions, control bar, side panel | RX-1 | Page renders with mock data |
-| RC-2 | todo | `styles/theme.css`: Mac-native look per ARCHITECTURE.md section 4 (style only, no coucou assets). Dark and light | RC-1 | Looks like a native Mac app, not a web template |
+| RC-2 | doing | `styles/theme.css`: Mac-native look per ARCHITECTURE.md section 4 (style only, no coucou assets). Dark and light | RC-1 | Looks like a native Mac app, not a web template |
 | RC-3 | doing | `lib/ws.ts`: connect `ws://localhost:8000/ws?room=demo&user=<name>`, auto-reconnect, typed send/receive using `protocol.ts`, event emitter | RX-1 | Connects to server; logs `status` messages |
 | RC-4 | todo | `lib/speech.ts`: Web Speech API wrapper: continuous, interim + final; emits `speechstart` the instant a user starts talking; auto-restarts when Chrome stops it; send `user_text` | RC-3 | Talking shows live captions; finals reach server |
 | RC-5 | todo | `lib/player.ts`: audio queue by `say_id`/`seq`, decode base64 WAV, play in order, `stopAll()` instantly; `data:null` -> `speechSynthesis` fallback; report playback start time for latency logging | RC-3 | Plays server chunks smoothly; stop is instant |
 | RC-6 | todo | Barge-in: on speechstart while playing -> `player.stopAll()` then send `barge_in`; handle `stop_audio` | RC-4, RC-5 | Talking over Twin silences it immediately |
-| RC-7 | todo | `ParticipantTile.tsx`: Twin tile states from `status` (listening, thinking, speaking glow, hand raised); `Captions.tsx` showing transcript with speaker names | RC-3 | States visibly change during a turn |
+| RC-7 | doing | `ParticipantTile.tsx`: Twin tile states from `status` (listening, thinking, speaking glow, hand raised); `Captions.tsx` showing transcript with speaker names | RC-3 | States visibly change during a turn |
 | RC-8 | todo | Push-to-talk button + keyboard shortcut (hold space) sending `push_to_talk` | RC-3 | Holding it makes Twin respond without saying its name |
 | RC-9 | todo | M4: polish pass, demo flow, record 1-minute video | M3 done | Video recorded |
-| RC-10 | todo | **Join screen** (`JoinScreen.tsx`): name, mic + camera preview, Join; room from URL `/room/demo` | RX-1 | Feels like joining a Meet call |
-| RC-11 | todo | **Camera + tiles** (`media.ts`, `ParticipantTile.tsx`): local webcam via getUserMedia; remote humans as avatar tiles; active-speaker ring from `participants`; Twin tile with avatar, AI label, voice ring animation | RC-3 | Speaking person's tile lights up |
-| RC-12 | todo | **Control bar + side panel** (`ControlBar.tsx`, `SidePanel.tsx`): mic, camera, present/whiteboard, captions, raise hand, people, Twin activity (AgentTree), tasks, connections, leave | RC-1 | All buttons work or are clearly disabled |
+| RC-10 | doing | **Join screen** (`JoinScreen.tsx`): name, mic + camera preview, Join; room from URL `/room/demo` | RX-1 | Feels like joining a Meet call |
+| RC-11 | doing | **Camera + tiles** (`media.ts`, `ParticipantTile.tsx`): local webcam via getUserMedia; remote humans as avatar tiles; active-speaker ring from `participants`; Twin tile with avatar, AI label, voice ring animation | RC-3 | Speaking person's tile lights up |
+| RC-12 | doing | **Control bar + side panel** (`ControlBar.tsx`, `SidePanel.tsx`): mic, camera, present/whiteboard, captions, raise hand, people, Twin activity (AgentTree), tasks, connections, leave | RC-1 | All buttons work or are clearly disabled |
 | RC-13 | todo | **Echo guard, browser side** (`echoGuard.ts`, ARCH 1E.3): while Twin plays, ignore interim speech that matches Twin's current sentence; only barge in on non-matching words. Show a "use headphones" hint | RC-6 | Twin through speakers does not interrupt itself |
 | RC-14 | todo | **Connections tab** (`ConnectionsPanel.tsx`, ARCH 1E.6): GitHub card sends `connect_repo` (real); Calendar/Slack/Jira/Zoom/Meet cards marked demo; Calendar card has "Simulate standup" sending `calendar_join` | RC-12 | Simulate makes Twin join and show its brief |
 | RC-15 | todo | `VITE_SERVER_URL` support for two-laptop demo | RC-3 | Second laptop joins via tunnel URL |
@@ -81,8 +81,8 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
 | RX-1 | done | (PARSH-CLAUDE) Scaffold `web/` with Vite + React + TS + tldraw, `lib/protocol.ts` v1 types. **Follow-up for PREET-CLAUDE: add the PROTOCOL v2 types to `protocol.ts`** | - | `npm run dev` serves on 5173 |
-| RX-2 | doing | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
-| RX-3 | doing | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
+| RX-2 | todo | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
+| RX-3 | todo | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
 | RX-4 | todo | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
 | RX-5 | todo | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
 | RX-6 | todo | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
