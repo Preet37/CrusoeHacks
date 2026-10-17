@@ -63,6 +63,12 @@ def repo_ops(code_map, board, topic_id: str | None) -> list[dict]:
     rows = [selected[i:i + 5] for i in range(0, len(selected), 5)]
     height = 880 // len(rows)
     ops = []
+    if not topic_id:
+        # Deterministic overview routing need not create a conversation topic.
+        # Keep all rows inside one overview so the browser fits the full graph.
+        topic_id = f"{prefix}_overview"
+        ops.append({"op": "frame", "id": topic_id, "title": "Repository architecture",
+                    "x": 0, "y": 0, "w": 1000, "h": 1000})
     for row, members in enumerate(rows):
         frame = f"{prefix}_r{row}"
         directories = list(dict.fromkeys(str(PurePosixPath(path).parent) for path in members))

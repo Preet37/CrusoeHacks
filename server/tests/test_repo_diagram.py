@@ -88,3 +88,13 @@ async def test_clear_during_publish_stops_remaining_graph():
     with pytest.raises(StaleBoardError):
         await draw_repo(session, session.board, None, publish, session.board.revision)
     assert not session.board.boxes
+
+
+def test_overview_without_topic_focuses_parent_containing_all_rows():
+    ops = repo_ops(code_map(20), BoardState(), None)
+    parent = ops[0]
+    assert parent['op'] == 'frame'
+    rows = [op for op in ops[1:] if op['op'] == 'frame']
+    assert len(rows) == 4
+    assert all(row['frame'] == parent['id'] for row in rows)
+    assert ops[-1] == {'op': 'focus', 'id': parent['id']}
