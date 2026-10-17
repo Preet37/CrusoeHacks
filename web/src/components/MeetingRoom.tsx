@@ -119,7 +119,17 @@ export default function MeetingRoom({
           <HumanTile key={p.name} name={p.name} speaking={isSpeaking(p)} />
         ),
       )}
-      <TwinTile key="Twin" status={m.twinMuted ? 'listening' : m.twinStatus} muted={m.twinMuted} />
+      <TwinTile
+        key="Twin"
+        status={m.twinMuted ? 'listening' : m.twinStatus}
+        muted={m.twinMuted}
+        sketching={m.sketching.length > 0}
+        handRaisedAt={m.handRaisedAt}
+        onLetSpeak={() =>
+          // Turn-taking answers when addressed by name, which also ends a "not now" hold.
+          client.send({ type: 'user_text', speaker: user, text: 'Twin, go ahead.', final: true, ts: Date.now() })
+        }
+      />
     </>
   )
 

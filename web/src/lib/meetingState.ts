@@ -42,6 +42,10 @@ export interface MeetingState {
   topic: Topic | null
   brief: Brief | null
   lastError: string | null
+  /** Diagrammer jobs currently running (event ids) -> Twin is sketching. */
+  sketching: string[]
+  /** When Twin's status became hand_raised (ms), else null. */
+  handRaisedAt: number | null
 }
 
 const MAX_LINES = 200
@@ -62,6 +66,8 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
     topic: null,
     brief: null,
     lastError: null,
+    sketching: [],
+    handRaisedAt: null,
   }))
 
   useEffect(() => {
@@ -71,9 +77,24 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
     const off = client.onAny((m: AnyServerMessage) => {
       const msg = m as Record<string, unknown> & { type: string }
       switch (msg.type) {
-        case 'status':
-          set((p) => ({ ...p, twinStatus: msg.state as StatusState }))
+        case 'status': {
+          const st = msg.state as StatusState
+          set((p) => ({
+            ...p,
+            twinStatus: st,
+            handRaisedAt: st === 'hand_raised' ? (p.twinStatus === 'hand_raised' ? p.handRaisedAt : Date.now()) : null,
+          }))
           break
+        }
+        case 'agent_event': {
+          if (!/diagram/i.test(String(msg.agent))) break
+          const id = String(msg.event_id)
+          set((p) => {
+            const rest = p.sketching.filter((x) => x !== id)
+            return { ...p, sketching: msg.state === 'started' ? [...rest, id] : rest }
+          })
+          break
+        }
         case 'transcript': {
           const speaker = String(msg.speaker)
           // ts = local receive time, so caption timing never depends on the server clock.

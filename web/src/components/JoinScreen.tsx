@@ -5,6 +5,7 @@ import { TwinAvatar } from './ParticipantTile'
 
 export interface JoinChoice {
   name: string
+  room: string
   cam: boolean
   mic: boolean
 }
@@ -20,6 +21,19 @@ function savedName() {
 
 export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c: JoinChoice) => void }) {
   const [name, setName] = useState(savedName)
+  const [roomName, setRoomName] = useState(room)
+  const [copied, setCopied] = useState(false)
+  const cleanRoom = roomName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'demo'
+  const inviteLink = `${location.origin}/room/${encodeURIComponent(cleanRoom)}${location.search}`
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+    } catch {
+      window.prompt('Copy this invite link', inviteLink)
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
   const media = useLocalMedia({ cam: true, mic: true })
   const videoRef = useVideoRef(media.stream)
   const hasVideo = media.camOn && !!media.stream?.getVideoTracks().length
@@ -34,7 +48,7 @@ export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c:
     }
     // Release devices; the meeting room acquires its own.
     media.stream?.getTracks().forEach((t) => t.stop())
-    onJoin({ name: n, cam: media.camOn, mic: media.micOn })
+    onJoin({ name: n, room: cleanRoom, cam: media.camOn, mic: media.micOn })
   }
 
   return (
@@ -70,9 +84,18 @@ export default function JoinScreen({ room, onJoin }: { room: string; onJoin: (c:
         </div>
         <div className="join-side">
           <h1>Ready to join?</h1>
-          <p>
-            Room <b>{room}</b>
-          </p>
+          <div className="row" style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="field"
+              style={{ flex: 1 }}
+              aria-label="Room"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+            />
+            <button className="pill" onClick={copyInvite} title={inviteLink}>
+              {copied ? 'Copied ✓' : 'Copy invite link'}
+            </button>
+          </div>
           <div className="twin-chip">
             <TwinAvatar />
             <div>
