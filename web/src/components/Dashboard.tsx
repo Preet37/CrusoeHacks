@@ -296,7 +296,7 @@ export default function Dashboard({
             {info?.repo_url ? (
               <div className="repo">
                 <span className="logo">GH</span>
-                <a href={info.repo_url} target="_blank" rel="noreferrer">{info.repo_url.replace('https://github.com/', '')}</a>
+                <a href={info.repo_url} target="_blank" rel="noreferrer">{info.repo_url.replace('https://github.com/', '').replace(/\.git$/, '')}</a>
                 <span className="tag live">REMEMBERED</span>
               </div>
             ) : (
