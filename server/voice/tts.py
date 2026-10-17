@@ -27,12 +27,12 @@ MAGPIE_SYNTH_URL = f"{MAGPIE_BASE}/v1/audio/synthesize"
 MAGPIE_VOICES_URL = f"{MAGPIE_BASE}/v1/audio/list_voices"
 VOICE = os.getenv("TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")
 # Free-tier Magpie rate-limits bursts (HTTP 429): retry briefly, then fall back to data:null.
-RETRY_429_BACKOFF_S: tuple[float, ...] = (0.4, 0.9)
+RETRY_429_BACKOFF_S: tuple[float, ...] = (0.4,)
 CACHE_SIZE = 64  # repeated phrases (acks, greetings) skip the network
 _CACHE: "OrderedDict[tuple[str, str], bytes]" = OrderedDict()
 LANGUAGE = "en-US"
 SAMPLE_RATE = 44100
-TTS_TIMEOUT = 10.0
+TTS_TIMEOUT = float(os.getenv("TTS_TIMEOUT_S", "4.0"))  # slow Magpie -> data:null -> browser voice, never silence
 TTS_CONCURRENCY = 2
 
 Emit = Callable[[dict], Awaitable[None]]
