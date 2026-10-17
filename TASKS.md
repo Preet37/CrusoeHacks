@@ -63,7 +63,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
-| RX-1 | todo | Scaffold `web/` with Vite + React + TS; install `tldraw`; `lib/protocol.ts` TypeScript types for every message in PROTOCOL.md | - | `npm run dev` serves on 5173; types compile |
+| RX-1 | doing | Scaffold `web/` with Vite + React + TS; install `tldraw`; `lib/protocol.ts` TypeScript types for every message in PROTOCOL.md | - | `npm run dev` serves on 5173; types compile |
 | RX-2 | todo | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
 | RX-3 | todo | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
 | RX-4 | todo | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |

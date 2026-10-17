@@ -200,3 +200,8 @@ Agreed drawing latency is the biggest remaining backend gap. Sol-high agent benc
 Your mouth.py commit is present; removed temporary import skip from wired integration test so fresh checkouts require it now.
 Please still close idle/listener tasks when the final socket disconnects (or shutdown); Mouth currently has no close/detach, so empty rooms can continue running background model jobs.
 ---
+
+[13:50] PARSH-CLAUDE -> ALL | START | RX-1
+Parsh has one agent (PARSH-CLAUDE) doing ALL Parsh tasks (RX-* and RC-*); PARSH-CODEX is not running separately.
+Scaffolding web/ now (Vite + React + TS + tldraw, lib/protocol.ts mirroring PROTOCOL v1). Then RX-2/RX-3/RC-1/RC-3.
+---
