@@ -10,11 +10,109 @@ import ast
 from collections import deque
 import os
 from pathlib import Path
+import posixpath
+import re
 import subprocess
 from typing import Any
 
 
 _SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "dist", "build"}
+_JS_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx")
+_JS_SYMBOL = re.compile(r"\b(?:async\s+)?(?:function|class|interface|type|enum|const|let|var)\s+([A-Za-z_$][\w$]*)")
+
+
+def _js_tokens(source: str) -> list[tuple[str, str]]:
+    """Lex enough JS/TS to distinguish literal imports from comments/strings."""
+    tokens = []
+    i = 0
+    while i < len(source):
+        char = source[i]
+        if char.isspace():
+            i += 1
+        elif source.startswith("//", i):
+            end = source.find("\n", i + 2)
+            i = len(source) if end < 0 else end + 1
+        elif source.startswith("/*", i):
+            end = source.find("*/", i + 2)
+            i = len(source) if end < 0 else end + 2
+        elif char in "\"'`":
+            quote = char
+            start = i + 1
+            i = start
+            while i < len(source):
+                if source[i] == "\\":
+                    i += 2
+                elif source[i] == quote:
+                    break
+                else:
+                    i += 1
+            value = source[start:i]
+            tokens.append(("string" if quote != "`" and "\\" not in value else "other", value))
+            i += 1
+        elif char.isalpha() or char in "_$":
+            start = i
+            i += 1
+            while i < len(source) and (source[i].isalnum() or source[i] in "_$"):
+                i += 1
+            tokens.append(("name", source[start:i]))
+        else:
+            tokens.append(("punct", char))
+            i += 1
+    return tokens
+
+
+def _js_info(source: str) -> tuple[list[str], set[str]]:
+    tokens = _js_tokens(source)
+    imports: set[str] = set()
+    for index, (kind, value) in enumerate(tokens):
+        if kind != "name" or value not in {"import", "export", "require"}:
+            continue
+        if index and tokens[index - 1] == ("punct", "."):
+            continue
+        if value == "require" or (value == "import" and index + 1 < len(tokens)
+                                   and tokens[index + 1] == ("punct", "(")):
+            if (index + 2 < len(tokens) and tokens[index + 1] == ("punct", "(")
+                    and tokens[index + 2][0] == "string"):
+                imports.add(tokens[index + 2][1])
+            continue
+        if value == "import" and index + 1 < len(tokens) and tokens[index + 1][0] == "string":
+            imports.add(tokens[index + 1][1])
+            continue
+        for position in range(index + 1, min(index + 25, len(tokens))):
+            candidate = tokens[position]
+            if candidate == ("punct", ";"):
+                break
+            if candidate == ("name", "from"):
+                if position + 1 < len(tokens) and tokens[position + 1][0] == "string":
+                    imports.add(tokens[position + 1][1])
+                break
+    # Symbol extraction uses only lexical names and punctuation, so words in
+    # comments or string literals cannot become fabricated symbols.
+    code = " ".join(value if kind != "string" else " " for kind, value in tokens)
+    symbols = sorted(set(_JS_SYMBOL.findall(code)))
+    return symbols, {name for name in imports if name.startswith(".")}
+
+
+def _resolve_js_import(source: str, literal: str, indexed: set[str]) -> str | None:
+    if not literal.startswith(".") or "\\" in literal or "?" in literal or "#" in literal:
+        return None
+    parent = posixpath.dirname(source)
+    base = posixpath.normpath(posixpath.join(parent, literal))
+    if base == ".." or base.startswith("../") or base.startswith("/"):
+        return None
+    extension = posixpath.splitext(base)[1]
+    if extension in _JS_EXTENSIONS:
+        if base in indexed:
+            return base
+        # TypeScript sources often write the emitted .js import path.
+        candidates = [base[:-3] + suffix for suffix in (".ts", ".tsx")]
+    elif extension:
+        return None
+    else:
+        candidates = [base + suffix for suffix in _JS_EXTENSIONS]
+        candidates += [base + "/index" + suffix for suffix in _JS_EXTENSIONS]
+    matches = [candidate for candidate in candidates if candidate in indexed]
+    return matches[0] if len(matches) == 1 else None
 
 
 class CodeMap:
@@ -95,13 +193,14 @@ class CodeMap:
             raise ValueError(f"code root is not a directory: {self.root}")
         self.files = {}
         pending_imports: dict[str, set[str]] = {}
+        pending_js_imports: dict[str, set[str]] = {}
         paths: list[Path] = []
         for directory, subdirs, filenames in os.walk(self.root, followlinks=False):
             subdirs[:] = sorted(name for name in subdirs
                                 if name not in _SKIP_DIRS and not name.startswith(".")
                                 and not (Path(directory) / name).is_symlink())
             for filename in sorted(filenames):
-                if filename.endswith(".py"):
+                if filename.endswith((".py",) + _JS_EXTENSIONS):
                     paths.append(Path(directory) / filename)
                     if len(paths) >= self.max_files:
                         break
@@ -113,15 +212,20 @@ class CodeMap:
             rel = path.relative_to(self.root).as_posix()
             module = self._module(rel)
             source = path.read_text(encoding="utf-8", errors="replace")
-            try:
-                tree = ast.parse(source, filename=rel)
-                symbols = sorted(node.name for node in tree.body
-                                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)))
-                summary = (ast.get_docstring(tree) or "").splitlines()[:1]
-                pending_imports[rel] = self._import_names(tree, module, path.name == "__init__.py")
-            except SyntaxError:
-                symbols, summary = [], []
-                pending_imports[rel] = set()
+            if path.suffix == ".py":
+                try:
+                    tree = ast.parse(source, filename=rel)
+                    symbols = sorted(node.name for node in tree.body
+                                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)))
+                    summary = (ast.get_docstring(tree) or "").splitlines()[:1]
+                    pending_imports[rel] = self._import_names(tree, module, path.name == "__init__.py")
+                except SyntaxError:
+                    symbols, summary = [], []
+                    pending_imports[rel] = set()
+            else:
+                symbols, names = _js_info(source)
+                pending_js_imports[rel] = names
+                summary = [f"{'TypeScript' if path.suffix in ('.ts', '.tsx') else 'JavaScript'} source {rel}"]
             self.files[rel] = {
                 "path": rel,
                 "module": module,
@@ -131,9 +235,13 @@ class CodeMap:
                 "owner": None,
                 "owners": [],
                 "summary": (summary[0].strip()[:180] if summary else f"Python module {module or rel}"),
-                "is_test": "tests" in Path(rel).parts or Path(rel).name.startswith("test_"),
+                "is_test": ("tests" in Path(rel).parts or Path(rel).name.startswith("test_")
+                            or Path(rel).name.endswith((".test.ts", ".test.tsx", ".test.js",
+                                                        ".test.jsx", ".spec.ts", ".spec.tsx",
+                                                        ".spec.js", ".spec.jsx"))),
             }
-        by_module = {record["module"]: path for path, record in self.files.items() if record["module"]}
+        by_module = {record["module"]: path for path, record in self.files.items()
+                     if record["module"] and path.endswith(".py")}
         for path, names in pending_imports.items():
             imports: set[str] = set()
             for name in names:
@@ -146,6 +254,14 @@ class CodeMap:
                         if target != path:
                             imports.add(target)
                         break
+            self.files[path]["imports"] = sorted(imports)
+            for target in imports:
+                self.files[target]["imported_by"].append(path)
+        indexed = set(self.files)
+        for path, names in pending_js_imports.items():
+            imports = {target for literal in names
+                       if (target := _resolve_js_import(path, literal, indexed)) is not None
+                       and target != path}
             self.files[path]["imports"] = sorted(imports)
             for target in imports:
                 self.files[target]["imported_by"].append(path)

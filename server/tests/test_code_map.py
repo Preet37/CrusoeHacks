@@ -66,3 +66,52 @@ def test_fake_history_has_three_owners_without_touching_checkout(tmp_path: Path)
         "Avery Chen", "Morgan Patel", "Riley Okafor",
     }
     assert not (DEMO / ".git").exists()
+
+
+def test_typescript_javascript_literal_relative_imports_and_impact(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "parts").mkdir()
+    (tmp_path / "src" / "parts" / "index.ts").write_text(
+        "export interface Part { id: string }\nexport const wing = 1;\n")
+    (tmp_path / "src" / "engine.ts").write_text("export function buildEngine() {}\n")
+    (tmp_path / "src" / "plane.tsx").write_text(
+        "import { wing } from './parts';\n"
+        "import { buildEngine } from './engine.js';\n"
+        "// import fake from './missing';\n"
+        "const stringOnly = \"require('./also_missing')\";\n"
+        "export function Plane() { return wing; }\n")
+    (tmp_path / "src" / "entry.jsx").write_text(
+        "export { Plane } from './plane';\nconst engine = require('./engine');\n")
+    (tmp_path / "src" / "plane.test.ts").write_text("import './plane';\n")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "bad.ts").write_text("export const bad = 1\n")
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "bad.js").write_text("export const bad = 1\n")
+    code_map = CodeMap(tmp_path).build()
+    assert "src/parts/index.ts" in code_map.files
+    assert "Plane" in code_map.files["src/plane.tsx"]["symbols"]
+    assert set(code_map.files["src/plane.tsx"]["imports"]) == {
+        "src/parts/index.ts", "src/engine.ts"}
+    assert set(code_map.files["src/entry.jsx"]["imports"]) == {
+        "src/plane.tsx", "src/engine.ts"}
+    assert code_map.files["src/plane.test.ts"]["is_test"] is True
+    assert "node_modules/bad.ts" not in code_map.files
+    assert "build/bad.js" not in code_map.files
+    impacted = {item["path"]: item["distance"] for item in code_map.impact("src/engine.ts")}
+    assert impacted["src/plane.tsx"] == 1
+    assert impacted["src/entry.jsx"] == 1
+    assert impacted["src/plane.test.ts"] == 2
+    assert "buildEngine" in code_map.resolve("buildEngine") or code_map.resolve("buildEngine") == ["src/engine.ts"]
+    assert "export function Plane" in code_map.read_file("src/plane.tsx", max_chars=1000)
+
+
+def test_js_import_resolution_skips_ambiguous_or_nonliteral_targets(tmp_path: Path) -> None:
+    (tmp_path / "a.ts").write_text("export const a = 1\n")
+    (tmp_path / "a.js").write_text("export const a = 2\n")
+    (tmp_path / "caller.ts").write_text(
+        "import { a } from './a';\n"
+        "const dynamic = import(variable);\n"
+        "import external from 'package';\n"
+        "/* import hidden from './a.js'; */\n")
+    code_map = CodeMap(tmp_path).build()
+    assert code_map.files["caller.ts"]["imports"] == []
