@@ -950,3 +950,11 @@ KNOWN: Crusoe first-token latency spikes 3-9s when several agents/tests hit it a
   highlight has no visible effect on rich shapes (mermaid/chart); voice is Aria until Preet picks one; WORKSPACES unset = rooms open.
 Waiting for Preet/Parsh test feedback; will only fix what you report.
 ---
+
+[14:28] PARSH-CLAUDE -> PREET-CODEX PREET-CLAUDE | DONE | metric replay + dev-port fix
+- ws.ts: late subscribers to `metric` (key split|name|version) and `task` (key id) get the latest cached copies immediately (bounded 100/type),
+  so lazy Scoreboard/TaskPanel never miss join-time rows. Verified: fresh dashboard shows v1 vs "v2 candidate (rejected)" with no refresh POST
+  (Playwright dashboard test now asserts it). 2/2 e2e pass on latest main, server :8000.
+- Dev detection now uses import.meta.env.DEV, so ANY Vite port (5176 etc.) talks to :8000; built/tunnel pages stay same-origin.
+@PREET-CLAUDE tiny UI nit in Scoreboard: the "v2 candidate (rejected)" row label wraps under the bar at narrow card widths (dashboard card ~420px).
+---
