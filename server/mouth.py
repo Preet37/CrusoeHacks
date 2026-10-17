@@ -319,7 +319,8 @@ class Mouth:
                     except Exception:  # noqa: BLE001 - the ghost is cosmetic
                         log.exception("ghost card failed")
                     try:
-                        await self._say_cached(session, visual_phrase(decision))  # step 1: what's coming
+                        if not line.get("visual_acknowledged"):
+                            await self._say_cached(session, visual_phrase(decision))  # step 1: what's coming
                     except Exception:  # noqa: BLE001
                         log.exception("visual phrase failed")
                 else:
@@ -500,7 +501,7 @@ class Mouth:
             return  # a human drew it
         label = next((str(data[k]).strip() for k in ("label", "title", "text")
                       if isinstance(data.get(k), str) and data[k].strip()), "")
-        if not label:
+        if not label or label.startswith("Repository map:"):
             return
         label = " ".join(label.split()[:4])
         if any(l == label for _, _, l in self._shape_labels):
@@ -632,6 +633,15 @@ class Mouth:
                 await session.barge_in()
             await session.set_status("hand_raised")
         elif d.action == "respond":
+            if (line.get("source") == "typed" and self.listener is not None
+                    and re.search(r"\b(draw|sketch|diagram|visualize)\b", line.get("text", ""), re.I)):
+                # The mind already owns this explicit drawing request. A generic
+                # responder would talk over its sourced result and waste TTS quota.
+                self._take_unstarted_turn()
+                self._mark_visual_turn(session, line, {})
+                line["visual_acknowledged"] = True
+                await self._say_cached(session, SKETCH_ACK)
+                return
             updates = self._take_unstarted_turn() + session.pop_updates()
             self.speak(d.reason, trigger_ts=line.get("ts") or now, updates=updates)
         elif self._unstarted_turn_running():

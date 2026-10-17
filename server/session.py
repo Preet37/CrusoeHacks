@@ -610,6 +610,8 @@ class Session:
                 if not text:
                     return
                 line = await self.add_line(msg.speaker or user, text, msg.ts)
+                if msg.source:
+                    line["source"] = msg.source
                 self._run_final_text_hooks(line)
                 self.respond_hook_check(line)
         elif t == "barge_in":

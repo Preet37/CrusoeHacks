@@ -193,3 +193,35 @@ def test_empty_frames_do_not_count_as_drawn():
     s = Session("frames")
     s.board.apply({"op": "frame", "id": "t_x", "title": "Decisions", "x": 0, "y": 0, "w": 1000, "h": 1000})
     assert mouth.drop_false_draw_claims(s, ["Got the board set up with architecture."]) == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_typed_diagram_acknowledges_without_generic_responder(monkeypatch):
+    class Listener:
+        async def close(self):
+            pass
+    monkeypatch.setattr(mouth, '_make_listener', lambda s: Listener())
+    s = Session('typed-spec-ack')
+    m = mouth.attach(s)
+    phrases = []
+    async def ack(session, text):
+        phrases.append(text)
+    monkeypatch.setattr(m, '_say_cached', ack)
+    line = {'speaker': 'Preet', 'text': 'Twin, draw the connected repository architecture', 'source': 'typed'}
+    await m.on_final(s, line)
+    assert phrases == [mouth.SKETCH_ACK]
+    assert line['visual_acknowledged'] is True
+    assert 'responder' not in s._tasks
+    assert m._visual_turn['addressed'] is True
+    await mouth.detach(s)
+
+
+@pytest.mark.asyncio
+async def test_repository_legend_is_not_narrated_as_component(monkeypatch):
+    monkeypatch.setattr(mouth, '_make_listener', lambda s: None)
+    s = Session('labels')
+    m = mouth.attach(s)
+    m._collect_label({'op': 'add_text', 'id': 'repo_legend', 'text': 'Repository map: 20 of 169 indexed files.', 'x': 30})
+    m._collect_label({'op': 'add_box', 'id': 'repo_file', 'label': 'lib/geometryAudit.ts', 'x': 40})
+    assert m.narration_labels() == ['lib/geometryAudit.ts']
+    await mouth.detach(s)
