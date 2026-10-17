@@ -123,6 +123,8 @@ export default function MeetingRoom({
   const [toast, setToast] = useState<string | null>(null)
   useEffect(() => {
     if (!m.lastError) return
+    // Older servers don't know set_mode yet; that's not worth a toast.
+    if (/set_mode/.test(m.lastError)) return
     setToast(m.lastError)
     const id = window.setTimeout(() => setToast(null), 5000)
     return () => window.clearTimeout(id)

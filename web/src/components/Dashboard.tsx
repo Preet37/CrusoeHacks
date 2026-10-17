@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { meetingHistory, scopedRoom, signOut, slug, type WorkspaceSession } from '../lib/workspace'
 import { createClient, serverHttpBase, type TwinClient } from '../lib/ws'
 import { Scoreboard } from './optional'
+import PermissionsCard from './PermissionsCard'
 import { TwinAvatar } from './ParticipantTile'
 
 interface CalMeeting {
@@ -317,6 +318,8 @@ export default function Dashboard({
             </div>
             {repoStatus && <div className="hint" style={{ marginTop: 6 }}>{repoStatus}</div>}
           </section>
+
+          <PermissionsCard session={session} />
 
           <section className="dash-card glass">
             <h2>Twin's learning</h2>

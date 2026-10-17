@@ -443,3 +443,5 @@ input { font: inherit; }
 .twin-mode { align-self: center; }
 .twin-mode button { height: 28px; }
 @media (max-width: 1100px) { .twin-mode button { padding: 0 7px; font-size: 11px; } }
+.perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.perm-row:first-of-type { border-top: 0; }
