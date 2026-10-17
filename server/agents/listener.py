@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from collections import deque
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from agents.diagrammer import StaleBoardError, emit_event
 log = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "listener.md"
 MOMENT_TYPES = {"system_fact", "decision", "question", "claim", "task"}
+_RENAME = re.compile(r"\brename\s+([a-z][a-z0-9_-]*)\s+to\s+(.+?)[.!?]?\s*$", re.I)
 
 
 def _parse_moments(raw: str) -> list[dict]:
@@ -124,8 +126,30 @@ class Listener:
                             "previous_moments": list(self._previous),
                         })},
                     ]
-                    moments = _parse_moments(await llm.chat(config.MODEL_FAST, messages,
-                                                            max_tokens=800))
+                    raw = await llm.chat(config.MODEL_FAST, messages, max_tokens=1600)
+                    try:
+                        moments = _parse_moments(raw)
+                    except (ValueError, json.JSONDecodeError):
+                        # A reasoning-heavy Nano reply can hit its output cap
+                        # mid-JSON. Retry once only when parsing actually fails.
+                        repaired = await llm.chat(config.MODEL_FAST, messages + [
+                            {"role": "assistant", "content": raw},
+                            {"role": "user", "content": "Return the complete JSON moment array only."},
+                        ], max_tokens=2400)
+                        moments = _parse_moments(repaired)
+                    # Short imperative edits are often classified as tasks by
+                    # Nano. If the named component is already on this board,
+                    # make the requested diagram change a routed system fact.
+                    for line in lines:
+                        match = _RENAME.search(line["text"].strip())
+                        if match is None or match.group(1).lower() not in self.session.board.boxes:
+                            continue
+                        source, target = match.group(1).lower(), match.group(2).strip()
+                        if not any(m["type"] == "system_fact" and source in m["text"].lower()
+                                   and target.lower() in m["text"].lower() for m in moments):
+                            moments.append({"type": "system_fact",
+                                            "text": f"Rename {source} to {target}",
+                                            "entities": [source]})
                     seen = {(m["type"], m["text"].casefold()) for m in self._previous}
                     moments = [m for m in moments if (m["type"], m["text"].casefold()) not in seen]
                     if moments:

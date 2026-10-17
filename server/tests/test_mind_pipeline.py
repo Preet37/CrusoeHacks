@@ -124,6 +124,40 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual([line["text"] for line in calls[0]], ["the web app", "calls auth"])
 
+    async def test_explicit_component_rename_routes_even_if_model_calls_it_a_task(self):
+        session = FakeSession()
+        session.board.apply({"op": "add_box", "id": "auth", "label": "Auth", "x": 400,
+                             "y": 300, "kind": "service"})
+
+        async def chat(*args, **kw):
+            return '[{"type":"task","text":"rename auth to Auth (sessions)","entities":["auth"]}]'
+
+        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+            await handlers["rename"](id="auth", label="Auth (sessions)")
+
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+            listener = Listener(session, debounce_seconds=0)
+            listener.submit("Preet", "rename auth to Auth (sessions)")
+            await asyncio.wait_for(listener.wait_idle(), 1)
+        self.assertEqual(session.board.boxes["auth"]["label"], "Auth (sessions)")
+        self.assertEqual(len([m for m in session.messages if m["type"] == "draw"]), 1)
+
+    async def test_listener_retries_truncated_json_once(self):
+        session = FakeSession()
+        output = iter(['[{"type":"system_fact"', "[]"])
+        tokens = []
+
+        async def chat(model, messages, **kw):
+            tokens.append(kw["max_tokens"])
+            return next(output)
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, debounce_seconds=0)
+            listener.submit("Preet", "hello")
+            await asyncio.wait_for(listener.wait_idle(), 1)
+        self.assertEqual(tokens, [1600, 2400])
+        self.assertTrue(any(m.get("state") == "done" for m in session.messages))
+
     async def test_noop_does_not_broadcast_or_queue_update(self):
         session = FakeSession()
         session.board.apply({"op": "add_box", "id": "auth", "label": "Auth", "x": 400,
