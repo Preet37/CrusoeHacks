@@ -186,3 +186,35 @@ All v1 messages are unchanged. Every new draw op below may carry an optional `"f
 - `shape`: `box | cylinder | sphere | cone | torus | plane`. `pos`/`rot`(radians)/`scale` are `[x,y,z]`. `color` hex. `label` optional (shown as a floating tag). Max 60 objects.
 - `update` with the same id replaces the scene. `remove`, `highlight`, `focus` work as for other shapes.
 - Browser renders with Three.js (`@react-three/fiber` + `@react-three/drei`), orbit by drag, auto-rotate if set. On render failure send `draw_error`.
+
+## v2.2 PROPOSED (Preet, 13:55, after the first live test). PREET-CLAUDE + PARSH-CLAUDE: ack in chat, then bump PROTOCOL_VERSION to 2.2
+
+(Examples are fenced `json-proposed` so the round-trip test skips them; switch the fence to `json` when the ops are implemented.)
+
+Goal: every person in the room sees and can do everything (shared board, shared screen), Twin can mark up a shared screen, and meeting output becomes tickets.
+
+**Humans draw too (Browser -> Server -> everyone).** A browser sends the SAME `draw` ops Twin uses, plus `by`. Server validates with the same rules,
+applies to BoardState (so Twin sees human shapes), and broadcasts to every socket in the room except the sender. Twin's ops carry `"by":"Twin"`.
+```json-proposed
+{"type":"draw","op":"add_box","id":"h_preet_1","label":"Payments","x":300,"y":200,"by":"Preet"}
+```
+
+**Screen share as frames (no WebRTC needed).** Sharer sends a JPEG about once per second (max width 1280, max ~200 KB); server keeps the latest
+frame per room and relays it to the other sockets. Twin's vision reads the latest frame. `screen_stop` ends it.
+```json-proposed
+{"type":"screen_frame","user":"Preet","jpeg":"<base64>","w":1280,"h":800,"ts":1760731200000}
+{"type":"screen_stop","user":"Preet"}
+```
+
+**Twin marks up the shared screen (Server -> Browser).** Coordinates are 0..1 of the frame, so they fit any tile size. Drawn as an overlay on the
+screen-share stage, fades after `ttl_s` unless pinned. `kind`: `box | arrow | text | highlight | circle`.
+```json-proposed
+{"type":"annotate","target":"screen","user":"Preet","id":"a1","ttl_s":20,"items":[{"kind":"box","x":0.12,"y":0.30,"w":0.25,"h":0.08,"text":"this call is N+1"},{"kind":"arrow","x":0.40,"y":0.34,"x2":0.55,"y2":0.50}]}
+```
+
+**Tickets from the meeting (Server -> Browser), plus where they went.** `status`: `draft | sent | in_progress | done`. `links` filled once pushed.
+```json-proposed
+{"type":"ticket","id":"T-12","title":"Add Redis session store","body":"Decided in standup: auth keeps sessions in Redis.","owner":"Parsh","topic":"t_auth","source":"meeting","status":"sent","links":{"jira":null,"slack":null,"agent":null}}
+{"type":"ticket_action","id":"T-12","action":"send_to_agent"}
+```
+`ticket_action` (Browser -> Server) `action`: `approve | push_jira | post_slack | send_to_agent | dismiss`.

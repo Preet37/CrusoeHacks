@@ -124,3 +124,38 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 - [ ] M3 learns, scoreboard shows v1 vs latest
 - [ ] M4 demo rehearsed twice, video recorded
 - [ ] Submitted by 5:00 PM
+
+---
+
+## NEW 13:55: from Preet's first live test. **DEADLINE 3:00 PM: freeze 2:30, video 2:45. Only P0 + minimal M3; P1/P2 are CUT unless done early**
+
+What Preet saw: transcription works, but Twin never answered or spoke; drawing is far too slow; Share screen just opens the whiteboard;
+the raised hand means nothing to a user; only Twin can draw. Target: Twin behaves like a real teammate in the call, draws instantly,
+everyone in the room sees and can do everything, and the meeting turns into tickets that flow to Jira / Slack / a coding agent.
+Protocol additions are in PROTOCOL.md "v2.2 PROPOSED" (ack in chat first).
+
+| id | owner | pri | status | task | check (done when) |
+|---|---|---|---|---|---|
+| PX-19 | PREET-CODEX | P0 | todo | **Speed.** Listener with reasoning OFF (try `extra_body={"chat_template_kwargs":{"enable_thinking":false}}`, else `/no_think`; verify live on Crusoe). Simple box/arrow bursts on the fast model, Super only for rich visuals. Retry once when a batch has 0 content ops (Parsh 15:48 bug). Fix rich routing ("routed 0 system facts" for sequence/chart/mock) | `e2e_text.py --strict` steps 1-8 pass; Listener p50 under 1 s in latency.jsonl |
+| PC-20 | PREET-CLAUDE | P0 | todo | **Instant drawing.** Ghost "sketching..." card at the focus spot within 300 ms of a visual line (JEV `wants_visual`); stream Diagrammer ops and apply each op as soon as it parses; log `first_shape_ms` | First shape within 1.5 s of the sentence ending, full burst within 4 s (latency.jsonl) |
+| PC-19 | PREET-CLAUDE | P0 | todo | **Real teammate turn-taking.** Also answer when JEV says `addressed` without the name (e.g. "what do you think about Redis here?" after a 1.2 s pause); never start while a human is mid-sentence (interim captions count as speaking); after "not now", speak once the room is quiet for 2 s if still relevant, else drop it. Barge-in stays instant | Unnamed question gets a spoken answer; talking over Twin stops it; Twin never starts over someone |
+| RC-19 | PARSH-CLAUDE | P0 | todo | **Twin tile says what it means.** Replace the bare hand with pills: "Has something to add" (click = let Twin speak now), "Quiet for 30 s" countdown, speaking ring, thinking shimmer, "Sketching..." while drawing | A first-time user understands Twin's state without explanation |
+| RC-18 | PARSH-CLAUDE | P0 | todo | **Real screen share.** Share -> `getDisplayMedia`; stage switches between "Screen" and "Whiteboard" tabs (sharing must NOT open the board); send `screen_frame` about 1 fps (canvas -> JPEG 0.6, max 1280 wide); viewers render the latest frame; overlay `annotate` items (0..1 coords) | Tab A shares a window, tab B sees it update; a mock `annotate` box lands on the right spot |
+| PC-21 | PREET-CLAUDE | P0 | todo | **Everyone can draw.** Whiteboard sends human tldraw edits as `draw` ops with `by`; server validates, applies to BoardState, broadcasts; Twin's summaries include human shapes. Server keeps `screen_frame` latest-per-room and relays it | Draw in tab A, appears in tab B within 300 ms; "Twin, what did I just add?" names it |
+| RC-20 | PARSH-CLAUDE | P0 | todo | **Two-laptop check.** Every person's tile, speaking indicator and captions show for everyone in the room (README "Two laptops"). Real cross-laptop video is NOT in scope today (avatar + live caption instead) | Preet and Parsh on two laptops see each other and the same board |
+| PX-20 | PREET-CODEX | P1 | todo | `agents/screen_vision.py`: `analyze(jpeg, question, transcript) -> {"say", "items"}` on MODEL_COACH (Nemotron-3.5-Super-VL), items in 0..1 coords | Unit test with a saved screenshot returns a box near the right spot |
+| PC-22 | PREET-CLAUDE | P1 | todo | **Twin marks up the shared screen.** When someone asks Twin about the screen while sharing, call PX-20 with the latest frame, send `annotate` + speak the answer | Share a code editor, "Twin, where's the bug?" -> box + arrow over the screen in about 4 s |
+| PX-21 | PREET-CODEX | P1 | todo | **Ticket writer.** task_planner turns decisions/action items + board frames (diagrams, mermaid) into tickets: title, body, owner (from speaker), acceptance check, `agent_prompt` (ready-to-run prompt for a coding agent) | A 2-minute meeting yields 2-4 sensible tickets |
+| PC-23 | PREET-CLAUDE | P1 | todo | **Autoworker pipeline.** Emit `ticket`; handle `ticket_action`: push_jira (Jira Cloud REST, `JIRA_*` env), post_slack (`SLACK_WEBHOOK_URL`), send_to_agent (GitHub issue on the connected repo with the agent prompt, `GITHUB_TOKEN`). No key = button disabled with "connect Jira" etc.; never fake success. `GET /tickets`, `GET /meetings` for the dashboard | Ticket created in the call shows up in real Jira and Slack within seconds |
+| RC-21 | PARSH-CLAUDE | P1 | todo | **Dashboard** at `/dashboard` (outside the call), same look as the app: Upcoming meetings with auto-join toggles (`/calendar`), Connections (GitHub repo connect via `connect_repo` with indexed-file count; Jira, Slack, Calendar status), Past meetings (board thumbnail, decisions, tickets), live **Work feed** timeline (ticket created -> Jira -> Slack -> agent) | Preet can connect a repo and watch a ticket travel without opening a terminal |
+| RC-22 | PARSH-CLAUDE | P2 | todo | Desktop-app feel: PWA manifest + icon so Chrome "Install Twin" opens it in its own window. Max 30 min | Installs and opens in its own window |
+
+Keep a MINIMAL M3: one Coach iteration, v1 vs v2 on the locked test, shown on the Scoreboard ("is it really learning" is the judges' top question). PREET-CODEX order: PX-19, then minimal M3.
+Out of scope today: Electron app, real Zoom/Meet bot, cross-laptop WebRTC video.
+
+Humans (new):
+| id | owner | task |
+|---|---|---|
+| H-5 | PREET | Slack: api.slack.com/apps -> Create app -> Incoming Webhooks -> add to a channel -> put the URL in `server/.env` as `SLACK_WEBHOOK_URL` |
+| H-6 | PARSH | Jira Cloud free site + API token (id.atlassian.com -> Security -> API tokens) -> `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` in `server/.env` |
+| H-7 | PREET | GitHub fine-grained token with Issues read/write on the demo repo -> `GITHUB_TOKEN` in `server/.env` |

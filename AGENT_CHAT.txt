@@ -1,5 +1,4 @@
 AGENT_CHAT.txt
-=======Shared chat log for every coding agent on this project. Humans may post too.
 
 WHO IS HERE
   PREET-CLAUDE  (Preet's Claude Code)  server core: websocket, session, the mouth, voice
@@ -40,7 +39,6 @@ EXAMPLE
   ---
 
 LOG STARTS BELOW
-=========
 [12:50] PREET -> ALL | INFO | -
 Kickoff. Read ARCHITECTURE.md (sections 0, 1A, 1B, 1C, 2, 6, 9 first), PROTOCOL.md, TASKS.md.
 First goal is M1: Twin talks live and draws on the whiteboard. Target 2:15 PM.
@@ -620,4 +618,26 @@ Same M2 run also said `I've updated auth/login.py` although CodeAnalyst only cre
 
 [14:00] PREET-CODEX -> ALL | DONE | PX5 PX9 PX14 PX15 PX17 PX18
 Browser verified real nested specialist tree, highlighted impact file boxes, Avery task. Strict live12/12 pass. 3D final direct check now PASS in one Super call11.6s: exactly three labeled joints, valid BoardState+protocol, no repair/fallback. Added Y-up hint to match renderer. PX13 stays doing because latency target~4s is not consistently met; API capacity/latency varies. T3 stays doing pending golden renderer replay. M2 speech source wording fixes requested from Claude before closing milestone gate.
+[13:55] PREET -> ALL | CHANGE | new P0/P1 tasks after first live test
+(Clock note: my earlier 14:40/14:45/14:50 stamps were wrong; real time is 13:55.)
+I ran it in my Chrome. Transcription works. Twin NEVER answered or spoke, drawing was very slow, Share screen just opened the whiteboard,
+the raised hand meant nothing to me, and only Twin can draw. New rows at the bottom of TASKS.md ("NEW 13:55"). Do P0 first:
+  @PREET-CODEX PX-19 speed (Listener reasoning off, fast model for simple bursts, empty-batch retry, rich routing). Then M3, then PX-20/21.
+  @PREET-CLAUDE PC-20 instant drawing, PC-19 real-teammate turn-taking, PC-21 everyone can draw + screen_frame relay. Then PC-22, PC-23.
+  @PARSH-CLAUDE RC-19 Twin tile states, RC-18 real screen share, RC-20 two-laptop check. Then RC-21 dashboard, RC-22 PWA.
+PROTOCOL.md has "v2.2 PROPOSED" (human draw ops with `by`, screen_frame/screen_stop, annotate, ticket/ticket_action). Examples are fenced
+json-proposed so tests stay green. @PREET-CLAUDE @PARSH-CLAUDE ack or amend, then implement and flip the fence to json.
+Feature freeze 4:15. Video 4:40. Do not break main.
+---
+
+[13:58] PREET -> ALL | CHANGE | DEADLINE IS 3:00 PM, NOT 5:00
+Real deadline is 3:00 PM. Feature freeze 2:30. Video recorded by 2:45. Submit by 2:55. Only P0 below; everything else in "NEW 13:55" is CUT
+unless you finish early. Small commits, keep main green, pull often.
+  @PREET-CODEX  1) PX-19 speed (Listener reasoning off; fast model for simple boxes; target first shape < 2 s). 2) Minimal M3 proof for the
+                judges' "is it really learning": one Coach iteration on the locked test with v1 vs v2 score shown on the Scoreboard. That's it.
+  @PREET-CLAUDE 1) PC-19 Twin answers unnamed questions to it (JEV addressed) and never talks over a human. 2) PC-20 ghost "sketching..."
+                card within 300 ms. 3) If time: PC-21 human draws sync to everyone.
+  @PARSH-CLAUDE 1) RC-18 real screen share (getDisplayMedia on the stage, Screen/Whiteboard tabs; frames to others optional). 2) RC-19 Twin
+                tile pills instead of a bare raised hand. 3) Fix @PREET-CODEX 13:51 narrow-viewport side-panel bug. Then RC-9: demo flow polish.
+Preet tested on localhost:8000 and got a different app there; agents use 8765. Everyone: say which port your server runs on in DONE posts.
 ---
