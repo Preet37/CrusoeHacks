@@ -187,3 +187,9 @@ def test_draw_claims_dropped_on_empty_board():
     assert mouth.drop_false_draw_claims(s, ["Avery owns auth/login.py."]) == ["Avery owns auth/login.py."]
     s.board.apply({"op": "add_box", "id": "web", "label": "Web", "x": 100, "y": 100, "kind": "client"})
     assert mouth.drop_false_draw_claims(s, ["I drew the web box."]) == ["I drew the web box."]
+
+
+def test_empty_frames_do_not_count_as_drawn():
+    s = Session("frames")
+    s.board.apply({"op": "frame", "id": "t_x", "title": "Decisions", "x": 0, "y": 0, "w": 1000, "h": 1000})
+    assert mouth.drop_false_draw_claims(s, ["Got the board set up with architecture."]) == []

@@ -281,6 +281,16 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
                 if isinstance(data, dict) and data.get("type") == "ticket_action":
                     await session.ticket_action(ws, data)  # PC-23 (v2.2 proposed message)
                     continue
+            if isinstance(raw, str) and '"annotate"' in raw and len(raw) <= 64_000:
+                try:
+                    data = json.loads(raw)
+                except ValueError:
+                    data = None
+                if isinstance(data, dict) and data.get("type") == "annotate":
+                    # Human annotation (screen share or board), Zoom-style: everyone sees it with who drew it.
+                    data["by"] = session.sockets.get(ws, user) or "guest"
+                    await session.broadcast_except(ws, data)
+                    continue
             try:
                 msg = protocol.parse(raw)
             except ValueError as e:
@@ -307,4 +317,9 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
                     save_meeting(session)
                 except Exception:
                     log.exception('[%s] could not save meeting summary', room)
+                # Nobody left: the next join is a brand-new meeting (fresh history, board, topic).
+                # The summary is already saved; the workspace repo/memory reload on join.
+                if not session.sockets and SESSIONS.get(room) is session:
+                    SESSIONS.pop(room, None)
+                    log.info("[%s] room empty: meeting ended, next join starts fresh", room)
         log.info("[%s] %s disconnected (%d sockets)", room, user, len(session.sockets))

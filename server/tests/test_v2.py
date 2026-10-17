@@ -273,7 +273,7 @@ async def test_calendar_join_uses_demo_calendar_then_greets():
                                                          "scheduled": "13:30"}))
     brief = ws.of("brief")[0]
     assert brief["title"] == "Daily standup" and len(brief["predictions"]) == 3
-    assert any("Redis" in p for p in brief["predictions"]) and brief["ts"] > 0
+    assert any("repo" in p for p in brief["predictions"]) and brief["ts"] > 0  # neutral, no hard-coded JWT story
     assert s.mouth.greets == [("Daily standup", brief["predictions"])]
 
 
@@ -401,3 +401,34 @@ async def test_muted_microphone_keeps_explicit_typed_specs_actionable():
     await s.handle_message(ws, "Preet", protocol.parse({"type": "user_text", "source": "typed", "speaker": "Preet", "text": "Twin, draw my pasted spec", "final": True}))
     assert [line["text"] for line in s.history] == ["Twin, draw my pasted spec"]
     assert "Preet" in s.mic_muted
+
+
+def test_rejoin_after_everyone_left_is_a_fresh_meeting(_no_mouth):
+    from session import SESSIONS
+    room = _room()
+    with TestClient(app) as client:
+        with client.websocket_connect(f"/ws?room={room}&user=Preet") as a:
+            _recv_type(a, "participants")
+            a.send_json({"type": "user_text", "speaker": "Preet", "text": "old meeting content here", "final": True})
+            _recv_type(a, "transcript")
+        import time as _t
+        for _ in range(50):
+            if room not in SESSIONS:
+                break
+            _t.sleep(0.02)
+        with client.websocket_connect(f"/ws?room={room}&user=Preet") as b:
+            _recv_type(b, "participants")
+            assert SESSIONS[room].history == []
+
+
+def test_human_annotate_relayed_with_by(_no_mouth):
+    room = _room()
+    with TestClient(app) as client:
+        with client.websocket_connect(f"/ws?room={room}&user=Preet") as a:
+            _recv_type(a, "participants")
+            with client.websocket_connect(f"/ws?room={room}&user=Parsh") as b:
+                _recv_type(b, "participants")
+                a.send_json({"type": "annotate", "target": "screen", "id": "a1", "by": "spoofed",
+                             "items": [{"kind": "box", "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.1}]})
+                m = _recv_type(b, "annotate")
+                assert m["by"] == "Preet" and m["items"][0]["kind"] == "box"

@@ -152,7 +152,10 @@ def board_is_empty(session) -> bool:
         snap = board.snapshot() if board is not None else {}
     except Exception:  # noqa: BLE001
         return False
-    return not (snap.get("boxes") or snap.get("edges") or snap.get("shapes"))
+    content = [x for x in (snap.get("shapes") or [])
+               if isinstance(x, dict) and x.get("op") not in ("frame", "focus", "highlight")
+               and not str(x.get("id", "")).startswith("ghost_")]
+    return not (snap.get("boxes") or snap.get("edges") or content)  # empty topic frames don't count
 
 
 def drop_false_draw_claims(session, updates: list[str]) -> list[str]:

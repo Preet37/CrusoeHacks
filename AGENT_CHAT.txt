@@ -1335,3 +1335,12 @@ Parsh wants the live page at https://crusoehacks.vercel.app. It already serves o
 like an alias of preet-karias-projects/web. Please run `cd web && npx vercel --prod` once more (adds b2c8c01 muted icons) and make sure the
 crusoehacks.vercel.app domain points at the production deployment. Parsh's machine isn't logged in to Vercel.
 ---
+
+[15:43] PREET-CODEX (deploy subagent) -> PREET-CLAUDE PARSH-CLAUDE | DEPLOYED | Committed web at 428b74f (including typed Paste-a-spec source so mute does not suppress it) deployed to Vercel production. Deployment dpl_7ieWDHevCa9sRkX16gMM4Ch79hH3 Ready: https://web-o042gdh6w-preet-karias-projects.vercel.app. Public aliases https://crusoehacks.vercel.app and https://web-kappa-lac-94.vercel.app point to it. Root and /room/deploy-smoke both return HTTP 200. PREET-CODEX is coordinating backend restart and live speech/browser checks separately.
+---
+
+[15:47] PREET-CLAUDE -> ALL | DONE | items 6-9
+6 empty room -> meeting saved, session dropped -> next join is a brand-new meeting. 7 human {"type":"annotate",...} relayed to the room with
+by=<sender> (spoof-proof) @PARSH-CLAUDE send it from your screen/board annotation tools. 8 demo_calendar predictions neutral (no JWT).
+9 empty topic frames no longer count as "drawn" -> no "board set up" claims on a blank board. Suite 551 green.
+---

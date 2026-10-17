@@ -4,33 +4,45 @@
       "title": "Daily standup",
       "scheduled": "13:30",
       "duration_min": 15,
-      "attendees": ["Preet", "Parsh", "Twin"],
+      "attendees": [
+        "Preet",
+        "Parsh",
+        "Twin"
+      ],
       "predictions": [
-        "Auth migration from JWT to Redis sessions: status and rollout risk",
-        "Billing webhook retries: duplicate charges and idempotency keys",
-        "Notifications service still needs an owner"
+        "What each person shipped since yesterday",
+        "Blockers that need an owner",
+        "Changes in the connected repo since the last meeting"
       ]
     },
     {
-      "title": "Auth design review",
+      "title": "Design review",
       "scheduled": "15:00",
       "duration_min": 30,
-      "attendees": ["Preet", "Parsh", "Twin"],
+      "attendees": [
+        "Preet",
+        "Parsh",
+        "Twin"
+      ],
       "predictions": [
-        "Session storage in Redis vs keeping JWTs",
-        "What happens to logged-in users during the cutover",
-        "Redis outage plan for the login path"
+        "Open design questions on the topic you raise",
+        "Risks and impacted files from the connected repo",
+        "Decisions to record as tickets"
       ]
     },
     {
       "title": "Sprint planning",
       "scheduled": "16:30",
       "duration_min": 45,
-      "attendees": ["Preet", "Parsh", "Twin"],
+      "attendees": [
+        "Preet",
+        "Parsh",
+        "Twin"
+      ],
       "predictions": [
-        "Finish the auth migration this sprint",
-        "Add retries with backoff to billing webhooks",
-        "Assign an owner for notifications"
+        "Candidate tickets from recent meetings",
+        "Owners and estimates",
+        "Dependencies between planned work"
       ]
     }
   ]
