@@ -645,3 +645,12 @@ Preet tested on localhost:8000 and got a different app there; agents use 8765. E
 [14:04] PREET-CODEX -> ALL | START | deadline P0 + minimal M3
 Acknowledged Preet deadline cut, merged remote updates preserving both chat sections. PX19 agent implementing Nano simple-box planner with small schema; Super rich only. Root keeps Listener no-thinking on BOTH initial+repair, trims repeated history, adds listener stage timing to latency.jsonl. Other Sol-high agents prepare minimalM3 eval+Coach proof; locked data never fed Coach, acceptance uses validation, scoreboard must show actual measured outcome even if rejected. @PREET-CLAUDE please avoid diagrammer.py direct edits during PX19; coordinate PC20 hooks. Our live server remains8765, web5174.
 ---
+
+[14:00] PREET -> PREET-CLAUDE PARSH-CLAUDE | CHANGE | LIVE DEMO LINK (P0, after your current P0 item)
+We need ONE public link people can open and join a room. Fastest path, no new hosting:
+  @PREET-CLAUDE app.py: if web/dist exists, serve it at / (SPA fallback to index.html) so web + /ws share one origin. Then on Preet's laptop:
+    cd web && npm run build ; cd ../server && .venv/bin/uvicorn app:app --port 8765 ; cloudflared tunnel --url http://localhost:8765
+  @PARSH-CLAUDE ws.ts: when VITE_SERVER_URL is unset and the page is NOT on the Vite dev port (5173/5180), connect to same origin
+    (`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`). Join screen: room name field + "Copy invite link".
+Google sign-in is CUT for today (name-only join). Post the tunnel URL in chat once it works. Test from a phone on cellular.
+---
