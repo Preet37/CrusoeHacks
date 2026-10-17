@@ -26,6 +26,11 @@ _CONTRADICTION = re.compile(r"\b(actually|instead|scratch that|not that|change (
 _TOPIC_SWITCH = re.compile(r"(?:different topic\s*[:,]?\s*(?:let(?: us|['’]s) talk about\s+)?|switching to\s+|back to\s+)([^.!?;:]{1,60})", re.I)
 _DECISION = re.compile(r"\b(?:we (?:have )?decided|we agreed|decision is|let['’]s (?:move|migrate|switch|use|adopt)|will own (?:it|this))\b", re.I)
 _VISUAL_HINTS = {"architecture", "sequence", "chart", "mockup", "table", "code", "3d"}
+_META_LINE = re.compile(
+    r"^(?:(?:please|twin)[,\s]+)?(?:(?:let['’]s|let us|we should|can we)\s+)?"
+    r"(?:(?:end|stop|close|finish)\s+(?:(?:the|this|our)\s+)?meeting(?:\s+now)?"
+    r"|(?:keep|continue)\s+(?:doing\s+)?(?:that|this|it)(?:\s+way)?)"
+    r"[.!?\s]*$", re.I)
 _MODEL_TIMEOUTS = (4.0, 7.0)
 _NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
 
@@ -198,6 +203,8 @@ class Listener:
             return
         text = text.strip()
         if not text:
+            return
+        if _META_LINE.fullmatch(text):
             return
         # Echoes need both a confident reflex answer and the Session's lexical
         # guard. A mistaken single model score must not discard human input.
@@ -375,6 +382,8 @@ class Listener:
                         topic_meta = None
                     else:
                         moments, topic_meta = await _extract_batch(messages, len(lines))
+                    moments = [moment for moment in moments
+                               if not _META_LINE.fullmatch(str(moment.get("text") or "").strip())]
                     # Short imperative edits are often classified as tasks by
                     # Nano. If the named component is already on this board,
                     # make the requested diagram change a routed system fact.

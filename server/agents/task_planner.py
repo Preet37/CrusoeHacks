@@ -19,6 +19,11 @@ PROMPT = Path(__file__).parent / "prompts" / "task_planner.md"
 _NAMED_OWNER = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+will\s+own\b")
 _SELF_OWNER = re.compile(r"\b(?:I(?:'ll| will| can)\s+(?:own|take)|assign\s+(?:it|this)\s+to\s+me)\b", re.I)
 _MAX_DRAFTS = 64
+_META_DECISION = re.compile(
+    r"^(?:(?:please|twin)[,\s]+)?(?:(?:let['’]s|let us|we should|can we)\s+)?"
+    r"(?:(?:end|stop|close|finish)\s+(?:(?:the|this|our)\s+)?meeting(?:\s+now)?"
+    r"|(?:keep|continue)\s+(?:doing\s+)?(?:that|this|it)(?:\s+way)?)"
+    r"[.!?\s]*$", re.I)
 
 
 def _spoken_owner(decision: str, source_lines: list[dict], candidates: list[str]) -> str | None:
@@ -105,10 +110,16 @@ class TaskPlanner:
     async def handle(self, session, moment: dict, *, parent_id: str | None = None,
                      budget: JobBudget | None = None,
                      source_lines: list[dict] | None = None) -> dict:
+        decision = str(moment.get("text") or "").strip()[:500]
+        # A turn-taking command or deictic acknowledgement is not a product
+        # decision, even when extraction labels it as one.
+        if (_META_DECISION.fullmatch(decision) or
+                (source_lines and all(_META_DECISION.fullmatch(str(line.get("text") or "").strip())
+                                      for line in source_lines))):
+            return {"summary": None, "citations": [], "tasks": [], "tickets": []}
         budget = budget or JobBudget()
         if not budget.reserve_job():
             return {"summary": None, "citations": [], "tasks": [], "tickets": []}
-        decision = str(moment.get("text") or "").strip()[:500]
         event_id = await emit_event(session, "Task Planner", config.MODEL_SMART,
                                     "started", f"plan {decision}"[:160],
                                     parent_id=parent_id)
