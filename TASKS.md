@@ -100,7 +100,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | id | owner | status | task | check |
 |---|---|---|---|---|
 | RC-16 | PARSH-CLAUDE | done | **Twin 3D orb avatar** in Twin's tile (`@react-three/fiber` + `drei`): breathes when listening, swirls when thinking, pulses with real voice amplitude (Web Audio analyser on playback), glow ring when hand raised. Lazy-loaded | Judges notice it immediately; 60 fps on a MacBook |
-| RC-17 | PARSH-CLAUDE | todo | **UI polish pass per ARCH 1G**: frosted panels over subtle animated background, spring transitions, side panel slide-ins, captions styling, empty states, loading states. "Looks complex, feels simple" | Screen at rest shows only call + board + Twin |
+| RC-17 | PARSH-CLAUDE | done | **UI polish pass per ARCH 1G**: frosted panels over subtle animated background, spring transitions, side panel slide-ins, captions styling, empty states, loading states. "Looks complex, feels simple" | Screen at rest shows only call + board + Twin |
 | RX-10 | PREET-CLAUDE | done | **`add_3d` renderer** (PROTOCOL v2.1) in `web/src/components/board/`: primitives scene with labels, orbit, auto-rotate, optional glTF; `draw_error` on failure; lazy-load Three.js. Add to mock server sequence | Mock shows a rotating 3D robot arm on the board |
 | RX-11 | PREET-CLAUDE | done | Stretch: **3D view toggle** of the architecture board (layered stack, particles along edges) | Toggle switches 2D board to 3D and back |
 | RX-12 | PREET-CLAUDE | todo | Stretch: **Twin brain view** (3D force graph of memory facts) in the side panel | Nodes light up when used |
@@ -113,7 +113,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | id | owner | task |
 |---|---|---|
 | H-1 | PARSH (done) | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
-| H-2 | PARSH | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
+| H-2 | PARSH (done 16:20, findings in AGENT_CHAT) | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
 | H-3 | PREET | DONE: JEV = TypeSafe AI System One model (ARCH 1F) |
 | H-4 | PREET (done) | Get a TypeSafe API key at console.typesafe.ai/keys (may be early access/waitlist). Put it in `server/.env` as `TYPESAFE_API_KEY`. If no access today, PX-17 runs on the Nano fallback |
 
@@ -157,5 +157,5 @@ Humans (new):
 | id | owner | task |
 |---|---|---|
 | H-5 | PREET | Slack: api.slack.com/apps -> Create app -> Incoming Webhooks -> add to a channel -> put the URL in `server/.env` as `SLACK_WEBHOOK_URL` |
-| H-6 | PARSH | Jira Cloud free site + API token (id.atlassian.com -> Security -> API tokens) -> `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` in `server/.env` |
+| H-6 | PARSH (done, keys live on :8000) | Jira Cloud free site + API token (id.atlassian.com -> Security -> API tokens) -> `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` in `server/.env` |
 | H-7 | PREET | GitHub fine-grained token with Issues read/write on the demo repo -> `GITHUB_TOKEN` in `server/.env` |

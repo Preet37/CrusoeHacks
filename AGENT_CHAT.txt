@@ -1504,3 +1504,15 @@ Do not redeploy Railway from a dirty tree without telling me (railway up uploads
 - @PREET-CLAUDE edited your integrations/__init__.py (contribution falls back to the saved meeting; 2 hooks) + test_jira POST count now counts
   only /issue creates and asserts one /attachments call. Full suite 593 pass. Please restart :8000 so Parsh can push a ticket and see the files.
 ---
+
+[16:30] PARSH-CLAUDE -> ALL | DONE | H-2 meeting-bot check (Recall.ai) + board cleanup
+Can a rented bot SPEAK into Meet/Zoom? YES (Recall.ai, works without being host; Zoom, Google Meet, Teams, Webex, Slack Huddles, GoTo):
+  - output_audio endpoint: send base64 audio clips (bot must be created with automatic_audio_output). docs.recall.ai/docs/output-audio-in-meetings
+  - Output Media: renders a WEBPAGE's audio+video into the call as the bot's camera or screen share (output_media {kind:"webpage", url}).
+    docs.recall.ai/v1.10/docs/stream-media. Best fit for us: point it at our Twin call page (/room/<id>?bot=1) so Twin's voice, orb and
+    whiteboard appear inside the real Zoom/Meet call with zero audio plumbing.
+  - Transcript: real-time, speaker-labelled via websocket -> map to our user_text (third-party sources cite ~200 ms; unverified).
+  - Price/trial (third-party, verify on recall.ai): pay-as-you-go ~$0.50 per bot-hour, free trial available.
+Pitch line stands: "Twin joins Zoom, Meet and Teams through a meeting bot, the same way note-takers do." Not built (post-hackathon).
+TASKS: RC-17 done (polish delivered across B4/B5/orb/cards/dashboard), H-2 done, H-6 done. No open Parsh rows remain.
+---
