@@ -1,3 +1,4 @@
+import { Component, Suspense, lazy, type ReactNode } from 'react'
 import type { StatusState } from '../lib/protocol'
 import { avatarColor, initials, useVideoRef } from '../lib/media'
 import { MicOffIcon } from './Icons'
@@ -13,6 +14,27 @@ export function TwinAvatar({ className = '' }: { className?: string }) {
 }
 
 const QUIET_S = 30
+
+// 3D orb is lazy-loaded (three.js is big); the CSS avatar shows while it loads or if WebGL fails.
+const TwinOrb = lazy(() => import('./TwinOrb'))
+class OrbBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
+}
+function hasWebGL() {
+  try {
+    const c = document.createElement('canvas')
+    return !!(c.getContext('webgl2') || c.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
+const WEBGL = typeof document !== 'undefined' && hasWebGL()
 
 export function TwinTile({
   status,
@@ -43,7 +65,17 @@ export function TwinTile({
 
   return (
     <div className={`tile twin ${status} ${status === 'speaking' ? 'speaking' : ''} ${sketching ? 'sketching' : ''}`}>
-      <TwinAvatar />
+      {WEBGL ? (
+        <div className="twin-orb">
+          <OrbBoundary fallback={<TwinAvatar />}>
+            <Suspense fallback={<TwinAvatar />}>
+              <TwinOrb mode={muted ? 'listening' : sketching && status !== 'speaking' ? 'sketching' : status} />
+            </Suspense>
+          </OrbBoundary>
+        </div>
+      ) : (
+        <TwinAvatar />
+      )}
       <div className="tw-pills">{pill}</div>
       <div className="name glass">
         Twin <span className="badge">AI</span>

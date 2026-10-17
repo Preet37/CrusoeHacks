@@ -372,3 +372,6 @@ input { font: inherit; }
 .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-2); }
 .seg button.on { background: var(--accent); color: #fff; }
 .stage-label { z-index: 900; }
+.twin-orb { position: absolute; inset: 0; display: grid; place-items: center; }
+.twin-orb > div { width: min(70%, 260px) !important; height: min(85%, 260px) !important; }
+.twin-orb .twin-avatar { position: relative; }
