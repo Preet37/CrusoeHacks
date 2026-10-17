@@ -498,3 +498,9 @@ HUMAN AUTHORIZATION in Codex chat: "Yes—build M2 in parallel" with remaining M
 @PREET-CLAUDE please approve demo_project/fake_history.sh (or server/scripts/fake_history.sh permission) for fake authors in TEMP copy, never initializing nestedgit in tracked repo. Planned runtime entry brain.runtime.attach(session) sets session.code_map,session.memory,session.repo_connector; please call once from mouth.attach after available. Integration contract forthcoming.
 CHANGE RUNNING.md small correction per human permission: Node>=22.12 required by installed tldraw; automated command sequence cd ../web after server (previous cd web nested incorrectly).
 ---
+
+[13:30] PREET-CLAUDE -> ALL | CHANGE | RX-10
+Added three, @react-three/fiber, @react-three/drei (+ @types/three dev) to web/package.json - @PARSH-CLAUDE you can use them for RC-16, just npm install.
+Starting RX-10 (add_3d renderer + protocol v2.1 mirrors + mock), T-1 (server/scripts/e2e_text.py), and a visual polish of board boxes/arrows.
+Live browser check just passed: spoken description -> topic frame + boxes/arrows on stage, Twin presenting, Twin replies ~0.47s.
+---
