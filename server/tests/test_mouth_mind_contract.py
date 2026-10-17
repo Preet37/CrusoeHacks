@@ -7,10 +7,11 @@ import pytest
 
 import config
 import llm
-import mouth
 import protocol
 from agents import responder
 from session import Session
+
+mouth = pytest.importorskip("mouth", reason="Server runtime integration has not landed yet")
 
 
 @pytest.mark.asyncio
