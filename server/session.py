@@ -182,7 +182,8 @@ class Session:
         self._reset_hooks: list[ResetHook] = []
         self.urgent_updates = False
         self.twin_mode = "on_request"
-        self.mic_muted: set[str] = set()
+        self.mic_muted: set[str] = set()  # names whose EVERY connection is muted (derived)
+        self.mic_muted_ws: set = set()      # muted connections (per socket, not per name)
         # async decide_and_respond(session, line) -> None. Runs turn-taking and, if it
         # decides to talk, should spawn the responder via session.spawn("responder", ...).
         self.decide_and_respond: Callable[["Session", dict], Awaitable[Any]] | None = None
@@ -281,6 +282,7 @@ class Session:
 
     def remove_socket(self, ws) -> None:
         self.sockets.pop(ws, None)
+        self.mic_muted_ws.discard(ws)
         self._send_locks.pop(ws, None)
 
     async def send_to(self, ws, msg) -> bool:
@@ -449,7 +451,8 @@ class Session:
             if not name or name in seen or name == TWIN_SPEAKER:
                 continue
             seen.add(name)
-            muted = name in self.mic_muted
+            socks = [w for w, n in self.sockets.items() if n == name]
+            muted = bool(socks) and all(w in self.mic_muted_ws for w in socks)
             speaking = (not muted) and now - self.last_heard.get(name, 0) <= SPEAKING_WINDOW_MS
             people.append({"name": name, "kind": "human", "speaking": speaking, "muted": muted})
         people.append({"name": TWIN_SPEAKER, "kind": "ai",
@@ -596,7 +599,7 @@ class Session:
                 self.sockets[ws] = msg.user
                 await self.broadcast_participants()
         elif t == "user_text":
-            if msg.source != "typed" and ((msg.speaker or user) in self.mic_muted or user in self.mic_muted):
+            if msg.source != "typed" and ws in self.mic_muted_ws:
                 return  # mute drops microphone results; explicit typed requests remain usable
             text = msg.text.strip()
             if self.is_echo(text, bool(msg.final)):
@@ -631,6 +634,11 @@ class Session:
             elif msg.action in ("mic_off", "mic_on"):
                 name = self.sockets.get(ws, user)
                 if msg.action == "mic_off":
+                    self.mic_muted_ws.add(ws)
+                else:
+                    self.mic_muted_ws.discard(ws)
+                socks = [w for w, n in self.sockets.items() if n == name]
+                if socks and all(w in self.mic_muted_ws for w in socks):
                     self.mic_muted.add(name)
                     self.last_heard.pop(name, None)
                 else:

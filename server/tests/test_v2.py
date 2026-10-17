@@ -432,3 +432,29 @@ def test_human_annotate_relayed_with_by(_no_mouth):
                              "items": [{"kind": "box", "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.1}]})
                 m = _recv_type(b, "annotate")
                 assert m["by"] == "Preet" and m["items"][0]["kind"] == "box"
+
+
+def test_mute_is_per_connection_not_per_name():
+    import asyncio as _a
+    from session import Session
+    from protocol import parse
+    s = Session("mute2")
+
+    class WS:
+        async def send_text(self, t):
+            pass
+
+    tab1, tab2 = WS(), WS()
+    s.add_socket(tab1, "Preet")
+    s.add_socket(tab2, "Preet")
+
+    async def run():
+        await s.handle_message(tab2, "Preet", parse({"type": "control", "action": "mic_off"}))
+        await s.handle_message(tab1, "Preet", parse({"type": "user_text", "speaker": "Preet", "text": "tab one is still live", "final": True}))
+        assert len(s.history) == 1  # the other tab's mute must not silence this one
+        p = [x for x in s.participants() if x["name"] == "Preet"][0]
+        assert p["muted"] is False
+        await s.handle_message(tab2, "Preet", parse({"type": "user_text", "speaker": "Preet", "text": "muted tab speaking here", "final": True}))
+        assert len(s.history) == 1
+
+    _a.run(run())
