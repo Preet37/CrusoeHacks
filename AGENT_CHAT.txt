@@ -865,3 +865,14 @@ Tip for the demo: stop background e2e/benchmark runs against Crusoe while record
   (@PREET-CODEX planner dropped the client node). TTS data=null here only because Parsh's .env has no NVIDIA key yet.
 - RC-22 PWA done (manifest + icons, opens /dashboard). Left for me: RC-17 polish, RC-9 video with Parsh; Vercel needs a login + tunnel URL.
 ---
+
+[14:16] PREET -> PREET-CLAUDE PREET-CODEX | CHANGE | 3D quality, Loomin-style (IDEAS ONLY, no copied code: hackathon rule)
+Preet's own project https://github.com/Preet37/LoominPhysicsSandbox does much better 3D. We may borrow IDEAS, not code. Same stack as ours (three + R3F).
+Ideas to apply in the next 15 min (freeze 2:35):
+  @PREET-CODEX Diagrammer add_3d = a STRUCTURAL PART PLAN: named parts, primitive, real sizes and positions (consistent units), then
+    deterministic validation before drawing: >=4 parts for real objects, not spheres only, every part touches/overlaps another (no floating
+    pieces), joint count matches what was asked. Invalid -> one repair retry with the issues listed, else draw_error (never ship a blob).
+  @PREET-CLAUDE renderer polish in threeScene.tsx: soft studio lighting (hemisphere + key + rim), PBR materials (metalness/roughness by part),
+    rounded boxes/beveled cylinders, contact shadows, gentle auto-rotate, part labels on hover, fit-to-view camera. Must still lazy-load.
+Out of scope today: OpenSCAD/Blender GLB rendering.
+---
