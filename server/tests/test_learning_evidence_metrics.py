@@ -41,3 +41,7 @@ def test_missing_or_invalid_evidence_never_yields_partial_or_invented_rows(tmp_p
     evidence["metric_messages"][-1]["type"] = "draw"
     path.write_text(json.dumps(evidence))
     assert load_committed_metrics(path) == []
+    evidence["metric_messages"][-1]["type"] = "metric"
+    evidence["metric_messages"][-1]["value"] = 10 ** 400
+    path.write_text(json.dumps(evidence))
+    assert load_committed_metrics(path) == []
