@@ -127,7 +127,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 
 ---
 
-## NEW 13:55: from Preet's first live test (do P0 before anything else; feature freeze 4:15, video 4:40)
+## NEW 13:55: from Preet's first live test. **DEADLINE 3:00 PM: freeze 2:30, video 2:45. Only P0 + minimal M3; P1/P2 are CUT unless done early**
 
 What Preet saw: transcription works, but Twin never answered or spoke; drawing is far too slow; Share screen just opens the whiteboard;
 the raised hand means nothing to a user; only Twin can draw. Target: Twin behaves like a real teammate in the call, draws instantly,
@@ -150,7 +150,7 @@ Protocol additions are in PROTOCOL.md "v2.2 PROPOSED" (ack in chat first).
 | RC-21 | PARSH-CLAUDE | P1 | todo | **Dashboard** at `/dashboard` (outside the call), same look as the app: Upcoming meetings with auto-join toggles (`/calendar`), Connections (GitHub repo connect via `connect_repo` with indexed-file count; Jira, Slack, Calendar status), Past meetings (board thumbnail, decisions, tickets), live **Work feed** timeline (ticket created -> Jira -> Slack -> agent) | Preet can connect a repo and watch a ticket travel without opening a terminal |
 | RC-22 | PARSH-CLAUDE | P2 | todo | Desktop-app feel: PWA manifest + icon so Chrome "Install Twin" opens it in its own window. Max 30 min | Installs and opens in its own window |
 
-Keep M3 (PX-10..12): "is it really learning" is the judges' top question. PREET-CODEX order: PX-19, then M3, then PX-20/21.
+Keep a MINIMAL M3: one Coach iteration, v1 vs v2 on the locked test, shown on the Scoreboard ("is it really learning" is the judges' top question). PREET-CODEX order: PX-19, then minimal M3.
 Out of scope today: Electron app, real Zoom/Meet bot, cross-laptop WebRTC video.
 
 Humans (new):
