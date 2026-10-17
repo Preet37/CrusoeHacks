@@ -33,18 +33,44 @@ def _planned_ops(value: Any, board, topic_id: str | None) -> list[dict]:
     if not isinstance(value, dict) or set(value) != {"layers", "nodes", "edges"}:
         raise ValueError("architecture plan needs only layers, nodes, edges")
     raw_layers, raw_nodes, raw_edges = (value[key] for key in ("layers", "nodes", "edges"))
-    if not isinstance(raw_layers, list) or not 2 <= len(raw_layers) <= 4:
-        raise ValueError("architecture needs 2 to 4 layers")
+    if not isinstance(raw_layers, list) or not 2 <= len(raw_layers) <= 20:
+        raise ValueError("architecture needs 2 to 20 source layers")
     if not isinstance(raw_nodes, list) or not 8 <= len(raw_nodes) <= 20:
         raise ValueError("architecture needs 8 to 20 named nodes")
     if not isinstance(raw_edges, list) or not 7 <= len(raw_edges) <= 32:
         raise ValueError("architecture needs 7 to 32 labeled edges")
+    if len(raw_layers) > 6:
+        # Some models create a layer for each subsystem despite the requested
+        # limit. Merge adjacent *used* layers; the graph's nodes and edges stay
+        # exactly as extracted, and the resulting frames remain legible.
+        if any(not isinstance(node, dict) or type(node.get("layer")) is not int
+               or not 0 <= node["layer"] < len(raw_layers) for node in raw_nodes):
+            raise ValueError("excess layers need numeric node memberships")
+        used = sorted({node["layer"] for node in raw_nodes})
+        if len(used) < 2:
+            raise ValueError("architecture needs multiple used layers")
+        group_count = min(5, len(used))
+        grouped: list[list[str]] = [[] for _ in range(group_count)]
+        remap = {}
+        for ordinal, old_index in enumerate(used):
+            group = ordinal * group_count // len(used)
+            remap[old_index] = group
+            raw_layer = raw_layers[old_index]
+            title = raw_layer if isinstance(raw_layer, str) else (
+                raw_layer.get("title") if isinstance(raw_layer, dict) else None)
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError("invalid source layer title")
+            grouped[group].append(title.strip())
+        raw_layers = [" / ".join(group)[:100] for group in grouped]
+        raw_nodes = [{**node, "layer": remap[node["layer"]]} for node in raw_nodes]
     # Current model output uses array positions for references, removing the
     # chance of an edge naming a node omitted from the final node list. Accept
     # the original string-id format too, for existing callers and fixtures.
     layers = []
     for index, raw in enumerate(raw_layers):
-        if isinstance(raw, dict) and set(raw) == {"title"}:
+        if isinstance(raw, str):
+            layers.append({"id": f"layer_{index}", "title": raw})
+        elif isinstance(raw, dict) and set(raw) == {"title"}:
             layers.append({"id": f"layer_{index}", "title": raw["title"]})
         else:
             layers.append(raw)
@@ -113,7 +139,7 @@ def _planned_ops(value: Any, board, topic_id: str | None) -> list[dict]:
             ops.append({"op": "add_box", "id": f"{prefix}_n{node_ids.index(node['id']) + 1}",
                         "label": node["label"], "kind": node["kind"],
                         "x": round(80 + (position + 0.5) * 840 / len(members)),
-                        "y": 500, "frame": frame_id})
+                        "y": 250, "frame": frame_id})
     mapped = {node_id: f"{prefix}_n{index + 1}" for index, node_id in enumerate(node_ids)}
     # A model may use the displayed label instead of its JSON id in an edge.
     # Resolve only unambiguous names; never invent a missing component.
@@ -156,19 +182,21 @@ async def draw_paragraph(session, board, request: str, topic_id: str | None, pub
     raw = await asyncio.wait_for(llm.chat(config.MODEL_RESPONDER, [
         {"role": "system", "content": "Extract a layered architecture graph only from the supplied specification. "
          "Return ONLY one JSON object with exactly these keys: "
-         "layers:[{title}], nodes:[{label,kind,layer}], edges:[{from,to,label}]. "
-         "Use 2-4 layers, 8-20 real named components, and 7-32 labeled relationships. "
-         "Node layer is a ZERO-BASED INTEGER position in the layers array. Edge from/to are "
-         "ZERO-BASED INTEGER positions in the FINAL nodes array, never names or IDs. "
-         "For example, an edge from nodes[0] to nodes[2] is "
-         "{\"from\":0,\"to\":2,\"label\":\"HTTPS\"}. "
+         "layers:[string], nodes:[{label,kind,layer}], edges:[{from,to,label}]. "
+         "Use 2-5 named layers (group related components; never one layer per service), "
+         "8-20 real named components, and 7-32 labeled relationships. "
+         "Node layer is a zero-based integer position in layers. Edge from/to MUST copy the "
+         "EXACT label of a node in the final nodes array; never use numeric edge endpoints. "
+         "For example if nodes contain labels 'Web Client' and 'API Gateway', an edge is "
+         "{\"from\":\"Web Client\",\"to\":\"API Gateway\",\"label\":\"HTTPS\"}. "
          "Kinds are client, service, datastore, external, or note. "
          "First list every named component in the source, then connect only listed nodes. "
+         "Check every edge endpoint against the final node labels before responding. "
          "Include every stated relationship. Events and messages are edge labels, unless "
          "the source explicitly names a queue or broker. Do not invent components or edges."},
         {"role": "user", "content": request},
     ], max_tokens=4000, response_format={"type": "json_object"},
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}}), timeout=15)
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}}), timeout=30)
     from agents.diagrammer import StaleBoardError
     if session.board is not board or board.revision != expected_revision:
         raise StaleBoardError("board changed before architecture plan")

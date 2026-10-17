@@ -167,7 +167,7 @@ async def test_natural_language_model_ids_stay_internal_and_nodes_use_layer_coor
     await run(session)
     assert len(session.board.boxes) == 8
     assert len(session.board.edges) == 7
-    assert all(box["id"].startswith("arch_") and box["y"] == 500
+    assert all(box["id"].startswith("arch_") and box["y"] == 250
                for box in session.board.boxes.values())
 
 
@@ -194,7 +194,7 @@ async def test_indexed_one_call_plan_is_complete(monkeypatch):
     session = Session()
     await run(session)
     assert len(calls) == 1
-    assert "ZERO-BASED INTEGER" in calls[0]
+    assert "never use numeric edge endpoints" in calls[0]
     assert len(session.board.boxes) == 8
     assert len(session.board.edges) == 7
     assert {edge["label"] for edge in session.board.edges.values()} == {
@@ -214,3 +214,78 @@ async def test_indexed_dangling_or_boolean_endpoint_rejects_atomically(monkeypat
         await run(session)
     assert session.board.boxes == {}
     assert session.board.edges == {}
+
+
+@pytest.mark.asyncio
+async def test_string_layers_and_exact_node_label_edges(monkeypatch):
+    plan = indexed_plan()
+    labels = [node["label"] for node in plan["nodes"]]
+    plan["layers"] = [layer["title"] for layer in plan["layers"]]
+    for edge in plan["edges"]:
+        edge["from"] = labels[edge["from"]]
+        edge["to"] = labels[edge["to"]]
+
+    async def chat(*args, **kwargs):
+        return json.dumps(plan)
+
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    await run(session)
+    assert len(session.board.boxes) == 8
+    assert len(session.board.edges) == 7
+
+
+@pytest.mark.asyncio
+async def test_five_valid_layers_from_live_format_are_kept(monkeypatch):
+    plan = indexed_plan()
+    plan["layers"] = ["Clients", "Gateway", "Applications", "Cache", "Data"]
+    by_label = {node["label"]: node for node in plan["nodes"]}
+    by_label["Web"]["layer"] = 0
+    by_label["Mobile"]["layer"] = 0
+    by_label["API Gateway"]["layer"] = 1
+    by_label["Auth"]["layer"] = 2
+    by_label["Billing"]["layer"] = 2
+    by_label["Redis"]["layer"] = 3
+    by_label["Postgres"]["layer"] = 4
+    by_label["Invoice DB"]["layer"] = 4
+    labels = [node["label"] for node in plan["nodes"]]
+    for edge in plan["edges"]:
+        edge["from"] = labels[edge["from"]]
+        edge["to"] = labels[edge["to"]]
+
+    async def chat(*args, **kwargs):
+        return json.dumps(plan)
+
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    await run(session)
+    assert len(session.board.boxes) == 8
+    assert len(session.board.edges) == 7
+    assert len([shape for shape in session.board.shapes.values()
+                if shape["op"] == "frame"]) == 6  # Five layers plus topic frame.
+
+
+@pytest.mark.asyncio
+async def test_excess_model_layers_coalesce_without_losing_nodes_or_edges(monkeypatch):
+    plan = indexed_plan()
+    plan["layers"] = [f"Subsystem {index}" for index in range(10)]
+    for index, node in enumerate(plan["nodes"]):
+        node["layer"] = index
+    labels = [node["label"] for node in plan["nodes"]]
+    for edge in plan["edges"]:
+        edge["from"] = labels[edge["from"]]
+        edge["to"] = labels[edge["to"]]
+
+    async def chat(*args, **kwargs):
+        return json.dumps(plan)
+
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    await run(session)
+    assert len(session.board.boxes) == 8
+    assert len(session.board.edges) == 7
+    layer_frames = [shape for shape in session.board.shapes.values()
+                    if shape["op"] == "frame" and shape["id"] != "t_arch"]
+    assert len(layer_frames) == 5
+    assert all(box["frame"] in {frame["id"] for frame in layer_frames}
+               and box["y"] == 250 for box in session.board.boxes.values())
