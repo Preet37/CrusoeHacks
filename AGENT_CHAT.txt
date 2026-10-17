@@ -371,4 +371,10 @@ Thanks for the board drafts - my agent is starting from parsh/board-drafts.
 web/src/components/AgentTree.tsx, TaskPanel.tsx, Scoreboard.tsx (+ panels.css, all classes tw- prefixed, light/dark).
 Each: default export ({ client }: { client: TwinClient }), self-subscribing, fills + scrolls its container. Mount them in your SidePanel tabs.
 AgentTree shows live nesting by parent_id, model badges, "N running" + "depth N" (recursion proof), finished trees collapse to one line.
+[14:20] PREET -> ALL | CHANGE | PX-17
+JEV added: ARCHITECTURE.md new section 1F. JEV (TypeSafe AI) = fast typed decisions (choice/score/yes-no + probability, ~70-500 ms).
+It is Twin's reflex layer in front of Nemotron: per final sentence one call answers addressed / kind / topic_changed / wants_visual / is_echo.
+@PREET-CODEX PX-17: server/agents/fast_decide.py decide(state, questions) with JEV backend + Nano fallback (same interface). After PX-13/14.
+@PREET-CLAUDE once decide() exists, use is_echo for the echo guard and topic_changed for newest-wins (PC-13/14).
+JEV never produces user-facing text; all reasoning stays on Nemotron/Crusoe. Key: TYPESAFE_API_KEY in server/.env only.
 ---

@@ -52,6 +52,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PX-13 | doing | **PRIORITY: one call per drawing burst** (ARCH 1E.5 rule 3): Diagrammer emits all ops in ONE call (parallel tool calls or validated JSON-ops batch), then applies them progressively | PX-4 | 5-op burst under ~4 s instead of ~26 s |
 | PX-14 | doing | **Topic tracking** in Listener: every batch returns `topic_id`, `title`, `topic_changed`; Conductor tags jobs with topic; Diagrammer draws into that topic's `frame` and emits `focus` on switch | PX-3 | Switching topics creates a new frame and pans; returning pans back |
 | PX-15 | doing | **Rich drawing**: extend BoardState + Diagrammer tools with v2 ops (frame, focus, add_sticky, add_text, add_mermaid, add_chart, add_table, add_code, add_mock, sketch, update) + the choosing rule in ARCH 1E.4; fix Mermaid once on `draw_error` | PX-13 | "Walk me through the login sequence" draws a Mermaid sequence diagram; numbers produce a chart; "what would the screen look like" produces a mock |
+| PX-17 | todo | **JEV fast path** (ARCH 1F): `server/agents/fast_decide.py` with `decide(state, questions)`; JEV backend (`typesafe-sdk`, `TYPESAFE_API_KEY`) + Nemotron Nano fallback; one call per final sentence with addressed/kind/topic_changed/wants_visual/is_echo; gate Listener, topic switch, Diagrammer tool choice, echo drop; log latency. Add `TYPESAFE_API_KEY=` to `.env.example` | PX-3 | Small-talk lines skip the Listener; topic switch detected in under ~0.5 s with JEV |
 | PX-16 | todo | M2: `connect_repo`: build the code map from a public GitHub URL (shallow clone, size cap) | PX-7 | Pasting the demo repo URL builds the map |
 
 ## PARSH-CLAUDE (meeting page, look, mic, speech, audio)
@@ -97,7 +98,8 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 |---|---|---|
 | H-1 | PARSH | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
 | H-2 | PARSH | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
-| H-3 | PREET | Confirm what "JEV" is (link) for the first-pass filter (ARCH 1D) |
+| H-3 | PREET | DONE: JEV = TypeSafe AI System One model (ARCH 1F) |
+| H-4 | PREET | Get a TypeSafe API key at console.typesafe.ai/keys (may be early access/waitlist). Put it in `server/.env` as `TYPESAFE_API_KEY`. If no access today, PX-17 runs on the Nano fallback |
 
 ## Milestone gates (humans check these)
 - [ ] M0 setup: server + web start, smoke_crusoe and smoke_tts pass

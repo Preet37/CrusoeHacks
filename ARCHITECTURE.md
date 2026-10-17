@@ -121,10 +121,30 @@ Crusoe also hosts non-NVIDIA models (DeepSeek, Gemma, GLM, others). **We do not 
 
 **Solution: narrow first, think last.** Three passes, cheapest first:
 1. **Deterministic pass (code, milliseconds):** `brain/code_map.py` builds the map once, ahead of the meeting: files, symbols, imports, reverse imports ("who depends on me"), owners from git. A question like "what does changing login touch?" becomes a graph walk, not a model call. This alone handles most impact questions on any size codebase.
-2. **Fast filter pass:** for fuzzy questions, a fast first-pass filter scores candidate files and facts and keeps the top few dozen out of thousands. Planned: **JEV** as this first-pass filter [need: Preet to confirm exactly what JEV is and link it, so the right agent can integrate it]. Until confirmed, the filter is Nemotron Nano scoring short summaries in batches (each file gets a one-line summary when the map is built), plus plain keyword search.
+2. **Fast filter pass:** for fuzzy questions, **JEV** (see 1F) answers a batch of yes/no relevance questions over candidate file summaries and facts in one call and keeps the top few dozen out of thousands. Fallback when JEV is unavailable: Nemotron Nano scoring the same summaries (each file gets a one-line summary when the map is built), plus plain keyword search.
 3. **Reasoning pass:** Nemotron Super reads only the shortlisted files and facts and answers, citing sources.
 
 Pitch line: the library can be any size; what lands on the model's desk stays small. We can show that on the scoreboard (tokens per answer stays flat as the codebase grows).
+
+### 1F. JEV: the fast "System One" decision layer (added 13:20)
+
+**What it is, in plain words:** JEV (by TypeSafe AI) is a model that does not chat or write. You give it some text (the "state") and a set of typed questions, and it answers each one with a typed value plus a calibrated probability: a **choice** from options you define, a **score** on a scale you define, or a **noul** (a 0 to 1 yes/no probability). Claimed latency 70 to 500 ms end to end, input about $0.042 per million tokens, output free. Many questions run in parallel in ONE call against the same state. Think: a reflex, not a thought. Nemotron does the thinking; JEV does the instant gut checks.
+
+**API (from docs.typesafe.ai quickstart):** `POST https://api.typesafe.ai/v1/systemone`, header `Authorization: Bearer $TYPESAFE_API_KEY`, body `{"model":"jev-latest","state":"<text or JSON>","questions":{"<id>":{"type":"choice"|"score"|"noul","instructions":"...","criteria":...}}}`. Response `answers.<id>` has `choice`/`score`/`noul`, `confidence`, `probabilities`. Python SDK: `pip install typesafe-sdk`, `from typesafe_sdk import Choice, Noul, Score, TypeSafeClient`, `TypeSafeClient(model="jev-latest").system_one(state=..., questions={...})`. Key from console.typesafe.ai/keys. **Access:** TypeSafe's launch post said early access with a waitlist; confirm our key works before building on it.
+
+**Where Twin uses JEV (the live fast path, in front of Nemotron):** on every final human sentence, ONE JEV call with several questions:
+- `addressed` (noul): is this sentence directed at Twin?
+- `kind` (choice): system_fact | decision | claim | question | task | small_talk | none
+- `topic_changed` (noul): did the conversation move to a new topic vs the current topic title?
+- `wants_visual` (choice): none | architecture | sequence | chart | mockup | table | code
+- `is_echo` (noul): is this just Twin's own last sentence picked up by the mic? (echo guard)
+Results gate everything: `kind=none/small_talk` -> skip the Listener entirely (saves Nemotron calls); `topic_changed` -> new frame + cancel stale jobs (speed rule 1); `addressed` -> Responder starts immediately; `wants_visual` -> tells the Diagrammer which tool to use; `is_echo` -> drop the line.
+Also: **first-pass relevance** over code-map summaries and memory facts (1D step 2), and **pre-checks for the Fact Checker** (does this claim contradict fact X? only send likely contradictions to Super).
+
+**Rules:**
+- JEV never writes anything the user sees or hears; Nemotron on Crusoe does all reasoning and language. This keeps us inside the hackathon rule (agent team on Crusoe) and the Best Use of Nemotron story.
+- One interface, two backends: `server/agents/fast_decide.py` exposes `decide(state, questions) -> answers`. Backend = JEV when `TYPESAFE_API_KEY` is set and a health check passes; otherwise Nemotron Nano with a strict JSON prompt. The rest of the code never knows which one ran.
+- Log JEV latency next to the Nemotron latency in `latency.jsonl`. Demo line: "the reflex layer answers in about X ms" (real measured number only).
 
 ---
 
