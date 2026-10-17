@@ -225,7 +225,7 @@ async def test_false_claim_gets_only_sourced_urgent_correction(monkeypatch):
     starts = event_tree(session)
     assert any(m["agent"] == "Fact Checker" for m in starts.values())
     assert session.updates == [(
-        "Correction: Auth currently validates JWT tokens. (source: auth/jwt_tokens.py:verify).",
+        "Correction from auth/jwt_tokens.py:verify: Auth currently validates JWT tokens.",
         True)]
     assert not any(m.get("type") == "draw" for m in session.messages)
 

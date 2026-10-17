@@ -71,7 +71,7 @@ class FactChecker:
                                 source = json.dumps(source, default=str)
                             source = source[:240]
                             result = {
-                                "summary": f"Correction: {matched['claim']} (source: {source}).",
+                                "summary": f"Correction from {source}: {matched['claim']}",
                                 "citations": [{"id": matched["id"], "claim": matched["claim"],
                                                "source": matched["source"]}],
                                 "urgent": True,
