@@ -14,6 +14,7 @@ import threading
 from brain.code_map import CodeMap
 from brain.memory import MemoryStore
 from brain.repo_connector import connect_repo
+from brain.workspace_registry import REGISTRY
 
 log = logging.getLogger(__name__)
 DEMO = Path(__file__).resolve().parents[2] / 'demo_project'
@@ -51,6 +52,7 @@ def attach(session) -> None:
         from learning.prep import brief_provider
         session.brief_provider = brief_provider
     if getattr(session, '_mind_runtime_ready', False):
+        REGISTRY.register(session)
         return
     try:
         session.code_map = demo_map()
@@ -72,6 +74,7 @@ def attach(session) -> None:
             for claim, source, subject in seed:
                 if (claim, source) not in existing:
                     session.memory.add_fact(claim, source, scope=session.code_fact_scope, subject=subject)
+        REGISTRY.register(session)
         session._mind_runtime_ready = True
     except Exception:
         # Keep the conversation usable if a local code map or state file fails.

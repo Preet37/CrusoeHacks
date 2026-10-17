@@ -9,7 +9,10 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import weakref
 from urllib.parse import urlsplit
+
+from brain.workspace_registry import REGISTRY, workspace_key
 
 MAX_BYTES = 50 * 1024 * 1024
 MAX_FILES = 6000
@@ -86,8 +89,13 @@ async def connect_repo(session, url: str) -> None:
     from agents.diagrammer import emit_event
 
     temporary = None
-    generation = object()
-    session._repo_connect_generation = generation
+    workspace = workspace_key(session)
+    if workspace is not None:
+        REGISTRY.register(session)
+        generation = REGISTRY.claim(workspace)
+    else:
+        generation = object()
+        session._repo_connect_generation = generation
     event_id = await emit_event(session, 'Repository index', 'deterministic',
                                 'started', 'index public repository')
     try:
@@ -97,16 +105,22 @@ async def connect_repo(session, url: str) -> None:
         await _clone(canonical, checkout)
         root = checkout / 'demo_project' if (checkout / 'demo_project').is_dir() else checkout
         code_map = await asyncio.to_thread(lambda: CodeMap(root).build())
-        if session._repo_connect_generation is not generation:
-            raise asyncio.CancelledError
-        old_temporary = getattr(session, '_repo_directory', None)
-        session.code_map = code_map
-        session.repo_url = canonical
-        session.code_fact_scope = "repo:" + hashlib.sha256(canonical.encode()).hexdigest()[:16] + ":code"
-        session._repo_directory = temporary
+        scope = "repo:" + hashlib.sha256(canonical.encode()).hexdigest()[:16] + ":code"
+        if workspace is not None:
+            if not REGISTRY.publish(workspace, generation, code_map, canonical,
+                                    scope, temporary):
+                raise asyncio.CancelledError
+        else:
+            if session._repo_connect_generation is not generation:
+                raise asyncio.CancelledError
+            # A previous analyst may still be reading its checkout. Its map
+            # finalizer removes it only after all references are gone.
+            weakref.finalize(code_map, shutil.rmtree, temporary, ignore_errors=True)
+            session.code_map = code_map
+            session.repo_url = canonical
+            session.code_fact_scope = scope
+            session._repo_directory = temporary
         temporary = None
-        if old_temporary is not None:
-            shutil.rmtree(old_temporary, ignore_errors=True)
         update = session.push_update(f'I indexed {len(code_map.files)} source files from {canonical.removesuffix(".git")}.')
         if inspect.isawaitable(update):
             await update
