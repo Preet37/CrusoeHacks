@@ -185,10 +185,19 @@ class Diagrammer:
                                                       "max_draw_calls": MAX_OPS})},
         ]
         try:
-            # run_tools executes both native tool calls and its JSON-ops fallback
-            # through these handlers; its return value is only a completion/result.
-            await llm.run_tools(config.MODEL_SMART, messages, DRAW_TOOLS,
-                                handlers, max_steps=MAX_OPS, max_tokens=1200)
+            # Super emits an ordered JSON batch in one request. The shared LLM
+            # client validates schemas before any handler runs, and handlers
+            # still enforce BoardState revision, op budget, and wire updates.
+            try:
+                await llm.run_json_ops(config.MODEL_SMART, messages, DRAW_TOOLS,
+                                       handlers, max_ops=MAX_OPS, max_tokens=1200)
+            except ValueError:
+                # The native loop can repair a malformed plan, but replaying
+                # after any attempted operation could duplicate side effects.
+                if attempts:
+                    raise
+                await llm.run_tools(config.MODEL_SMART, messages, DRAW_TOOLS,
+                                    handlers, max_steps=MAX_OPS, max_tokens=1200)
         finally:
             # Native tools may have changed the board before a later model step
             # fails or gets cancelled. The update still needs to be spoken once.

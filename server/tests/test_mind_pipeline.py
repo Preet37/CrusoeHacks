@@ -50,7 +50,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 active -= 1
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             facts = json.loads(messages[-1]["content"])["facts"]
             if "web talks" in facts[0]["text"]:
                 await handlers["add_box"](id="web", label="Web app", x=100, y=300, kind="client")
@@ -62,7 +62,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
             return "done"
 
         listener = Listener(session, debounce_seconds=0)
-        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_json_ops", tools):
             listener.submit("Preet", "the web app talks to auth")
             await asyncio.wait_for(first_started.wait(), 1)
             listener.submit("Preet", "auth also uses Redis")
@@ -90,8 +90,8 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_and_excess_draw_calls_do_not_escape_board(self):
         session = FakeSession()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
-            self.assertEqual(max_steps, 8)
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
+            self.assertEqual(max_ops, 8)
             rejected = await handlers["add_box"](id="bad", label="Bad", x=1001, y=0, kind="service")
             self.assertFalse(rejected["ok"])
             for index in range(12):
@@ -99,13 +99,70 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
                                           x=index * 20, y=100, kind="service")
             return None
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             draws = await Diagrammer().handle(session, [{"type": "system_fact", "text": "many boxes"}])
         self.assertEqual(len(draws), 7)
         self.assertEqual(len(session.board.boxes), 7)
         self.assertEqual(len(session.updates), 1)
         self.assertNotIn("bad", session.board.boxes)
         self.assertEqual(len([m for m in session.messages if m["type"] == "draw"]), 7)
+
+    async def test_malformed_json_plan_falls_back_to_native_before_any_op(self):
+        session = FakeSession()
+        calls = []
+
+        async def invalid_json(*args, **kw):
+            calls.append("json")
+            raise ValueError("invalid JSON ops")
+
+        async def native(model, messages, definitions, handlers, max_steps, **kw):
+            calls.append("native")
+            self.assertEqual(max_steps, 8)
+            await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
+
+        with patch("agents.diagrammer.llm.run_json_ops", invalid_json), \
+                patch("agents.diagrammer.llm.run_tools", native):
+            await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
+        self.assertEqual(calls, ["json", "native"])
+        self.assertEqual(set(session.board.boxes), {"auth"})
+
+    async def test_json_error_after_an_attempt_does_not_replay_or_retry_native(self):
+        session = FakeSession()
+        native_called = False
+
+        async def partial(model, messages, definitions, handlers, max_ops, **kw):
+            await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
+            raise ValueError("later operation invalid")
+
+        async def native(*args, **kw):
+            nonlocal native_called
+            native_called = True
+
+        with patch("agents.diagrammer.llm.run_json_ops", partial), \
+                patch("agents.diagrammer.llm.run_tools", native):
+            with self.assertRaisesRegex(ValueError, "later operation invalid"):
+                await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
+        self.assertFalse(native_called)
+        self.assertEqual(set(session.board.boxes), {"auth"})
+        self.assertEqual(len(session.updates), 1)
+
+    async def test_network_error_does_not_retry_with_native(self):
+        session = FakeSession()
+        native_called = False
+
+        async def network_error(*args, **kw):
+            raise RuntimeError("network unavailable")
+
+        async def native(*args, **kw):
+            nonlocal native_called
+            native_called = True
+
+        with patch("agents.diagrammer.llm.run_json_ops", network_error), \
+                patch("agents.diagrammer.llm.run_tools", native):
+            with self.assertRaisesRegex(RuntimeError, "network unavailable"):
+                await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
+        self.assertFalse(native_called)
+        self.assertEqual(session.board.boxes, {})
 
     async def test_quiet_window_batches_burst_of_final_lines(self):
         session = FakeSession()
@@ -132,10 +189,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         async def chat(*args, **kw):
             return '[{"type":"task","text":"rename auth to Auth (sessions)","entities":["auth"]}]'
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["rename"](id="auth", label="Auth (sessions)")
 
-        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_json_ops", tools):
             listener = Listener(session, debounce_seconds=0)
             listener.submit("Preet", "rename auth to Auth (sessions)")
             await asyncio.wait_for(listener.wait_idle(), 1)
@@ -163,11 +220,11 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         session.board.apply({"op": "add_box", "id": "auth", "label": "Auth", "x": 400,
                              "y": 300, "kind": "service"})
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["rename"](id="auth", label="Auth")
             return "done"
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             draws = await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
         self.assertEqual(draws, [])
         self.assertEqual(session.updates, [])
@@ -225,11 +282,11 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         async def chat(*args, **kw):
             return '[{"type":"system_fact","text":"auth exists","entities":["auth"]}]'
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
             raise RuntimeError("model failed after drawing")
 
-        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_json_ops", tools):
             listener = Listener(session, debounce_seconds=0)
             listener.submit("Preet", "auth exists")
             await asyncio.wait_for(listener.wait_idle(), 1)
@@ -246,12 +303,12 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         async def chat(*args, **kw):
             return '[{"type":"system_fact","text":"auth exists","entities":["auth"]}]'
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
             drawing.set()
             await asyncio.Event().wait()
 
-        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_json_ops", tools):
             listener = Listener(session, debounce_seconds=0)
             listener.submit("Preet", "auth exists")
             await asyncio.wait_for(drawing.wait(), 1)
@@ -275,10 +332,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         session = SlowSession()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             task = asyncio.create_task(Diagrammer().handle(
                 session, [{"type": "system_fact", "text": "auth exists"}]))
             await asyncio.wait_for(drawing.wait(), 1)
@@ -298,10 +355,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         session = FailingSession()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             with self.assertRaisesRegex(RuntimeError, "socket failed"):
                 await Diagrammer().handle(session, [{"type": "system_fact", "text": "auth exists"}])
         self.assertIn("auth", session.board.boxes)
@@ -315,12 +372,12 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         model_started = asyncio.Event()
         model_continue = asyncio.Event()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             model_started.set()
             await model_continue.wait()
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             task = asyncio.create_task(Diagrammer().handle(
                 session, [{"type": "system_fact", "text": "auth exists"}]))
             await asyncio.wait_for(model_started.wait(), 1)
@@ -346,10 +403,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         session = SlowSession()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             task = asyncio.create_task(Diagrammer().handle(
                 session, [{"type": "system_fact", "text": "auth exists"}]))
             await asyncio.wait_for(drawing.wait(), 1)
@@ -375,10 +432,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         session = SlowSession()
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             task = asyncio.create_task(Diagrammer().handle(
                 session, [{"type": "system_fact", "text": "auth exists"}]))
             await asyncio.wait_for(drawing.wait(), 1)
@@ -404,7 +461,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
             fact = "auth exists" if len(line_batches) == 1 else "Redis exists"
             return json.dumps([{"type": "system_fact", "text": fact, "entities": [fact.split()[0]]}])
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             fact = json.loads(messages[-1]["content"])["facts"][0]["text"]
             if fact == "auth exists":
                 old_model_started.set()
@@ -413,7 +470,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
             else:
                 await handlers["add_box"](id="redis", label="Redis", x=400, y=300, kind="datastore")
 
-        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.listener.llm.chat", chat), patch("agents.diagrammer.llm.run_json_ops", tools):
             listener = Listener(session, debounce_seconds=0)
             listener.submit("Preet", "auth exists")
             await asyncio.wait_for(old_model_started.wait(), 1)
@@ -430,7 +487,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len([m for m in terminal if m["state"] == "done"]), 3)
 
     async def test_diagrammer_clear_always_sends_draw_then_snapshot(self):
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["clear"]()
 
         for populated in (False, True):
@@ -438,7 +495,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
             if populated:
                 session.board.apply({"op": "add_box", "id": "auth", "label": "Auth",
                                      "x": 400, "y": 300, "kind": "service"})
-            with patch("agents.diagrammer.llm.run_tools", tools):
+            with patch("agents.diagrammer.llm.run_json_ops", tools):
                 await Diagrammer().handle(session, [{"type": "system_fact", "text": "clear"}])
             wire = [m for m in session.messages if m["type"] in ("draw", "board_snapshot")]
             self.assertEqual([m["type"] for m in wire], ["draw", "board_snapshot"])
@@ -461,10 +518,10 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         session.board.apply({"op": "add_box", "id": "auth", "label": "Auth",
                              "x": 400, "y": 300, "kind": "service"})
 
-        async def tools(model, messages, definitions, handlers, max_steps, **kw):
+        async def tools(model, messages, definitions, handlers, max_ops, **kw):
             await handlers["clear"]()
 
-        with patch("agents.diagrammer.llm.run_tools", tools):
+        with patch("agents.diagrammer.llm.run_json_ops", tools):
             task = asyncio.create_task(Diagrammer().handle(
                 session, [{"type": "system_fact", "text": "clear"}]))
             await asyncio.wait_for(publishing.wait(), 1)
