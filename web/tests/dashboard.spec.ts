@@ -13,6 +13,8 @@ test('workspace dashboard', async ({ page }, info) => {
   await expect(page.locator('.dash-ws')).toHaveText('crusoehacks')
   await expect(page.locator('.dash-row').first()).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('Daily standup')).toBeVisible()
+  // Twin's scores arrive at join; the lazy Scoreboard must still show them (ws.ts replay).
+  await expect(page.locator('.dash-card', { hasText: "Twin's learning" }).getByText('No scores yet')).toHaveCount(0, { timeout: 10_000 })
   await page.waitForTimeout(1500)
   await page.screenshot({ path: info.outputPath('dashboard.png'), fullPage: true })
 

@@ -54,8 +54,8 @@ export function serverWsBase(): string {
     }
     return toWsBase(q)
   }
-  const devPorts = new Set(['5173', '5174', '5180'])
-  const onDev = devPorts.has(location.port)
+  // Vite dev server (any port) or the usual dev ports when serving a preview build.
+  const onDev = import.meta.env.DEV || ['5173', '5174', '5180'].includes(location.port)
   try {
     const saved = onDev ? null : localStorage.getItem(SERVER_KEY)
     if (saved) return toWsBase(saved)
@@ -125,7 +125,26 @@ export function createClient(opts: {
     stateCbs.forEach((cb) => cb(s))
   }
 
+  // Late subscribers (lazy panels) get the latest copy of these, one per key, so data sent at join isn't lost.
+  const replay = new Map<string, Map<string, AnyServerMessage>>()
+  const replayKey = (m: AnyServerMessage): string | null => {
+    const r = m as Record<string, unknown>
+    if (m.type === 'metric') return `${r.split}|${r.name}|${r.version}`
+    if (m.type === 'task') return String(r.id)
+    return null
+  }
+  const remember = (m: AnyServerMessage) => {
+    const k = replayKey(m)
+    if (k === null) return
+    let bucket = replay.get(m.type)
+    if (!bucket) replay.set(m.type, (bucket = new Map()))
+    bucket.delete(k)
+    bucket.set(k, m)
+    if (bucket.size > 100) bucket.delete(bucket.keys().next().value as string)
+  }
+
   const dispatch = (msg: AnyServerMessage) => {
+    remember(msg)
     typed.get(msg.type)?.forEach((cb) => cb(msg))
     any.forEach((cb) => cb(msg))
   }
@@ -213,6 +232,11 @@ export function createClient(opts: {
       if (!set) typed.set(type, (set = new Set()))
       const fn = cb as (m: AnyServerMessage) => void
       set.add(fn)
+      const cached = replay.get(type)
+      if (cached?.size) {
+        const msgs = [...cached.values()]
+        queueMicrotask(() => set!.has(fn) && msgs.forEach((m) => fn(m)))
+      }
       return () => set!.delete(fn)
     },
     onAny(cb) {
