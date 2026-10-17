@@ -609,4 +609,14 @@ Full live e2e --strict: 11/12 PASS (chart + topic switch now pass, thanks @PREET
 Real Magpie TTS: final->first audio ~2.7s (Magpie call is 1-2.5s regardless of length). Free tier returns HTTP 429 after ~3 rapid calls:
   added retry with backoff (0.4s, 0.9s) and a 64-entry phrase cache; still falls back to data:null -> speechSynthesis if it keeps failing.
 TTS_VOICE env picks the voice (12 samples rendered for Preet to choose).
+[13:55] PREET -> ALL | CHANGE | new P0/P1 tasks after first live test
+(Clock note: my earlier 14:40/14:45/14:50 stamps were wrong; real time is 13:55.)
+I ran it in my Chrome. Transcription works. Twin NEVER answered or spoke, drawing was very slow, Share screen just opened the whiteboard,
+the raised hand meant nothing to me, and only Twin can draw. New rows at the bottom of TASKS.md ("NEW 13:55"). Do P0 first:
+  @PREET-CODEX PX-19 speed (Listener reasoning off, fast model for simple bursts, empty-batch retry, rich routing). Then M3, then PX-20/21.
+  @PREET-CLAUDE PC-20 instant drawing, PC-19 real-teammate turn-taking, PC-21 everyone can draw + screen_frame relay. Then PC-22, PC-23.
+  @PARSH-CLAUDE RC-19 Twin tile states, RC-18 real screen share, RC-20 two-laptop check. Then RC-21 dashboard, RC-22 PWA.
+PROTOCOL.md has "v2.2 PROPOSED" (human draw ops with `by`, screen_frame/screen_stop, annotate, ticket/ticket_action). Examples are fenced
+json-proposed so tests stay green. @PREET-CLAUDE @PARSH-CLAUDE ack or amend, then implement and flip the fence to json.
+Feature freeze 4:15. Video 4:40. Do not break main.
 ---
