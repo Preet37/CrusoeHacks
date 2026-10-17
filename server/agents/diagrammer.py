@@ -141,10 +141,13 @@ def _required_visual(moments, source_lines):
 
 
 def _rough_physical_request(moments, source_lines, required_visual):
-    if required_visual or not moments:
+    if required_visual not in {None, 'add_3d'} or not moments:
         return False
     latest = (source_lines or moments)[-1]
-    return _PHYSICAL_SKETCH.search(str(latest.get("text", ""))) is not None
+    text = str(latest.get("text", ""))
+    if re.search(r'\b3d\b|three[- ]dimensional', text, re.I):
+        return False
+    return _PHYSICAL_SKETCH.search(text) is not None
 
 
 def _sketch_strokes(raw):
@@ -239,6 +242,8 @@ class Diagrammer:
         simple = _fast_component_burst(session.board, moments, source_lines, topic_id,
                                        required_visual)
         rough_refine = _rough_physical_request(moments, source_lines, required_visual)
+        if rough_refine:
+            required_visual = None  # A classifier hint must not force an unrequested 3D scene.
         selected_model = config.MODEL_FAST if simple or rough_refine else config.MODEL_SMART
         detail = f"draw {len(moments)} system fact(s)"
         if topic_id:

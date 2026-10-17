@@ -48,7 +48,8 @@ def _fail_full_planner(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rough_is_visible_before_super_and_refinement_updates_same_id(monkeypatch):
+@pytest.mark.parametrize('hint', [None, '3d'])
+async def test_rough_is_visible_before_super_and_refinement_updates_same_id(monkeypatch, hint):
     session = Session()
     started, release = asyncio.Event(), asyncio.Event()
     calls = []
@@ -64,7 +65,9 @@ async def test_rough_is_visible_before_super_and_refinement_updates_same_id(monk
 
     monkeypatch.setattr(llm, "chat", chat)
     _fail_full_planner(monkeypatch)
-    task = asyncio.create_task(_request(session))
+    task = asyncio.create_task(Diagrammer().handle(
+        session, [{"type": "task", "text": REQUEST}],
+        source_lines=[{"text": REQUEST, "speaker": "Preet", "wants_visual": hint}]))
     try:
         await asyncio.wait_for(started.wait(), 2)
         rough = _sketches(session)
