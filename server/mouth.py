@@ -170,6 +170,9 @@ class Mouth:
         elif d.action == "hold":
             if s.status not in ("hand_raised", "speaking", "thinking"):
                 await s.set_status("hand_raised")
+        if (s.status == "listening" and now < self.state.hold_until_ms and not self.state.twin_speaking
+                and not s.current_say_id):
+            await s.set_status("hand_raised")  # a turn ended inside a "not now" hold: keep the hand up
         if s.status == "hand_raised" and now >= self.state.hold_until_ms and not self.state.twin_speaking:
             await s.set_status("listening")
 

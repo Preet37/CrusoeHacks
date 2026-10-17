@@ -100,7 +100,7 @@ async def clean_stream(deltas: AsyncIterator[str]) -> AsyncIterator[str]:
             yield tail
 
 
-_PREFIX_RE = re.compile(r"^\s*(?:twin\s*[:.,\-]\s*)+", re.I)
+_PREFIX_RE = re.compile(r"^\s*(?:(?:hey,?\s+|hi,?\s+)?(?:it's\s+)?twin(?:\s+here)?\s*[:.,!\-]\s*)+", re.I)
 
 
 async def strip_prefix(deltas: AsyncIterator[str]) -> AsyncIterator[str]:
@@ -112,7 +112,7 @@ async def strip_prefix(deltas: AsyncIterator[str]) -> AsyncIterator[str]:
             yield d
             continue
         head += d
-        if len(head) < 8 and "twin"[: len(head.strip())].lower() == head.strip().lower():
+        if len(head) < 14 and any(p.startswith(head.strip().lower()) for p in ("twin here", "it's twin", "hey, twin", "hi, twin")):
             continue  # could still be the start of a label
         done = True
         head = _PREFIX_RE.sub("", head)

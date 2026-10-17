@@ -124,3 +124,14 @@ async def test_strips_speaker_label():
     s = FakeSession()
     out = await responder.respond(s, "addressed", stream=labelled, speak=fake_speak)
     assert out == "I connected auth to postgres."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("chunks", [["Twin here.", " Looks right."], ["Twin ", "here. Looks right."], ["It's Twin: Looks right."]])
+async def test_strips_twin_here(chunks):
+    async def labelled(model, messages, **kw):
+        for d in chunks:
+            yield d
+
+    out = await responder.respond(FakeSession(), "addressed", stream=labelled, speak=fake_speak)
+    assert out == "Looks right."
