@@ -80,6 +80,8 @@ export default function Dashboard({
   const [calendar, setCalendar] = useState<CalMeeting[]>([])
   const [meetings, setMeetings] = useState<Meeting[] | null>(null)
   const [info, setInfo] = useState<WorkspaceInfo | null>(null)
+  const [integ, setInteg] = useState<Record<string, Record<string, unknown>> | null>(null)
+  const [pushing, setPushing] = useState<Record<string, string>>({})
   const [auto, setAuto] = useState(loadAuto)
   const [lobby, setLobby] = useState<TwinClient | null>(null)
   const [repo, setRepo] = useState('')
@@ -89,6 +91,13 @@ export default function Dashboard({
   const refresh = () => {
     void getJson<{ meetings: CalMeeting[] }>('/calendar', session).then((d) => setCalendar(d?.meetings ?? []))
     void getJson<WorkspaceInfo>('/workspace', session).then((d) => d && setInfo(d))
+    void getJson<Record<string, unknown>>('/integrations', session).then((d) => {
+      const raw = (d?.integrations ?? d) as Record<string, unknown> | null
+      if (!raw) return setInteg(null)
+      const norm: Record<string, Record<string, unknown>> = {}
+      for (const [k, v] of Object.entries(raw)) norm[k] = typeof v === 'object' && v ? (v as Record<string, unknown>) : { connected: !!v }
+      setInteg(norm)
+    })
     void Promise.all([
       getJson<{ meetings: Meeting[] }>('/meetings', session),
       getJson<{ tickets: (Ticket & { meeting_id?: string })[] }>('/tickets', session),
@@ -150,6 +159,20 @@ export default function Dashboard({
       localStorage.setItem(AUTO_KEY, JSON.stringify(next))
     } catch {
       /* ignore */
+    }
+  }
+
+  const pushJira = async (id: string) => {
+    setPushing((p) => ({ ...p, [id]: 'Pushing…' }))
+    try {
+      const q = new URLSearchParams({ workspace: session.workspace, code: session.code })
+      const r = await fetch(`${serverHttpBase()}/tickets/${encodeURIComponent(id)}/push_jira?${q}`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      const url = d?.links?.jira ?? d?.url ?? d?.jira_url
+      setPushing((p) => ({ ...p, [id]: r.ok ? (url ? `url:${url}` : 'Pushed') : d?.detail || d?.error || `Failed (${r.status})` }))
+      if (r.ok) refresh()
+    } catch {
+      setPushing((p) => ({ ...p, [id]: 'Server unreachable' }))
     }
   }
 
@@ -233,7 +256,7 @@ export default function Dashboard({
                     <span className="dash-title">{m.room.replace(`${session.workspace}-`, '').replace(/-/g, ' ')}</span>
                     {m.title && <span className="hint">· {m.title}</span>}
                     <span className="hint">{m.ended_at ? fmt(toMs(m.ended_at)) : ''}</span>
-                    {!!m.tickets?.length && <span className="tag">{m.tickets.length} tickets</span>}
+                    {!!m.tickets?.length && <span className="tag">{m.tickets.length} ticket{m.tickets.length === 1 ? "" : "s"}</span>}
                   </summary>
                   {m.summary && <p className="meet-sum">{m.summary}</p>}
                   {!!m.decisions?.length && (
@@ -268,6 +291,20 @@ export default function Dashboard({
                                 Copy agent prompt
                               </button>
                             )}
+                            {t.id && !links.some(([k]) => k === 'jira') && (() => {
+                              const st = pushing[t.id!]
+                              if (st?.startsWith('url:'))
+                                return (
+                                  <a className="pill small" href={st.slice(4)} target="_blank" rel="noreferrer">
+                                    Open in Jira
+                                  </a>
+                                )
+                              return (
+                                <button className="pill small on" disabled={st === 'Pushing…'} title={st || 'Create this ticket in Jira'} onClick={() => void pushJira(t.id!)}>
+                                  {st && st !== 'Pushing…' && st !== 'Pushed' ? 'Retry Jira' : st || 'Push to Jira'}
+                                </button>
+                              )
+                            })()}
                             {links.map(([k, v]) => (
                               <a key={k} href={v} target="_blank" rel="noreferrer" className="pill small">
                                 {k}
@@ -317,6 +354,23 @@ export default function Dashboard({
               </button>
             </div>
             {repoStatus && <div className="hint" style={{ marginTop: 6 }}>{repoStatus}</div>}
+          </section>
+
+          <section className="dash-card glass">
+            <h2>Integrations</h2>
+            {(['github', 'jira', 'slack'] as const).map((k) => {
+              const v = integ?.[k]
+              const connected = k === 'github' ? !!(v?.connected ?? info?.repo_url) : !!v?.connected
+              const detail = String(v?.project ?? v?.repo_url ?? v?.base_url ?? (k === 'github' ? (info?.repo_url ?? '') : ''))
+              return (
+                <div key={k} className="perm-row">
+                  <span className="dash-title" style={{ width: 70, textTransform: 'capitalize' }}>{k === 'github' ? 'GitHub' : k}</span>
+                  <span className="hint ellipsis" style={{ flex: 1 }}>{detail.replace('https://github.com/', '').replace(/\.git$/, '')}</span>
+                  <span className={`tag ${connected ? 'live' : ''}`}>{connected ? 'CONNECTED' : integ ? 'NOT CONNECTED' : '—'}</span>
+                </div>
+              )
+            })}
+            {!integ && <div className="hint">Integration status appears when the server exposes it.</div>}
           </section>
 
           <PermissionsCard session={session} />

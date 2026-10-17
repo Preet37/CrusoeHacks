@@ -465,3 +465,5 @@ input { font: inherit; }
 .chip-src { font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); text-decoration: none; }
 .take-q { font-weight: 600; padding: 8px 10px; border-radius: var(--r-sm); background: rgba(94, 92, 230, 0.12); border-left: 3px solid var(--twin-a); }
 .take-head b { white-space: nowrap; }
+.perm-row .tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--border-strong); color: var(--text-2); }
+.perm-row .tag.live { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
