@@ -18,7 +18,7 @@ async def test_wired_session_draws_speaks_and_replaces_listener_on_clear(monkeyp
     async def chat(*args, **kwargs):
         return json.dumps([{"type": "system_fact", "text": "The web app uses auth", "entities": ["web", "auth"]}])
 
-    async def run_tools(model, messages, tools, handlers, **kwargs):
+    async def run_operations(model, messages, tools, handlers, **kwargs):
         await handlers["add_box"](id="auth", label="Auth", x=400, y=300, kind="service")
         return "Done"
 
@@ -26,7 +26,8 @@ async def test_wired_session_draws_speaks_and_replaces_listener_on_clear(monkeyp
         yield "I am here to help."
 
     monkeypatch.setattr(llm, "chat", chat)
-    monkeypatch.setattr(llm, "run_tools", run_tools)
+    monkeypatch.setattr(llm, "run_tools", run_operations)
+    monkeypatch.setattr(llm, "run_json_ops", run_operations)
     monkeypatch.setattr(llm, "stream_chat", stream_chat)
     monkeypatch.setattr(config, "NVIDIA_API_KEY", "")
     monkeypatch.setattr(responder, "LATENCY_LOG", tmp_path / "latency.jsonl")
