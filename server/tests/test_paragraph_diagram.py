@@ -69,6 +69,7 @@ async def test_long_spec_one_call_layered_eight_nodes_labeled_edges(monkeypatch)
     session = Session()
     await run(session)
     assert calls == [config.MODEL_RESPONDER]
+    assert session.board.active_frame == "t_arch"
     assert len(session.board.boxes) == 8
     assert len(session.board.edges) == 7
     assert len([shape for shape in session.board.shapes.values() if shape["op"] == "frame"]) == 4
@@ -141,3 +142,75 @@ async def test_unique_label_aliases_resolve_without_inventing_nodes(monkeypatch)
     session = Session()
     await run(session)
     assert len(session.board.edges) == 7
+
+
+@pytest.mark.asyncio
+async def test_natural_language_model_ids_stay_internal_and_nodes_use_layer_coordinates(monkeypatch):
+    plan = json.loads(json.dumps(PLAN))
+    layer_names = {"clients": "Client Applications", "services": "Application Services",
+                   "data": "Data and Infrastructure"}
+    for layer in plan["layers"]:
+        layer["id"] = layer_names[layer["id"]]
+    labels = {node["id"]: node["label"] for node in plan["nodes"]}
+    for node in plan["nodes"]:
+        node["layer"] = layer_names[node["layer"]]
+        node["id"] = node["label"]
+    for edge in plan["edges"]:
+        edge["from"] = labels[edge["from"]]
+        edge["to"] = labels[edge["to"]]
+
+    async def chat(*args, **kwargs):
+        return json.dumps(plan)
+
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    await run(session)
+    assert len(session.board.boxes) == 8
+    assert len(session.board.edges) == 7
+    assert all(box["id"].startswith("arch_") and box["y"] == 500
+               for box in session.board.boxes.values())
+
+
+def indexed_plan():
+    plan = json.loads(json.dumps(PLAN))
+    layer_index = {layer["id"]: index for index, layer in enumerate(plan["layers"])}
+    node_index = {node["id"]: index for index, node in enumerate(plan["nodes"])}
+    return {
+        "layers": [{"title": layer["title"]} for layer in plan["layers"]],
+        "nodes": [{"label": node["label"], "kind": node["kind"],
+                   "layer": layer_index[node["layer"]]} for node in plan["nodes"]],
+        "edges": [{"from": node_index[edge["from"]], "to": node_index[edge["to"]],
+                   "label": edge["label"]} for edge in plan["edges"]],
+    }
+
+
+@pytest.mark.asyncio
+async def test_indexed_one_call_plan_is_complete(monkeypatch):
+    calls = []
+    async def chat(model, messages, **kwargs):
+        calls.append(messages[0]["content"])
+        return json.dumps(indexed_plan())
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    await run(session)
+    assert len(calls) == 1
+    assert "ZERO-BASED INTEGER" in calls[0]
+    assert len(session.board.boxes) == 8
+    assert len(session.board.edges) == 7
+    assert {edge["label"] for edge in session.board.edges.values()} == {
+        "HTTPS", "login", "billing", "users", "sessions", "writes"}
+
+
+@pytest.mark.parametrize("bad_endpoint", [8, -1, True])
+@pytest.mark.asyncio
+async def test_indexed_dangling_or_boolean_endpoint_rejects_atomically(monkeypatch, bad_endpoint):
+    plan = indexed_plan()
+    plan["edges"][-1]["to"] = bad_endpoint
+    async def chat(*args, **kwargs):
+        return json.dumps(plan)
+    monkeypatch.setattr(llm, "chat", chat)
+    session = Session()
+    with pytest.raises(ValueError, match="endpoint"):
+        await run(session)
+    assert session.board.boxes == {}
+    assert session.board.edges == {}

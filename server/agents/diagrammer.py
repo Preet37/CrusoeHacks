@@ -281,6 +281,10 @@ class Diagrammer:
             raise
         except Exception as exc:
             log.exception("Diagrammer failed")
+            if paragraph is not None:
+                update = session.push_update("I couldn't validate the architecture diagram. Please try the spec again.")
+                if inspect.isawaitable(update):
+                    await update
             if required_visual == "add_3d":
                 update = session.push_update("I couldn't validate the 3D model, so I didn't add it to the board.")
                 if inspect.isawaitable(update):

@@ -461,13 +461,21 @@ class BoardController {
       this.focusTarget = id
       return
     }
-    // Grid coords for the frame map onto the global page area...
+    // Layer frames live within their topic; only independent topics avoid overlaps.
+    const parent = typeof op.frame === 'string' ? this.frames.get(op.frame) : undefined
+    // Grid coords for top-level frames map onto the global page area...
     let x = (clampGrid(num(op.x, 0)) / 1000) * PAGE_W
-    const y = (clampGrid(num(op.y, 0)) / 1000) * PAGE_H
-    const w = (Math.max(50, Math.min(1000, num(op.w, 1000))) / 1000) * PAGE_W
-    const h = (Math.max(50, Math.min(1000, num(op.h, 1000))) / 1000) * PAGE_H
+    let y = (clampGrid(num(op.y, 0)) / 1000) * PAGE_H
+    let w = (Math.max(50, Math.min(1000, num(op.w, 1000))) / 1000) * PAGE_W
+    let h = (Math.max(50, Math.min(1000, num(op.h, 1000))) / 1000) * PAGE_H
     // ...but topics are separate areas: shift right past any frame it would overlap.
-    for (let i = 0; i < 50; i++) {
+    if (parent) {
+      x = parent.x + x / PAGE_W * parent.w
+      y = parent.y + y / PAGE_H * parent.h
+      w = w / PAGE_W * parent.w
+      h = h / PAGE_H * parent.h
+    }
+    for (let i = 0; !parent && i < 50; i++) {
       const hit = [...this.frames.values()].find((f) => x < f.x + f.w + FRAME_GAP && x + w + FRAME_GAP > f.x && y < f.y + f.h && y + h > f.y)
       if (!hit) break
       x = hit.x + hit.w + FRAME_GAP

@@ -32,13 +32,47 @@ def paragraph_request(moments: list[dict], source_lines: list[dict] | None) -> s
 def _planned_ops(value: Any, board, topic_id: str | None) -> list[dict]:
     if not isinstance(value, dict) or set(value) != {"layers", "nodes", "edges"}:
         raise ValueError("architecture plan needs only layers, nodes, edges")
-    layers, nodes, edges = (value[key] for key in ("layers", "nodes", "edges"))
-    if not isinstance(layers, list) or not 2 <= len(layers) <= 4:
+    raw_layers, raw_nodes, raw_edges = (value[key] for key in ("layers", "nodes", "edges"))
+    if not isinstance(raw_layers, list) or not 2 <= len(raw_layers) <= 4:
         raise ValueError("architecture needs 2 to 4 layers")
-    if not isinstance(nodes, list) or not 8 <= len(nodes) <= 20:
+    if not isinstance(raw_nodes, list) or not 8 <= len(raw_nodes) <= 20:
         raise ValueError("architecture needs 8 to 20 named nodes")
-    if not isinstance(edges, list) or not 7 <= len(edges) <= 32:
+    if not isinstance(raw_edges, list) or not 7 <= len(raw_edges) <= 32:
         raise ValueError("architecture needs 7 to 32 labeled edges")
+    # Current model output uses array positions for references, removing the
+    # chance of an edge naming a node omitted from the final node list. Accept
+    # the original string-id format too, for existing callers and fixtures.
+    layers = []
+    for index, raw in enumerate(raw_layers):
+        if isinstance(raw, dict) and set(raw) == {"title"}:
+            layers.append({"id": f"layer_{index}", "title": raw["title"]})
+        else:
+            layers.append(raw)
+    nodes = []
+    for index, raw in enumerate(raw_nodes):
+        if not isinstance(raw, dict):
+            raise ValueError("node must be an object")
+        node = dict(raw)
+        if set(node) == {"label", "kind", "layer"}:
+            node["id"] = f"node_{index}"
+        layer = node.get("layer")
+        if type(layer) is int:
+            if not 0 <= layer < len(layers):
+                raise ValueError("node layer index is out of range")
+            node["layer"] = layers[layer]["id"]
+        nodes.append(node)
+    edges = []
+    for raw in raw_edges:
+        if not isinstance(raw, dict):
+            raise ValueError("edge must be an object")
+        edge = dict(raw)
+        for endpoint in ("from", "to"):
+            index = edge.get(endpoint)
+            if type(index) is int:
+                if not 0 <= index < len(nodes):
+                    raise ValueError("architecture edge endpoint is out of range")
+                edge[endpoint] = nodes[index]["id"]
+        edges.append(edge)
     layer_names = []
     for layer in layers:
         if not isinstance(layer, dict) or set(layer) != {"id", "title"}:
@@ -108,6 +142,8 @@ def _planned_ops(value: Any, board, topic_id: str | None) -> list[dict]:
         ops.append({"op": "connect", "id": f"{prefix}_e{index + 1}",
                     "from_id": mapped[source], "to_id": mapped[target],
                     "label": edge["label"], **({"frame": topic_id} if topic_id else {})})
+    if topic_id:
+        ops.append({"op": "focus", "id": topic_id})
     staged = copy.deepcopy(board)
     for op in ops:
         staged.apply(op)
@@ -119,10 +155,17 @@ async def draw_paragraph(session, board, request: str, topic_id: str | None, pub
     """Stage the entire plan, then publish only if the source board is still current."""
     raw = await asyncio.wait_for(llm.chat(config.MODEL_RESPONDER, [
         {"role": "system", "content": "Extract a layered architecture graph only from the supplied specification. "
-         "Return ONLY JSON {layers:[{id,title}],nodes:[{id,label,kind,layer}],"
-         "edges:[{from,to,label}]}. Use 2-4 layers, 8-20 real named components, 7-32 labeled "
-         "relationships. Kinds: client,service,datastore,external,note. Each edge from/to "
-         "must copy the exact id of a listed node. Do not refer to omitted nodes or invent edges."},
+         "Return ONLY one JSON object with exactly these keys: "
+         "layers:[{title}], nodes:[{label,kind,layer}], edges:[{from,to,label}]. "
+         "Use 2-4 layers, 8-20 real named components, and 7-32 labeled relationships. "
+         "Node layer is a ZERO-BASED INTEGER position in the layers array. Edge from/to are "
+         "ZERO-BASED INTEGER positions in the FINAL nodes array, never names or IDs. "
+         "For example, an edge from nodes[0] to nodes[2] is "
+         "{\"from\":0,\"to\":2,\"label\":\"HTTPS\"}. "
+         "Kinds are client, service, datastore, external, or note. "
+         "First list every named component in the source, then connect only listed nodes. "
+         "Include every stated relationship. Events and messages are edge labels, unless "
+         "the source explicitly names a queue or broker. Do not invent components or edges."},
         {"role": "user", "content": request},
     ], max_tokens=4000, response_format={"type": "json_object"},
         extra_body={"chat_template_kwargs": {"enable_thinking": False}}), timeout=15)
