@@ -414,3 +414,29 @@ input { font: inherit; }
 .stage-wrap.hidden * { visibility: hidden !important; }
 .stage-wrap { transition: opacity 300ms var(--ease); }
 .grid { padding: 4px; }
+
+/* B5 login + calmer dashboard */
+.login-card { width: min(400px, 100%); padding: 28px; border-radius: 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; animation: pop 450ms var(--spring); }
+.login-card .twin-avatar { width: 48px; }
+.login-card h1 { margin: 6px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.login-card p { margin: 0 0 6px; line-height: 1.45; }
+.dash-cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 16px; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 900px) { .dash-cols { grid-template-columns: 1fr; } }
+.dash-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dash-head { max-width: 1200px; margin: 0 auto 20px; }
+.meet { border-top: 1px solid var(--border); padding: 10px 0; }
+.meet:first-of-type { border-top: 0; }
+.meet summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; text-transform: capitalize; }
+.meet summary::-webkit-details-marker { display: none; }
+.meet summary .tag { margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); text-transform: none; }
+.meet h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 12px 0 4px; }
+.meet ul { margin: 0; padding-left: 18px; color: var(--text-2); line-height: 1.55; }
+.meet-sum { margin: 8px 0 0; color: var(--text-2); line-height: 1.5; }
+.ticket { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.ticket .tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--border-strong); }
+.ticket a.pill { text-decoration: none; text-transform: capitalize; }
+.repo { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.repo .logo { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: #fff; background: #24292f; font-size: 11px; }
+.repo a { color: var(--text); text-decoration: none; }
+.repo .tag { margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+.repo .tag.live { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
