@@ -16,6 +16,7 @@ const TABS: { id: SideTab; label: string }[] = [
 ]
 
 export default function SidePanel({
+  open,
   tab,
   onTab,
   onClose,
@@ -23,6 +24,7 @@ export default function SidePanel({
   twinStatus,
   client,
 }: {
+  open: boolean
   tab: SideTab
   onTab(t: SideTab): void
   onClose(): void
@@ -31,7 +33,7 @@ export default function SidePanel({
   client: TwinClient | null
 }) {
   return (
-    <aside className="side glass">
+    <aside className="side glass" hidden={!open}>
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => onTab(t.id)}>
@@ -67,15 +69,15 @@ export default function SidePanel({
             ))}
           </>
         )}
-        {tab === 'activity' && (
-          <>
+        <div hidden={tab !== 'activity'}>
             <h3>Agent tree</h3>
             <AgentTree client={client} />
             <h3 style={{ marginTop: 18 }}>Learning</h3>
             <Scoreboard client={client} />
-          </>
-        )}
-        {tab === 'tasks' && <TaskPanel client={client} />}
+        </div>
+        <div hidden={tab !== 'tasks'}>
+          <TaskPanel client={client} />
+        </div>
         {tab === 'connections' && <ConnectionsPanel client={client} />}
       </div>
     </aside>

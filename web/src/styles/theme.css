@@ -320,3 +320,4 @@ input { font: inherit; }
   .controls .left, .controls .right { display: none; }
   .controls .mid { justify-self: center; flex-wrap: wrap; justify-content: center; }
 }
+.side[hidden] { display: none; }

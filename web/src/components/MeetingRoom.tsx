@@ -99,7 +99,9 @@ export default function MeetingRoom({
     for (const p of m.people) byName.set(p.name, p)
     if (!byName.has(user)) byName.set(user, { name: user, kind: 'human', speaking: false })
     if (!byName.has('Twin')) byName.set('Twin', { name: 'Twin', kind: 'ai', speaking: false })
-    for (const l of m.lines) if (!byName.has(l.speaker)) byName.set(l.speaker, { name: l.speaker, kind: 'human', speaking: false })
+    // Transcript speakers are only a fallback until the server sends an authoritative participant list.
+    if (!m.people.length)
+      for (const l of m.lines) if (!byName.has(l.speaker)) byName.set(l.speaker, { name: l.speaker, kind: 'human', speaking: false })
     return [...byName.values()]
   }, [m.people, m.lines, user])
   const isSpeaking = (p: Person) =>
@@ -182,16 +184,16 @@ export default function MeetingRoom({
             </div>
           )}
         </div>
-        {side && (
-          <SidePanel
-            tab={side}
+        {/* Always mounted so AgentTree/TaskPanel/Scoreboard collect events even while closed. */}
+        <SidePanel
+            open={side !== null}
+            tab={side ?? 'people'}
             onTab={setSide}
             onClose={() => setSide(null)}
             people={people}
             twinStatus={m.twinStatus}
             client={client}
           />
-        )}
       </div>
 
       <ControlBar
