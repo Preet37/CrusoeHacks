@@ -40,6 +40,30 @@ function getContext(): AudioContext {
   return sharedCtx;
 }
 
+// ---------- output level (drives Twin's orb) ----------
+
+let outputAnalyser: AnalyserNode | null = null;
+
+function getOutputNode(ctx: AudioContext): AudioNode {
+  if (!outputAnalyser) {
+    outputAnalyser = ctx.createAnalyser();
+    outputAnalyser.fftSize = 256;
+    outputAnalyser.connect(ctx.destination);
+  }
+  return outputAnalyser;
+}
+
+const levelBuf = new Uint8Array(256);
+/** 0..1 loudness of Twin's audio right now (0 when silent or using the speechSynthesis fallback). */
+export function getOutputLevel(): number {
+  if (!outputAnalyser) return 0;
+  const buf = levelBuf.subarray(0, outputAnalyser.fftSize);
+  outputAnalyser.getByteTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += ((buf[i] - 128) / 128) ** 2;
+  return Math.min(1, Math.sqrt(sum / buf.length) * 3.5);
+}
+
 /** Call from a user gesture (click/keydown) so the AudioContext may start. Safe to call repeatedly. */
 export function unlockAudio(): Promise<void> {
   const ctx = getContext();
@@ -379,7 +403,7 @@ export class AudioPlayer {
     if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(ctx.destination);
+    src.connect(getOutputNode(ctx));
     const now = ctx.currentTime;
     const startAt = Math.max(now, this.nextStart);
     this.nextStart = startAt + buf.duration;

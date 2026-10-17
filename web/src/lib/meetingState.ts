@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { StatusState } from './protocol'
 import type { AnyServerMessage, ConnState, TwinClient } from './ws'
+import type { Annotation, AnnotateItem, RemoteFrame } from '../components/ScreenStage'
 
 export interface Person {
   name: string
@@ -46,6 +47,10 @@ export interface MeetingState {
   sketching: string[]
   /** When Twin's status became hand_raised (ms), else null. */
   handRaisedAt: number | null
+  /** Latest frame someone else is sharing (screen_frame), else null. */
+  remoteScreen: RemoteFrame | null
+  /** Twin's live markup on the shared screen. */
+  annotations: Annotation[]
 }
 
 const MAX_LINES = 200
@@ -68,6 +73,8 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
     lastError: null,
     sketching: [],
     handRaisedAt: null,
+    remoteScreen: null,
+    annotations: [],
   }))
 
   useEffect(() => {
@@ -124,14 +131,45 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
             brief: { title: String(msg.title ?? ''), predictions: (msg.predictions as string[]) ?? [], ts: msg.ts as number },
           }))
           break
+        case 'screen_frame':
+          if (msg.user === client.user) break
+          set((p) => ({
+            ...p,
+            remoteScreen: { user: String(msg.user), jpeg: String(msg.jpeg), w: Number(msg.w) || 1280, h: Number(msg.h) || 800 },
+          }))
+          break
+        case 'screen_stop':
+          set((p) => (p.remoteScreen && p.remoteScreen.user === msg.user ? { ...p, remoteScreen: null, annotations: [] } : p))
+          break
+        case 'annotate': {
+          if (msg.target && msg.target !== 'screen') break
+          const ttl = Number(msg.ttl_s ?? 20)
+          const a: Annotation = {
+            id: String(msg.id ?? Date.now()),
+            items: (msg.items as AnnotateItem[]) ?? [],
+            until: ttl > 0 ? Date.now() + ttl * 1000 : null,
+          }
+          set((p) => ({ ...p, annotations: [...p.annotations.filter((x) => x.id !== a.id), a] }))
+          break
+        }
         case 'error':
           set((p) => ({ ...p, lastError: String(msg.message ?? 'error') }))
           break
       }
     })
+    // Drop expired annotations.
+    const sweep = window.setInterval(() => {
+      const now = Date.now()
+      set((p) =>
+        p.annotations.some((a) => a.until !== null && a.until < now)
+          ? { ...p, annotations: p.annotations.filter((a) => a.until === null || a.until >= now) }
+          : p,
+      )
+    }, 1000)
     return () => {
       off()
       offState()
+      window.clearInterval(sweep)
     }
   }, [client])
 

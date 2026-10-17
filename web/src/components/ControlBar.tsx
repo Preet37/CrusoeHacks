@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { SideTab } from './SidePanel'
 import {
   BoardIcon, CamIcon, CamOffIcon, CaptionsIcon, HandIcon, LeaveIcon, MicIcon, MicOffIcon,
-  PeopleIcon, SparkIcon, SpeakerIcon, SpeakerOffIcon, TalkIcon,
+  PeopleIcon, ShareIcon, SparkIcon, SpeakerIcon, SpeakerOffIcon, TalkIcon,
 } from './Icons'
 
 export interface ControlBarProps {
@@ -12,6 +12,8 @@ export interface ControlBarProps {
   captionsOn: boolean
   boardOn: boolean
   boardHasContent: boolean
+  sharing: boolean
+  onShare(): void
   handUp: boolean
   pttActive: boolean
   twinMuted: boolean
@@ -69,6 +71,13 @@ export default function ControlBar(p: ControlBarProps) {
           <TalkIcon />
         </button>
         <span className="sep" />
+        <button
+          className={`pill icon ${p.sharing ? 'on' : ''}`}
+          title={p.sharing ? 'Stop sharing your screen' : 'Share your screen'}
+          onClick={p.onShare}
+        >
+          <ShareIcon />
+        </button>
         <button
           className={`pill icon ${p.boardOn ? 'on' : ''}`}
           title={p.boardOn ? 'Hide whiteboard' : p.boardHasContent ? 'Show whiteboard' : 'Show whiteboard (empty)'}

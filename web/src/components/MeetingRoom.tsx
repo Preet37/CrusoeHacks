@@ -9,6 +9,7 @@ import ControlBar from './ControlBar'
 import { CloseIcon } from './Icons'
 import { Whiteboard } from './optional'
 import { HumanTile, TwinTile } from './ParticipantTile'
+import ScreenStage, { startFrameSender } from './ScreenStage'
 import SidePanel, { type SideTab } from './SidePanel'
 
 const SPEAKING_MS = 1500
@@ -36,6 +37,11 @@ export default function MeetingRoom({
   const [ptt, setPtt] = useState(false)
   const [side, setSide] = useState<SideTab | null>(null)
   const [briefOpen, setBriefOpen] = useState(true)
+  const [myScreen, setMyScreen] = useState<MediaStream | null>(null)
+  const [stageTab, setStageTab] = useState<'board' | 'screen'>('board')
+  const [screenErr, setScreenErr] = useState<string | null>(null)
+  /** Server rejected screen_frame (older server): keep sharing locally, stop sending frames. */
+  const framesUnsupported = useRef(false)
   const [, tick] = useState(0)
 
   const audio = useCallAudio({
@@ -46,6 +52,57 @@ export default function MeetingRoom({
     onInterim: (t) => m.addLocalInterim(user, t),
     onFinal: () => m.addLocalInterim(user, ''),
   })
+
+  // Screen share (RC-18): local capture + ~1 fps JPEG frames to the room.
+  const stopShare = () => {
+    myScreen?.getTracks().forEach((t) => t.stop())
+    setMyScreen(null)
+    client.send({ type: 'screen_stop', user })
+  }
+  const startShare = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: false })
+      setMyScreen(stream)
+      setStageTab('screen')
+      setScreenErr(null)
+    } catch (e) {
+      if ((e as Error).name !== 'NotAllowedError') setScreenErr((e as Error).message)
+    }
+  }
+  useEffect(() => {
+    if (!myScreen) return
+    const track = myScreen.getVideoTracks()[0]
+    const onEnded = () => {
+      setMyScreen(null)
+      client.send({ type: 'screen_stop', user })
+    }
+    track?.addEventListener('ended', onEnded)
+    const stop = startFrameSender(myScreen, (f) => {
+      if (!framesUnsupported.current) client.send({ type: 'screen_frame', user, ...f, ts: Date.now() })
+    })
+    const offErr = client.on('error', (msg) => {
+      if (/screen_frame/.test(String((msg as { message?: string }).message))) framesUnsupported.current = true
+    })
+    return () => {
+      stop()
+      offErr()
+      track?.removeEventListener('ended', onEnded)
+    }
+  }, [myScreen, client, user])
+  // Someone else started sharing: show their screen.
+  const remoteSharing = !!m.remoteScreen
+  useEffect(() => {
+    if (remoteSharing) setStageTab('screen')
+  }, [remoteSharing])
+
+  // Server errors show as a toast for 5 s.
+  const [toast, setToast] = useState<string | null>(null)
+  useEffect(() => {
+    if (!m.lastError) return
+    setToast(m.lastError)
+    const id = window.setTimeout(() => setToast(null), 5000)
+    return () => window.clearTimeout(id)
+  }, [m.lastError, m.lines.length])
 
   // Re-render periodically so "speaking" rings fade out.
   useEffect(() => {
@@ -107,7 +164,11 @@ export default function MeetingRoom({
   const isSpeaking = (p: Person) =>
     p.speaking || (m.lastSpoke[p.name] !== undefined && now - m.lastSpoke[p.name] < SPEAKING_MS) || !!m.interim[p.name]
 
-  const presenting = boardPinned ?? boardHasContent
+  const screenActive = !!myScreen || remoteSharing
+  const boardPresenting = boardPinned ?? boardHasContent
+  const presenting = boardPresenting || screenActive
+  // Sharing never opens the board; the board never hides an active share.
+  const tab: 'board' | 'screen' = !screenActive ? 'board' : !boardPresenting ? 'screen' : stageTab
   const humans = people.filter((p) => p.kind === 'human')
 
   const tiles = (
@@ -142,7 +203,11 @@ export default function MeetingRoom({
           {client.mock ? 'Mock server' : m.conn === 'open' ? 'Connected' : m.conn === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
         </span>
         {m.topic && <span className="chip">Topic: {m.topic.title}</span>}
-        {presenting && boardHasContent && <span className="chip presenting">Twin is presenting</span>}
+        {screenActive && (
+          <span className="chip presenting">{myScreen ? 'You are presenting' : `${m.remoteScreen?.user} is presenting`}</span>
+        )}
+        {!screenActive && presenting && boardHasContent && <span className="chip presenting">Twin is presenting</span>}
+        {screenErr && <span className="chip" style={{ color: 'var(--danger)' }}>{screenErr}</span>}
         <span className="spacer" />
         {audio.speechError && <span className="chip" style={{ color: 'var(--danger)' }}>{audio.speechError}</span>}
         <button
@@ -161,14 +226,34 @@ export default function MeetingRoom({
           <div className={`stage-wrap ${presenting ? '' : 'hidden'}`}>
             <div className="stage">
               <div className="stage-label">
-                <button className="pill small" onClick={() => client.send({ type: 'control', action: 'clear_board' })}>
-                  Clear board
-                </button>
-                <button className="pill small" title="Back to tiles" onClick={() => setBoardPinned(false)}>
-                  <CloseIcon />
-                </button>
+                {screenActive && boardPresenting && (
+                  <span className="seg">
+                    <button className={tab === 'screen' ? 'on' : ''} onClick={() => setStageTab('screen')}>Screen</button>
+                    <button className={tab === 'board' ? 'on' : ''} onClick={() => setStageTab('board')}>Whiteboard</button>
+                  </span>
+                )}
+                {tab === 'board' && (
+                  <button className="pill small" onClick={() => client.send({ type: 'control', action: 'clear_board' })}>
+                    Clear board
+                  </button>
+                )}
+                {tab === 'screen' && myScreen && (
+                  <button className="pill small danger" onClick={stopShare}>Stop sharing</button>
+                )}
+                {tab === 'board' && (
+                  <button className="pill small" title="Back to tiles" onClick={() => setBoardPinned(false)}>
+                    <CloseIcon />
+                  </button>
+                )}
               </div>
-              <Whiteboard client={client} onHasContent={(b: boolean) => setBoardHasContent(b)} />
+              <div className={`stage-layer ${tab === 'board' ? '' : 'off'}`}>
+                <Whiteboard client={client} onHasContent={(b: boolean) => setBoardHasContent(b)} />
+              </div>
+              {screenActive && (
+                <div className={`stage-layer ${tab === 'screen' ? '' : 'off'}`}>
+                  <ScreenStage myStream={myScreen} remote={myScreen ? null : m.remoteScreen} annotations={m.annotations} />
+                </div>
+              )}
             </div>
             <div className="strip">{presenting && tiles}</div>
           </div>
@@ -188,11 +273,7 @@ export default function MeetingRoom({
               </ul>
             </div>
           )}
-          {m.lastError && (
-            <div className="toast glass" onClick={() => undefined}>
-              {m.lastError}
-            </div>
-          )}
+          {toast && <div className="toast glass">{toast}</div>}
         </div>
         {/* Always mounted so AgentTree/TaskPanel/Scoreboard collect events even while closed. */}
         <SidePanel
@@ -211,7 +292,9 @@ export default function MeetingRoom({
         micOn={media.micOn}
         camOn={media.camOn}
         captionsOn={captionsOn}
-        boardOn={presenting}
+        boardOn={boardPresenting && (!screenActive || tab === 'board')}
+        sharing={!!myScreen}
+        onShare={() => (myScreen ? stopShare() : void startShare())}
         boardHasContent={boardHasContent}
         handUp={handUp}
         pttActive={ptt}
@@ -221,7 +304,11 @@ export default function MeetingRoom({
         onMic={() => media.setMicOn(!media.micOn)}
         onCam={() => media.setCamOn(!media.camOn)}
         onCaptions={() => setCaptionsOn((c) => !c)}
-        onBoard={() => setBoardPinned(!presenting)}
+        onBoard={() => {
+          if (screenActive && boardPresenting && tab !== 'board') return setStageTab('board')
+          setBoardPinned(!boardPresenting)
+          if (!boardPresenting) setStageTab('board')
+        }}
         onHand={() => setHandUp((h) => !h)}
         onPtt={setPushToTalk}
         onTwinMute={() => {
