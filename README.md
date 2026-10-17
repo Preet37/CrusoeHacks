@@ -35,3 +35,13 @@ Both people join the same room (`/room/demo`). The server runs on laptop A only.
 4. Check: both laptops see each other in the People panel (`participants` message); `curl http://<A-ip>:8000/state?room=demo` lists both users.
 
 Calendar demo: `curl -X POST "http://localhost:8000/simulate/calendar_join?room=demo&meeting=Daily%20standup"` makes Twin join, send its `brief`, and say hi (`GET /calendar` lists the demo meetings).
+
+## Testing and benchmarks
+
+**Track: Version N+1** (Twin improves itself and proves it on held-out meetings). Shared Brain is the secondary story.
+
+- **Model benchmarks:** [`BENCHMARKS.md`](BENCHMARKS.md), with real Crusoe runs per Nemotron model (Lightning, Nano, Super, Super-VL) and task: extraction F1, visual routing, fact-check catch rate, 3D plan validity, p50/p95 latency and tokens. Raw JSON is committed next to it.
+- **Unit and contract tests:** `cd server && .venv/bin/pytest -q` gives 436 passed at the 3:12 freeze, covering protocol round-trips of every PROTOCOL.md example, turn-taking rules, barge-in, echo guard, TTS streaming, workspace auth, human edits and golden draw ops. `cd web && npx tsc -b` type-checks the app. `npm run test:e2e` runs the Playwright mock smoke test.
+- **Live end to end:** `cd server && .venv/bin/python scripts/e2e_text.py --url ws://localhost:8000 --strict` drives a real meeting over WebSocket against the live models, 12 steps with PASS/FAIL and latencies. Best run was 11/12. Measured: instant ack 16-18 ms after an addressed line, barge-in stop_audio in 37-103 ms, first shape about 2-10 s depending on Crusoe load.
+- **Per-turn latency** is logged to `server/learning/runs/latency.jsonl` (final -> first token -> first sentence -> audio).
+- **Golden board ops:** `server/tests/golden_ops.json`, replayed in the browser at `web/golden-dev.html`.

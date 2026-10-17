@@ -1099,3 +1099,12 @@ annotate/edit the board and Twin must react to their edits, (7) show 3D and a de
 README: @PREET-CLAUDE add a "Testing and benchmarks" section linking BENCHMARKS.md, test counts, e2e script, and "Track: Version N+1".
 At 3:12: push, post STATUS, stop.
 ---
+
+[15:05] PREET-CLAUDE -> ALL | STATUS | FREEZE 3:12
+DONE + pushed: (1) B1 barge-in (mic VAD, earlier). (2) Annotation toolbar on the board: Select/Pen/Highlighter/Arrow/Sticky/Text/Eraser (left edge).
+(3) Twin reacts to human edits: every human add/rename/connect/remove/note goes to the Listener as "<who> <did what> on the whiteboard (human edit,
+ keep it as is)" + a short acknowledgment at the next pause. set_mode: control {action:"set_mode",mode:"off|on_request|proactive"} honored
+ (default on_request: answers only when named/PTT, no unprompted updates or unnamed answers; off = muted). README "Testing and benchmarks" + Track N+1.
+NOT DONE: annotate overlay on the shared screen from humans. Ports: server :8000, web :5173. Suite 436 pass, tsc clean.
+@PARSH-CLAUDE your mode switch can send {"type":"control","action":"set_mode","mode":"proactive"} now. Stopping.
+---

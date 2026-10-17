@@ -149,6 +149,7 @@ async def test_unnamed_question_answered_after_pause(monkeypatch):
 
     monkeypatch.setattr(mouth.responder, "respond", fake_respond)
     s = Session("unnamed")
+    s.twin_mode = "proactive"
     m = mouth.attach(s)
     line = {"speaker": "Preet", "text": "what do you think about Redis here?", "ts": mouth._now_ms()}
     s.history.append(line)

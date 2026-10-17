@@ -207,6 +207,8 @@ class Mouth:
 
     async def _answer_unnamed(self, session, line: dict) -> None:
         """PC-19: "what do you think about Redis here?" gets an answer after a natural pause."""
+        if getattr(session, "twin_mode", "proactive") != "proactive":
+            return  # on_request: only answer when named or push-to-talk
         if session.muted or _now_ms() < self.state.hold_until_ms:
             return
         if self._turn_running():
@@ -419,6 +421,9 @@ class Mouth:
             if now - hold_start >= QUIET_AFTER_HOLD_MS and quiet >= QUIET_AFTER_HOLD_MS:
                 self.state.hold_until_ms = now  # room went quiet: the held thought may come out now
         d = turn_taking.check_idle(self.state, now, has, age, urgent=bool(getattr(s, "urgent_updates", False)))
+        if d.action == "deliver_update" and getattr(s, "twin_mode", "proactive") == "on_request" \
+                and not getattr(s, "urgent_updates", False):
+            d = turn_taking.Decision("none", "on_request_mode")  # updates wait until someone asks Twin
         if d.action == "deliver_update":
             updates = drop_false_draw_claims(s, s.pop_updates())
             if updates:

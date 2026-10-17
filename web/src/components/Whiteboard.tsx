@@ -746,6 +746,61 @@ export function currentArchitecture() {
   return { boxes, edges }
 }
 
+const ANNOTATE_TOOLS: { id: string; label: string; icon: string }[] = [
+  { id: 'select', label: 'Select', icon: '\u2196' },
+  { id: 'draw', label: 'Pen', icon: '\u270E' },
+  { id: 'highlight', label: 'Highlighter', icon: '\u2591' },
+  { id: 'arrow', label: 'Arrow', icon: '\u2197' },
+  { id: 'note', label: 'Sticky note', icon: '\u25A4' },
+  { id: 'text', label: 'Text', icon: 'T' },
+  { id: 'eraser', label: 'Eraser', icon: '\u232B' },
+]
+
+function AnnotateToolbar({ editor }: { editor: Editor }) {
+  const [active, setActive] = useState(() => editor.getCurrentToolId())
+  useEffect(() => {
+    // Tools like text/note return to select on their own; resync after each interaction.
+    const sync = () => setActive(editor.getCurrentToolId())
+    editor.on('event', sync)
+    return () => void editor.off('event', sync)
+  }, [editor])
+  return (
+    <div
+      data-testid="board-annotate-toolbar"
+      style={{
+        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', zIndex: 400,
+        display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: 999,
+        border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+      }}
+    >
+      {ANNOTATE_TOOLS.map((t) => {
+        const on = active === t.id
+        return (
+          <button
+            key={t.id}
+            title={t.label}
+            aria-label={t.label}
+            aria-pressed={on}
+            onClick={() => {
+              editor.setCurrentTool(t.id)
+              setActive(editor.getCurrentToolId())
+            }}
+            style={{
+              width: 28, height: 28, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer',
+              background: on ? '#0a84ff' : 'transparent', color: on ? '#fff' : '#1d1d1f',
+              font: '600 14px -apple-system, BlinkMacSystemFont, system-ui, sans-serif', lineHeight: '28px',
+            }}
+          >
+            {t.icon}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Whiteboard({ client, onHasContent }: { client: TwinClient; onHasContent?: (has: boolean) => void }) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [view3d, setView3d] = useState(() => new URLSearchParams(location.search).get('view') === '3d')
@@ -797,6 +852,7 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
       <div style={{ position: 'absolute', inset: 0, visibility: view3d ? 'hidden' : 'visible' }}>
         <Tldraw hideUi shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
       </div>
+      {!view3d && editor && <AnnotateToolbar editor={editor} />}
       {view3d && <Board3D client={client} onClose={() => setView3d(false)} />}
       <button
         data-testid="board-3d-toggle"

@@ -61,12 +61,13 @@ class PushToTalk(Msg):
     ts: Optional[int] = None
 
 
-ControlAction = Literal["mute_twin", "unmute_twin", "clear_board", "reset_session"]
+ControlAction = Literal["mute_twin", "unmute_twin", "clear_board", "reset_session", "set_mode"]
 
 
 class Control(Msg):
     type: Literal["control"] = "control"
     action: ControlAction
+    mode: Optional[Literal["off", "on_request", "proactive"]] = None  # with action=set_mode
 
 
 class DrawError(Msg):

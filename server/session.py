@@ -181,6 +181,7 @@ class Session:
         self._final_text_hooks: list[FinalTextHook] = []
         self._reset_hooks: list[ResetHook] = []
         self.urgent_updates = False
+        self.twin_mode = "on_request"
         # async decide_and_respond(session, line) -> None. Runs turn-taking and, if it
         # decides to talk, should spawn the responder via session.spawn("responder", ...).
         self.decide_and_respond: Callable[["Session", dict], Awaitable[Any]] | None = None
@@ -367,7 +368,26 @@ class Session:
         await self.broadcast_except(ws, out)
         if out.op == "clear":
             await self.broadcast(self.snapshot_message())
+        self._react_to_human_edit(out.by, op)
         return True
+
+    def _react_to_human_edit(self, by: str, op: dict) -> None:
+        """Human edits are events for the mind and get a short acknowledgment at the next pause."""
+        name = op.get("label") or op.get("text") or op.get("id") or "a shape"
+        verb = {"add_box": f"added {name}", "add_sticky": f"left a note: {name}", "add_text": f"wrote {name}",
+                "connect": f"connected {op.get('from_id')} to {op.get('to_id')}", "rename": f"renamed {op.get('id')} to {name}",
+                "remove": f"removed {op.get('id')}"}.get(op.get("op", ""), None)
+        if not verb:
+            return
+        event = f"{by} {verb} on the whiteboard (human edit, keep it as is)"
+        mouth = getattr(self, "mouth", None)
+        listener = getattr(mouth, "listener", None) if mouth is not None else None
+        if listener is not None:
+            try:
+                listener.submit(by, event)
+            except Exception:  # noqa: BLE001
+                log.exception("listener rejected human edit event")
+        self.push_update(f"{by} {verb}; I'll treat that as the source of truth.")
 
     async def screen_frame(self, ws, user: str, msg) -> None:
         """v2.2: keep the latest frame per room and relay it to the other sockets."""
@@ -602,6 +622,9 @@ class Session:
                     await self.barge_in()
             elif msg.action == "unmute_twin":
                 self.muted = False
+            elif msg.action == "set_mode" and msg.mode:
+                self.twin_mode = msg.mode  # off | on_request | proactive (honored by mouth turn-taking)
+                self.muted = msg.mode == "off"
             elif msg.action == "clear_board":
                 await self.clear_board()
             elif msg.action == "reset_session":
