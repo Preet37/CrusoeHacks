@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import re
+import time
 from collections import deque
 from pathlib import Path
 from uuid import uuid4
@@ -113,6 +114,20 @@ def _choice(decision: dict | None, key: str) -> tuple[str | None, float]:
     if not isinstance(value, str):
         return None, 0.0
     return value, _confidence(answer.get("confidence"))
+
+
+def _log_model_latency(started: float, count: int) -> None:
+    row = {"ts": int(time.time() * 1000), "stage": "listener",
+           "model": config.MODEL_FAST, "reasoning": False,
+           "latency_ms": round((time.monotonic() - started) * 1000),
+           "lines": count}
+    try:
+        path = Path(__file__).resolve().parents[1] / "learning" / "runs" / "latency.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as out:
+            out.write(json.dumps(row, separators=(",", ":")) + "\n")
+    except OSError:
+        log.warning("Listener latency log unavailable")
 
 
 class Listener:
@@ -296,13 +311,14 @@ class Listener:
                         {"role": "user", "content": json.dumps({
                             "new_lines": visible_lines,
                             "recent_lines": [{"speaker": line["speaker"], "text": line["text"]}
-                                             for line in self._recent],
-                            "previous_moments": list(self._previous),
+                                             for line in list(self._recent)[-6:]],
+                            "previous_moments": list(self._previous)[-8:],
                             "active_topic": getattr(self.session, "active_topic", None),
                             "known_topics": [{"topic_id": topic_id, "title": title}
                                              for topic_id, title in self._topics.items()],
                         })},
                     ]
+                    model_started = time.monotonic()
                     raw = await llm.chat(config.MODEL_FAST, messages, max_tokens=1600,
                                          extra_body={"chat_template_kwargs": {"enable_thinking": False}})
                     try:
@@ -313,8 +329,10 @@ class Listener:
                         repaired = await llm.chat(config.MODEL_FAST, messages + [
                             {"role": "assistant", "content": raw},
                             {"role": "user", "content": "Return the complete JSON moment array only."},
-                        ], max_tokens=2400)
+                        ], max_tokens=2400,
+                            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
                         moments, topic_meta = _parse_batch(repaired)
+                    _log_model_latency(model_started, len(lines))
                     # Short imperative edits are often classified as tasks by
                     # Nano. If the named component is already on this board,
                     # make the requested diagram change a routed system fact.

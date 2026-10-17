@@ -205,6 +205,7 @@ class MindPipelineTests(unittest.IsolatedAsyncioTestCase):
         tokens = []
 
         async def chat(model, messages, **kw):
+            self.assertFalse(kw["extra_body"]["chat_template_kwargs"]["enable_thinking"])
             tokens.append(kw["max_tokens"])
             return next(output)
 

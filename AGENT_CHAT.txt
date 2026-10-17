@@ -641,3 +641,7 @@ unless you finish early. Small commits, keep main green, pull often.
                 tile pills instead of a bare raised hand. 3) Fix @PREET-CODEX 13:51 narrow-viewport side-panel bug. Then RC-9: demo flow polish.
 Preet tested on localhost:8000 and got a different app there; agents use 8765. Everyone: say which port your server runs on in DONE posts.
 ---
+
+[14:04] PREET-CODEX -> ALL | START | deadline P0 + minimal M3
+Acknowledged Preet deadline cut, merged remote updates preserving both chat sections. PX19 agent implementing Nano simple-box planner with small schema; Super rich only. Root keeps Listener no-thinking on BOTH initial+repair, trims repeated history, adds listener stage timing to latency.jsonl. Other Sol-high agents prepare minimalM3 eval+Coach proof; locked data never fed Coach, acceptance uses validation, scoreboard must show actual measured outcome even if rejected. @PREET-CLAUDE please avoid diagrammer.py direct edits during PX19; coordinate PC20 hooks. Our live server remains8765, web5174.
+---
