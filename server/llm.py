@@ -71,6 +71,7 @@ def _log_usage(model: str, operation: str, response: Any, elapsed: float) -> Non
 
 async def _create(model: str, messages: Sequence[dict[str, Any]], operation: str, **kw: Any) -> Any:
     started = time.monotonic()
+    kw.setdefault("max_tokens", config.CRUSOE_MAX_OUTPUT_TOKENS)
     for attempt in range(max(0, config.CRUSOE_MAX_RETRIES) + 1):
         try:
             response = await _client().chat.completions.create(model=model, messages=list(messages), **kw)
@@ -101,6 +102,7 @@ async def chat(model: str, messages: Sequence[dict[str, Any]], **kw: Any) -> str
 async def stream_chat(model: str, messages: Sequence[dict[str, Any]], **kw: Any) -> AsyncIterator[str]:
     """Yield text deltas. Retry only before yielding the first delta."""
     options = dict(kw)
+    options.setdefault("max_tokens", config.CRUSOE_MAX_OUTPUT_TOKENS)
     options.setdefault("stream_options", {"include_usage": True})
     started = time.monotonic()
     attempt = 0
@@ -301,6 +303,19 @@ async def run_tools(
     **kw: Any,
 ) -> str | None:
     """Run a bounded tool conversation, falling back to validated JSON ops."""
+    async with asyncio.timeout(config.CRUSOE_TOOL_TIMEOUT):
+        return await _run_tools(model, messages, tools, handlers, max_steps, validator, **kw)
+
+
+async def _run_tools(
+    model: str,
+    messages: Sequence[dict[str, Any]],
+    tools: Sequence[dict[str, Any]],
+    handlers: Mapping[str, Callable[..., Any]],
+    max_steps: int,
+    validator: Callable[[dict[str, Any]], Any] | None,
+    **kw: Any,
+) -> str | None:
     if max_steps < 1:
         return None
     history = list(messages)

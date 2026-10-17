@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock
@@ -62,6 +63,7 @@ async def test_chat_retries_transient_error_and_logs_usage(fake_client, caplog):
     ]
     assert await llm.chat("model", [{"role": "user", "content": "hi"}]) == "hello"
     assert fake_client.await_count == 2
+    assert fake_client.await_args.kwargs["max_tokens"] == llm.config.CRUSOE_MAX_OUTPUT_TOKENS
     assert '"total_tokens":6' in caplog.text
 
 
@@ -233,3 +235,14 @@ async def test_tool_loop_is_bounded(fake_client):
     assert await llm.run_tools("model", [], DRAW_TOOLS, {"add_box": handled}, max_steps=2) is None
     assert handled.await_count == 2
     assert fake_client.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_has_total_deadline(fake_client, monkeypatch):
+    async def slow_call(**_kwargs):
+        await asyncio.sleep(0.1)
+
+    monkeypatch.setattr(llm.config, "CRUSOE_TOOL_TIMEOUT", 0.01)
+    fake_client.side_effect = slow_call
+    with pytest.raises(TimeoutError):
+        await llm.run_tools("model", [], DRAW_TOOLS, {"add_box": AsyncMock()})
