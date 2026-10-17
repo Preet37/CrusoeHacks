@@ -1,0 +1,2 @@
+import type { TLShapeId } from 'tldraw'
+export interface RichCtx { gridToPage(x: number, y: number, frame?: string): { x: number; y: number }; sizeToPage(w: number, h: number, frame?: string): { w: number; h: number }; shapeIdFor(id: string): TLShapeId | undefined; register(id: string, shapeId: TLShapeId): void; unregister(id: string): void; frameShapeId(frameId: string): TLShapeId | undefined; send(msg: { type: string; [k: string]: unknown }): void }
