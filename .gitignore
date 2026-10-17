@@ -22,3 +22,7 @@ dist/
 
 # generated audio
 *.wav
+
+# voice reference sample (personal, never commit)
+server/voice/prompt.wav
+server/voice/*.wav

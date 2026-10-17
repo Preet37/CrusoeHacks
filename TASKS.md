@@ -33,6 +33,8 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-16 | done | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
 | PC-17 | done | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
 
+| PC-18 | todo | **Cloned voice with Magpie TTS Zeroshot** (Preet's choice: multilingual sounds bad). `voice/tts.py`: backend switch `TTS_MODEL=zeroshot|multilingual`; send a 3 to 10 s reference WAV (16-bit mono, 22.05 kHz+, clean speech, about 5 s best) from `VOICE_PROMPT_PATH` (default `server/voice/prompt.wav`, GITIGNORED, never committed) as `audio_prompt`, voice `Magpie-ZeroShot-Multilingual`; quality knob `TTS_ZS_QUALITY` (1 to 40, lower = faster). Get the exact hosted endpoint/function-id from the Get-API-Key code snippet on build.nvidia.com/nvidia/magpie-tts-zeroshot (Preet pastes it in chat or .env as `TTS_ZS_URL`). If the hosted call is refused (NVIDIA says zero-shot needs access approval), fall back to built-in `Magpie-ZeroShot-Multilingual.Male`/`.Female` voices, then multilingual, then browser voice. Measure latency per sentence | PC-6 | Twin speaks in the reference voice; smoke_tts.py --zeroshot writes out.wav |
+
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 
 | id | status | task | needs | check (done when) |
