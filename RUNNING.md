@@ -6,7 +6,7 @@ Everything runs on your own machine. You open it in **Google Chrome** (speech re
 
 ## 0. One-time setup (about 5 minutes)
 
-You need: **Python 3.11 or newer** (`python3 --version`), **Node.js 20 or newer** (`node --version`), **Chrome**, and ideally **headphones**.
+You need: **Python 3.11 or newer** (`python3 --version`), **Node.js 22.12 or newer** (`node --version`), **Chrome**, and ideally **headphones**.
 
 ```bash
 git clone https://github.com/Preet37/CrusoeHacks.git
@@ -104,8 +104,8 @@ Server latency for each turn is logged to `server/learning/runs/latency.jsonl` (
 
 ```bash
 cd server && .venv/bin/python -m pytest -q          # all server tests (offline, fake model calls, a few seconds)
-cd web && npm run build                             # type-checks the whole web app and builds it
-cd web && npm run lint                              # lint
+cd ../web && npm run build                             # type-checks the whole web app and builds it
+npm run lint                              # lint
 ```
 Live end-to-end test through the real server and Crusoe (no browser, no mic): see `server/scripts/e2e_text.py` once it exists (task T-1 in TASKS.md). It sends the M1 script as text over the WebSocket and checks that draws, transcript and audio messages come back.
 

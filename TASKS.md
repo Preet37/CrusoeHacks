@@ -42,10 +42,10 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PX-3 | done | `agents/listener.py` + `prompts/listener.md`: transcript lines -> moments JSON on MODEL_FAST; debounced, one call in flight | PX-1 | Given "the app talks to an auth service which uses Postgres" returns system_fact moments with entities |
 | PX-4 | done | `agents/diagrammer.py` + `prompts/diagrammer.md`: tool loop on MODEL_SMART with draw tools; applies via board.py; broadcasts `draw` via session; pushes one work update after changes | PX-2, PX-3, PC-5 | Speaking a system description draws it; a follow-up change renames or adds without duplicates |
 | PX-5 | blocked | `agents/conductor.py`: M1 plain routing (system_fact -> diagrammer). Emit `agent_event` for every job (started/done) with parent ids | PX-4 | UI agent tree shows listener -> conductor -> diagrammer events |
-| PX-6 | todo | M2: `demo_project/` fake app (web, auth JWT, billing, db Postgres, notifications; 10 to 15 files) + `scripts/fake_history.sh` creating commits by 3 fake authors | M1 done | `git log` in demo_project shows 3 authors |
-| PX-7 | todo | M2: `brain/code_map.py` (ast: symbols, imports, reverse imports, owners, one-line summary per file) + `impact()` | PX-6 | `impact("auth/login.py")` returns the right dependents |
-| PX-8 | todo | M2: `brain/memory.py` sourced facts + Librarian supersede logic; two-pass retrieval (Nano filter, Super read). Leave a clear hook for the JEV first-pass filter (ARCHITECTURE.md 1D) | PX-1 | Contradicting fact supersedes old one with reason; nothing deleted |
-| PX-9 | todo | M2: `code_analyst.py`, `fact_checker.py`, `task_planner.py`; Conductor becomes LLM router on MODEL_SMART that spawns specialists in parallel with depth limit 3 and merges results (the recursion) | PX-7, PX-8 | One moment spawns a visible tree of jobs; answer cites files |
+| PX-6 | doing | M2: `demo_project/` fake app (web, auth JWT, billing, db Postgres, notifications; 10 to 15 files) + `scripts/fake_history.sh` creating commits by 3 fake authors | M1 done | `git log` in demo_project shows 3 authors |
+| PX-7 | doing | M2: `brain/code_map.py` (ast: symbols, imports, reverse imports, owners, one-line summary per file) + `impact()` | PX-6 | `impact("auth/login.py")` returns the right dependents |
+| PX-8 | doing | M2: `brain/memory.py` sourced facts + Librarian supersede logic; two-pass retrieval (Nano filter, Super read). Leave a clear hook for the JEV first-pass filter (ARCHITECTURE.md 1D) | PX-1 | Contradicting fact supersedes old one with reason; nothing deleted |
+| PX-9 | doing | M2: `code_analyst.py`, `fact_checker.py`, `task_planner.py`; Conductor becomes LLM router on MODEL_SMART that spawns specialists in parallel with depth limit 3 and merges results (the recursion) | PX-7, PX-8 | One moment spawns a visible tree of jobs; answer cites files |
 | PX-10 | todo | M3: 12 scripted meetings JSON with ground truth (8 train, 2 validation, 2 locked test) about demo_project | PX-6 | Files exist, ground truth filled |
 | PX-11 | todo | M3: replay harness + `evaluate.py` metrics (ARCHITECTURE.md section 11) | PX-9, PX-10 | Prints scores for v1 on all splits |
 | PX-12 | todo | M3: `prep.py` predictions + `coach.py` (MODEL_COACH = Nemotron-3.5-Super-VL, no Ultra on Crusoe): one edit at a time to prompt files / playbook / turn-taking values, validate, keep or reject, log to `coach_log.jsonl` | PX-11 | At least 3 Coach iterations logged; version latest vs v1 on locked test |
@@ -53,7 +53,7 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PX-14 | doing | **Topic tracking** in Listener: every batch returns `topic_id`, `title`, `topic_changed`; Conductor tags jobs with topic; Diagrammer draws into that topic's `frame` and emits `focus` on switch | PX-3 | Switching topics creates a new frame and pans; returning pans back |
 | PX-15 | doing | **Rich drawing**: extend BoardState + Diagrammer tools with v2 ops (frame, focus, add_sticky, add_text, add_mermaid, add_chart, add_table, add_code, add_mock, sketch, update) + the choosing rule in ARCH 1E.4; fix Mermaid once on `draw_error` | PX-13 | "Walk me through the login sequence" draws a Mermaid sequence diagram; numbers produce a chart; "what would the screen look like" produces a mock |
 | PX-17 | doing | **JEV fast path** (ARCH 1F): `server/agents/fast_decide.py` with `decide(state, questions)`; JEV backend (`typesafe-sdk`, `TYPESAFE_API_KEY`) + Nemotron Nano fallback; one call per final sentence with addressed/kind/topic_changed/wants_visual/is_echo; gate Listener, topic switch, Diagrammer tool choice, echo drop; log latency. Add `TYPESAFE_API_KEY=` to `.env.example` | PX-3 | Small-talk lines skip the Listener; topic switch detected in under ~0.5 s with JEV |
-| PX-16 | todo | M2: `connect_repo`: build the code map from a public GitHub URL (shallow clone, size cap) | PX-7 | Pasting the demo repo URL builds the map |
+| PX-16 | doing | M2: `connect_repo`: build the code map from a public GitHub URL (shallow clone, size cap) | PX-7 | Pasting the demo repo URL builds the map |
 
 ## PARSH-CLAUDE (meeting page, look, mic, speech, audio)
 
@@ -105,7 +105,7 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 | PX-18 | PREET-CODEX | todo | Diagrammer + BoardState support `add_3d` (validate scene spec); choosing rule: physical objects, devices, robots, rack/room layouts, "show it in 3D" -> add_3d; JEV `wants_visual` gets a `3d` option | "Show me a three-joint robot arm" places a 3D scene |
 | T-1 | PREET-CLAUDE | todo | `server/scripts/e2e_text.py`: connects to the running server over WebSocket, sends the RUNNING.md section 3 script as `user_text` finals with pauses, asserts draws (boxes, edges, mermaid, chart, mock), Twin transcript, audio messages, topic switch; prints PASS/FAIL per step + latencies | Passes against the live server |
 | T-2 | PARSH-CLAUDE | todo | Playwright smoke test in mock mode (`web/tests/smoke.spec.ts`, `npm run test:e2e`): join screen -> room -> board receives shapes -> side panel opens -> no console errors | `npm run test:e2e` passes |
-| T-3 | PREET-CODEX | todo | Contract tests for every v2/v2.1 draw op (server validates; one golden JSON per op shared with web via `server/tests/golden_ops.json`) | Server tests pass; web renders every golden op in board-dev |
+| T-3 | PREET-CODEX | doing | Contract tests for every v2/v2.1 draw op (server validates; one golden JSON per op shared with web via `server/tests/golden_ops.json`) | Server tests pass; web renders every golden op in board-dev |
 
 ## Humans
 | id | owner | task |
