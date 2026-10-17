@@ -1072,3 +1072,30 @@ Nits seen in the saved data (yours, only if trivial):
  2) decisions dedupe: "...by Friday." and "...by Friday" both kept (normalise trailing punctuation).
  3) tickets: "Own Redis migration" and "Priya will own the Redis migration by Friday" are the same task (same owner) -> 2 tickets for 1 decision.
 ---
+
+[15:02] PREET -> ALL | CHANGE | JUDGE FEEDBACK. New deadline 3:15 (freeze 3:12). Pull, then do your list in order.
+Judge said: (1) prove how well we TESTED THE MODELS (benchmarks, push their limits), (2) codebase must be technically detailed,
+(3) pick ONE track and go deep: we are **Version N+1** (Twin improves itself, measured); Shared Brain is the secondary mention,
+(4) distraction risk: users need control over when Twin draws/speaks, (5) permissions/sandboxing for tools, (6) humans must be able to
+annotate/edit the board and Twin must react to their edits, (7) show 3D and a deep technical diagram from a one-paragraph description.
+@PREET-CODEX
+  1. BENCHMARKS: `server/bench/run_bench.py` + `BENCHMARKS.md`. For each Nemotron model we use (Lightning, Nano, Super, Super-VL) x task:
+     entity/edge extraction F1 vs the 12 scripted meetings' ground truth, visual routing accuracy, fact-check catch rate, 3D plan validity
+     rate, paragraph->diagram completeness; p50/p95 latency, tokens. Real runs only, N stated, raw JSON committed. Table at top of BENCHMARKS.md.
+  2. Run more Coach rounds now; report kept/rejected honestly (Version N+1 evidence). 3. Paragraph -> deep diagram: long user_text
+     (a spec paragraph) yields a layered architecture (frames per layer, 8-20 nodes, labeled edges), one call.
+@PREET-CLAUDE
+  1. Finish B1 barge-in if not done. 2. Board ANNOTATION toolbar for humans (pen, highlighter, arrow, sticky comment, text) on whiteboard
+     AND on the shared screen overlay (send `annotate` with `by`). 3. Twin REACTS to human edits: a human draw/rename/remove/comment is fed to
+     the Listener as an event ("Preet renamed Auth to Identity"); human edits are authoritative (never overwritten); Twin acknowledges in
+     one short line at the next pause and redraws dependent parts.
+@PARSH-CLAUDE
+  1. TWIN MODE switch in the control bar: Off / On request (only when named) / Proactive. Default On request. Board panel only opens when
+     there is content or a user opens it. Server: `control` message `{"type":"control","action":"set_mode","mode":"off|on_request|proactive"}`
+     (@PREET-CLAUDE honors it in turn_taking, 5 lines).
+  2. PERMISSIONS panel on the dashboard per workspace: Internet access (off), Read connected repo (on), Create tickets (ask first),
+     Read shared screen (ask first), Speak unprompted (off). Saved server-side; server refuses tools that are off. 3. "Paste a spec" box in the
+     room that sends a paragraph as user_text so Twin draws a deep diagram.
+README: @PREET-CLAUDE add a "Testing and benchmarks" section linking BENCHMARKS.md, test counts, e2e script, and "Track: Version N+1".
+At 3:12: push, post STATUS, stop.
+---
