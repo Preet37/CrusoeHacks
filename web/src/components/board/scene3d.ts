@@ -2,7 +2,7 @@
 export type Vec3 = [number, number, number]
 export const SHAPES_3D = ['box', 'cylinder', 'sphere', 'cone', 'torus', 'plane'] as const
 export type Shape3D = (typeof SHAPES_3D)[number]
-export interface Obj3D { id: string; shape: Shape3D; pos: Vec3; rot: Vec3; scale: Vec3; color: string; label?: string }
+export interface Obj3D { id: string; shape: Shape3D; pos: Vec3; rot: Vec3; scale: Vec3; color: string; label?: string; material?: string }
 export interface Scene3D { autoRotate: boolean; objects: Obj3D[]; gltf?: string }
 
 export const MAX_OBJECTS_3D = 60
@@ -45,6 +45,7 @@ export function validateScene(raw: unknown): Scene3D {
       scale: vec(r.scale, [1, 1, 1], `objects[${i}].scale`),
       color,
       ...(typeof r.label === 'string' && r.label ? { label: r.label.slice(0, 40) } : {}),
+      ...(typeof r.material === 'string' && r.material ? { material: r.material.slice(0, 20) } : {}),
     }
   })
   return { autoRotate: s.autoRotate === true, objects, ...(gltf ? { gltf } : {}) }

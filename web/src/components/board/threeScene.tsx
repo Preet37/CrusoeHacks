@@ -1,17 +1,17 @@
 /** Three.js renderer for 'twin-3d' (lazy chunk). Simple lights only: no network-fetched HDRs or fonts. */
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { ContactShadows, OrbitControls, useGLTF } from '@react-three/drei'
+import { ContactShadows, OrbitControls, RoundedBox, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Obj3D, Scene3D as SceneData } from './scene3d'
 
 function Geometry({ shape }: { shape: Obj3D['shape'] }) {
   switch (shape) {
     case 'box': return <boxGeometry args={[1, 1, 1]} />
-    case 'cylinder': return <cylinderGeometry args={[0.5, 0.5, 1, 40]} />
-    case 'sphere': return <sphereGeometry args={[0.5, 40, 24]} />
-    case 'cone': return <coneGeometry args={[0.5, 1, 40]} />
-    case 'torus': return <torusGeometry args={[0.4, 0.12, 20, 60]} />
+    case 'cylinder': return <cylinderGeometry args={[0.5, 0.5, 1, 64]} />
+    case 'sphere': return <sphereGeometry args={[0.5, 64, 40]} />
+    case 'cone': return <coneGeometry args={[0.5, 1, 64]} />
+    case 'torus': return <torusGeometry args={[0.4, 0.12, 32, 96]} />
     case 'plane': return <planeGeometry args={[1, 1]} />
   }
 }
@@ -46,15 +46,36 @@ function Label({ text, y }: { text: string; y: number }) {
   )
 }
 
-function Obj({ o }: { o: Obj3D }) {
+type Finish = { metalness: number; roughness: number; clearcoat?: number }
+/** PBR finish: honour an optional `material` hint, else infer from colour (low saturation -> brushed metal). */
+function finishFor(o: Obj3D): Finish {
+  const hint = String((o as Obj3D & { material?: unknown }).material ?? '').toLowerCase()
+  if (/metal|steel|alu|iron|chrome|brass|copper/.test(hint)) return { metalness: 0.85, roughness: 0.3 }
+  if (/rubber|tire|tyre|foam/.test(hint)) return { metalness: 0, roughness: 0.9 }
+  if (/glass|acrylic/.test(hint)) return { metalness: 0, roughness: 0.08, clearcoat: 1 }
+  if (/wood/.test(hint)) return { metalness: 0, roughness: 0.75 }
+  if (/plastic|abs|pla|nylon/.test(hint)) return { metalness: 0.05, roughness: 0.45, clearcoat: 0.3 }
+  const hsl = { h: 0, s: 0, l: 0 }
+  try { new THREE.Color(o.color).getHSL(hsl) } catch { /* unknown name: treat as plastic */ hsl.s = 1 }
+  return hsl.s < 0.12 && hsl.l > 0.12 && hsl.l < 0.9 ? { metalness: 0.6, roughness: 0.35 } : { metalness: 0.05, roughness: 0.45, clearcoat: 0.3 }
+}
+
+function Obj({ o, showLabel, onHover }: { o: Obj3D; showLabel: boolean; onHover: (id: string | null) => void }) {
+  const f = useMemo(() => finishFor(o), [o])
+  const side = o.shape === 'plane' ? THREE.DoubleSide : THREE.FrontSide
+  const mat = <meshPhysicalMaterial color={o.color} metalness={f.metalness} roughness={f.roughness} clearcoat={f.clearcoat ?? 0} clearcoatRoughness={0.35} envMapIntensity={0} side={side} />
+  const hover = {
+    onPointerOver: (e: { stopPropagation(): void }) => { e.stopPropagation(); onHover(o.id) },
+    onPointerOut: () => onHover(null),
+  }
+  const dims = o.scale.map(v => Math.max(Math.abs(v), 1e-3)) as [number, number, number]
   return (
     <>
-    {o.label && <group position={o.pos}><Label text={o.label} y={Math.abs(o.scale[1]) / 2 + 0.2} /></group>}
+    {o.label && showLabel && <group position={o.pos}><Label text={o.label} y={Math.abs(o.scale[1]) / 2 + 0.2} /></group>}
     <group position={o.pos} rotation={o.rot}>
-      <mesh scale={o.scale} castShadow receiveShadow>
-        <Geometry shape={o.shape} />
-        <meshStandardMaterial color={o.color} roughness={0.45} metalness={0.15} side={o.shape === 'plane' ? THREE.DoubleSide : THREE.FrontSide} />
-      </mesh>
+      {o.shape === 'box'
+        ? <RoundedBox args={dims} radius={Math.min(...dims) * 0.08} smoothness={4} castShadow receiveShadow {...hover}>{mat}</RoundedBox>
+        : <mesh scale={o.scale} castShadow receiveShadow {...hover}><Geometry shape={o.shape} />{mat}</mesh>}
     </group>
     </>
   )
@@ -112,6 +133,9 @@ export default function Scene3D({ scene, interactive }: { scene: SceneData; inte
   const d = radius * 2.4
   const camPos: [number, number, number] = [center.x + d * 0.75, center.y + d * 0.5, center.z + d * 0.75]
   const shadowKey = useMemo(() => JSON.stringify(scene), [scene])
+  const [hovered, setHovered] = useState<string | null>(null)
+  const alwaysLabels = scene.objects.length <= 6
+  const sh = radius * 3
   return (
     <Canvas
       dpr={[1, 2]}
@@ -122,23 +146,32 @@ export default function Scene3D({ scene, interactive }: { scene: SceneData; inte
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
       style={{ position: 'absolute', inset: 0, pointerEvents: interactive ? 'auto' : 'none' }}
     >
-      <hemisphereLight args={['#ffffff', '#c9d2e0', 0.7]} />
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[center.x + radius * 3, center.y + radius * 5, center.z + radius * 2]} intensity={1.4} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[center.x - radius * 3, center.y + radius * 2, center.z - radius * 3]} intensity={0.35} />
-      {scene.objects.map(o => <Obj key={o.id} o={o} />)}
+      {/* Soft studio rig: sky/ground fill, warm key with soft shadows, cool rim from behind. */}
+      <hemisphereLight args={['#f4f7ff', '#b9b2a8', 0.65]} />
+      <ambientLight intensity={0.15} />
+      <directionalLight
+        position={[center.x + radius * 3, center.y + radius * 5, center.z + radius * 2]}
+        color="#fff4e6" intensity={1.6} castShadow
+        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={6}
+        shadow-camera-left={-sh} shadow-camera-right={sh} shadow-camera-top={sh} shadow-camera-bottom={-sh}
+        shadow-camera-near={0.1} shadow-camera-far={radius * 20}
+      />
+      <directionalLight position={[center.x - radius * 4, center.y + radius * 1.5, center.z - radius * 3]} color="#9ec5ff" intensity={0.9} />
+      <directionalLight position={[center.x - radius * 3, center.y + radius * 2, center.z + radius * 3]} intensity={0.25} />
+      <directionalLight position={[center.x, center.y + radius * 4, center.z]} intensity={0.2} />
+      {scene.objects.map(o => <Obj key={o.id} o={o} showLabel={alwaysLabels || hovered === o.id} onHover={setHovered} />)}
       {scene.gltf && (
         <Suspense fallback={null}>
           <Model url={scene.gltf} />
         </Suspense>
       )}
       <gridHelper args={[radius * 6, 24, '#c3c9d4', '#dde1e8']} position={[center.x, floor - 0.001, center.z]} />
-      <ContactShadows key={shadowKey /* frames=1: re-bake on scene replace */} position={[center.x, floor, center.z]} scale={radius * 5} blur={2.4} opacity={0.35} far={radius * 3} frames={1} />
+      <ContactShadows key={shadowKey /* frames=1: re-bake on scene replace */} position={[center.x, floor, center.z]} scale={radius * 5} blur={2.6} opacity={0.42} far={radius * 3} frames={1} />
       <Rig pos={camPos} target={[center.x, center.y, center.z]} />
       <OrbitControls
         makeDefault
         autoRotate={scene.autoRotate}
-        autoRotateSpeed={1.2}
+        autoRotateSpeed={0.8}
         enableDamping
         enabled={interactive}
         enablePan={false}
