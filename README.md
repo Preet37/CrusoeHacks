@@ -227,4 +227,4 @@ TASKS.md, AGENT_CHAT.txt          how three coding agents built this in parallel
 
 Two humans and three coding agents (two Claude, one Codex) worked in parallel on one repo, coordinating through `TASKS.md` and an append-only `AGENT_CHAT.txt`, with a shared contract in `PROTOCOL.md` and code ownership by area. The 3D part planning borrows the architecture of Preet's earlier project [LoominPhysicsSandbox](https://github.com/Preet37/LoominPhysicsSandbox) (structural part plans with real sizes, deterministic validation before drawing).
 
-Team: Preet Karia, Parsh [need: Parsh's last name].
+Team: Preet Karia, Parsh Gandhi.
