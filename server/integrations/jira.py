@@ -195,3 +195,82 @@ async def attach_files(key: str, files: list[tuple[str, bytes, str]]) -> list[st
         return [str(a.get("filename")) for a in resp.json() if isinstance(a, dict)]
     except (ValueError, TypeError):
         return [name for name, _, _ in files]
+
+
+def _person(value) -> str | None:
+    return str(value.get("displayName") or value.get("emailAddress") or "") or None if isinstance(value, dict) else None
+
+
+async def get_issue(key: str) -> dict:
+    """Issue fields Twin needs: summary, description (ADF), people, status, attachments. Raises JiraError."""
+    base, _email, _token, _project = _env()
+    async with _client() as client:
+        resp = await _request(client, "GET", f"/rest/api/3/issue/{key}",
+                              params={"fields": "summary,description,assignee,reporter,status,attachment,labels"})
+    try:
+        fields = resp.json().get("fields") or {}
+    except (ValueError, AttributeError):
+        raise JiraError("Jira returned invalid JSON") from None
+    attachments = [{"id": a.get("id"), "filename": a.get("filename"), "mime": a.get("mimeType"),
+                    "size": a.get("size"), "content": a.get("content")}
+                   for a in fields.get("attachment") or [] if isinstance(a, dict)]
+    return {"key": key, "url": f"{base}/browse/{key}", "summary": fields.get("summary"),
+            "description": fields.get("description"), "assignee": _person(fields.get("assignee")),
+            "reporter": _person(fields.get("reporter")),
+            "status": ((fields.get("status") or {}).get("name") if isinstance(fields.get("status"), dict) else None),
+            "labels": fields.get("labels") or [], "attachments": attachments}
+
+
+async def download(url: str, max_bytes: int = 2_000_000) -> bytes:
+    """Download one attachment's content (Jira redirects to its media store)."""
+    async with _client() as client:
+        resp = await _request(client, "GET", url, follow_redirects=True)
+    data = resp.content
+    if len(data) > max_bytes:
+        raise JiraError("attachment too large")
+    return data
+
+
+async def add_comment(key: str, content: list[dict]) -> None:
+    async with _client() as client:
+        await _request(client, "POST", f"/rest/api/3/issue/{key}/comment", json={"body": doc(content)})
+
+
+async def transition(key: str, prefer: tuple[str, ...] = ("review", "progress")) -> str | None:
+    """Move the issue to the first available status whose name contains one of `prefer`. Returns the new status."""
+    async with _client() as client:
+        resp = await _request(client, "GET", f"/rest/api/3/issue/{key}/transitions")
+        try:
+            options = resp.json().get("transitions") or []
+        except (ValueError, AttributeError):
+            return None
+        for word in prefer:
+            for t in options:
+                name = str((t.get("to") or {}).get("name") or t.get("name") or "")
+                if word in name.casefold():
+                    await _request(client, "POST", f"/rest/api/3/issue/{key}/transitions",
+                                   json={"transition": {"id": t.get("id")}})
+                    return name
+    return None
+
+
+def adf_text(node) -> str:
+    """Plain text (code blocks fenced) from an ADF document."""
+    if isinstance(node, list):
+        return "".join(adf_text(n) for n in node)
+    if not isinstance(node, dict):
+        return ""
+    kind = node.get("type")
+    if kind == "text":
+        return str(node.get("text") or "")
+    inner = adf_text(node.get("content") or [])
+    if kind == "codeBlock":
+        lang = (node.get("attrs") or {}).get("language") or ""
+        return f"\n```{lang}\n{inner}\n```\n"
+    if kind == "heading":
+        return f"\n## {inner}\n"
+    if kind == "listItem":
+        return f"- {inner.strip()}\n"
+    if kind in ("paragraph", "bulletList", "orderedList"):
+        return inner + "\n"
+    return inner

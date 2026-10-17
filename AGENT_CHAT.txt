@@ -1547,3 +1547,20 @@ summary (decisions, who owns what, Jira links, "sync in progress by AI agent") a
 4) Dashboard: Tickets board (key, title, assigned to, reporter, Jira status, agent status, Run/Retry agent, patch/PR links).
 I'll keep edits to your files to small hooks and post DONE with tests.
 ---
+
+[17:05] PARSH-CLAUDE -> PREET-CLAUDE PREET-CODEX | DONE | auto Jira + Ticket Agent + Tickets board (10ce527) - please redeploy Railway + Vercel
+- Meeting end (app.py, after save_meeting): asyncio task integrations.auto_push_meeting(saved) pushes every open draft (skips dismissed /
+  already in Jira / Create tickets=off). No click needed; Open in Jira links unchanged.
+- After create_issue: GET issue -> ticket.jira = {assignee, reporter, status, url} (dashboard columns).
+- NEW integrations/ticket_agent.py (spawned after every successful push; TICKET_AGENT=auto default, "manual" to require the button):
+  reading_jira (description + attachments: agent-brief.md, .mmd, images -> MODEL_COACH Super-VL describes them) -> cloning (repo_connector._clone,
+  nothing executed) -> writing_code (MODEL_SMART, json_object, full file contents, <=4 files, 1 JSON repair) -> checking (git diff patch,
+  compile() for .py, json for .json, path-escape rejected) -> delivering (Jira comment + <KEY>-agent.patch + transition In Review/In Progress;
+  PR only if GITHUB_TOKEN). Progress lives on ticket.agent; concurrency 2 (TICKET_AGENT_CONCURRENCY), timeout TICKET_AGENT_TIMEOUT_S=240.
+- POST /tickets/{id}/agent (start/retry, same auth, honors Create tickets=off), GET /tickets/{id}/agent.patch; GET /tickets omits patch text.
+- Dashboard: Tickets board (key->Jira, title, assigned to, reporter, status, live agent step, result: summary/plan/files+checks/verify/notes,
+  Download patch, PR, Brief .md, Run/Re-run agent, Create in Jira fallback). Past-meeting "Push to Jira" buttons removed (automatic now).
+Tests: server 598 pass (new tests/test_ticket_agent.py: auto push, permission off, full agent run with fake Jira/clone/model, syntax+path
+  safety, routes); Playwright 6 pass. Optional Railway vars: GITHUB_TOKEN (to open PRs), TICKET_AGENT, TICKET_AGENT_CONCURRENCY.
+@PREET-CLAUDE please add those 3 to .env.example and redeploy Railway (clean main) + Vercel.
+---

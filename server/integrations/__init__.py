@@ -348,9 +348,56 @@ async def apply_action(ticket_id: str, action: str, *, workspace: str | None,
             ticket["attachments"] = await attach_agent_brief(ticket, session, meeting, workspace, issue)
         except Exception:  # noqa: BLE001 - the issue exists; a missing attachment must not fail the push
             log.exception("attaching agent brief to %s failed", issue.get("key"))
+        try:  # who it went to, for the dashboard Tickets board
+            info = await jira.get_issue(issue["key"])
+            ticket["jira"] = {k: info.get(k) for k in ("assignee", "reporter", "status", "url")}
+        except Exception:  # noqa: BLE001 - best effort
+            log.info("could not read back %s", issue.get("key"))
         ticket["status"] = "sent"
     _persist(session, meeting)
+    if action == "push_jira" and ticket.get("jira_key"):
+        _maybe_start_agent(ticket, session, meeting, workspace, room)
     return ticket, session
+
+
+def _maybe_start_agent(ticket: dict, session, meeting: dict | None, workspace: str | None, room: str | None) -> None:
+    """Spawn the Ticket Agent once the issue is in Jira (TICKET_AGENT=auto, the default)."""
+    from integrations import ticket_agent
+    if not ticket_agent.auto_enabled() or (ticket.get("agent") or {}).get("status") in ("running", "queued", "done"):
+        return
+    scope_room = room or getattr(session, "room", None) or (meeting or {}).get("room")
+    scope_ws = workspace or getattr(session, "workspace", None) or (meeting or {}).get("workspace")
+    try:
+        ticket_agent.start(str(ticket["id"]), scope_ws, scope_room)
+    except RuntimeError:  # no running event loop (sync callers/tests)
+        log.info("ticket agent not started for %s (no event loop)", ticket.get("id"))
+
+
+async def auto_push_meeting(meeting: dict | None) -> list[str]:
+    """Meeting just ended: push every open draft ticket to Jira (assigned, brief attached) without a click.
+
+    Skips dismissed/already-pushed tickets and workspaces whose 'Create tickets' permission is off."""
+    from integrations import jira
+    if not isinstance(meeting, dict) or not jira.configured():
+        return []
+    workspace, room = meeting.get("workspace"), meeting.get("room")
+    if ticket_permission(None, workspace) == "off":
+        log.info("[%s] auto Jira skipped: Create tickets is off", room)
+        return []
+    pushed = []
+    for t in list(meeting.get("tickets") or []):
+        if not isinstance(t, dict) or not t.get("id") or t.get("status") == "dismissed":
+            continue
+        if (t.get("links") or {}).get("jira"):
+            continue
+        try:
+            ticket, _ = await apply_action(t["id"], "push_jira", workspace=workspace, room=room)
+            pushed.append(str(ticket.get("jira_key")))
+        except TicketError as e:
+            log.warning("[%s] auto Jira failed for %s: %s", room, t.get("id"), e)
+    if pushed:
+        log.info("[%s] meeting ended: auto-created Jira %s", room, ", ".join(pushed))
+    return pushed
 
 
 def agent_brief_markdown(ticket: dict, session=None, meeting: dict | None = None,

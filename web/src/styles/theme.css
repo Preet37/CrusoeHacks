@@ -469,3 +469,42 @@ input { font: inherit; }
 .perm-row .tag.live { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
 /* On stage the take card sits low on the right and stays slim so it never hides the diagram. */
 .take-float.on-stage { top: auto; bottom: 96px; width: min(300px, calc(100% - 24px)); }
+
+/* Tickets board (dashboard) */
+.tickets-board { max-width: 1200px; margin: 0 auto 16px; }
+.tb-head, .tb-main { display: grid; grid-template-columns: minmax(0, 2.6fr) 1fr 1fr 0.9fr minmax(200px, 1.4fr); gap: 12px; align-items: center; }
+.tb-head { padding: 0 10px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.tb-row { border-top: 1px solid var(--border); }
+.tb-main { padding: 10px; cursor: pointer; border-radius: var(--r-sm); }
+.tb-main:hover { background: var(--border); }
+.tb-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
+.tb-key { flex: none; font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+.tb-key.off { background: var(--border-strong); color: var(--text-2); }
+.tb-person { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--border-strong); color: var(--text-2); white-space: nowrap; }
+.tb-status.s-in-progress, .tb-status.s-in-review { background: var(--accent-soft); color: var(--accent); }
+.tb-status.s-done { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
+.tb-agent { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.tb-busy { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent); font-weight: 600; }
+.tb-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+.tb-result { font-size: 11px; font-weight: 700; }
+.tb-result.r-done { color: var(--ok); }
+.tb-result.r-needs_review, .tb-result.r-no_change { color: var(--warn); }
+.tb-result.r-failed { color: var(--danger); }
+.tb-detail { padding: 4px 10px 14px; color: var(--text-2); line-height: 1.5; }
+.tb-detail h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 12px 0 4px; }
+.tb-detail p { margin: 0; color: var(--text); }
+.tb-detail ul, .tb-detail ol { margin: 0; padding-left: 18px; }
+.tb-links { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.tb-links a { text-decoration: none; }
+.tb-files code { font-size: 12px; }
+.tb-check { margin-left: 8px; font-size: 11px; font-weight: 600; }
+.tb-check.ok { color: var(--ok); }
+.tb-check.bad { color: var(--danger); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 900px) {
+  .tb-head { display: none; }
+  .tb-main { grid-template-columns: 1fr; gap: 4px; }
+  .tb-agent { justify-content: flex-start; }
+}
+.tb-links a.pill, .ticket a.pill { color: var(--text); }
