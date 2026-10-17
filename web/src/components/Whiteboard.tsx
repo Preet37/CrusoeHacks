@@ -41,8 +41,8 @@ const richShapeUtils: readonly TLAnyShapeUtilConstructor[] = richMod?.richShapeU
 /** Page area for the whole 0-1000 grid (no frame). */
 const PAGE_W = 2000
 const PAGE_H = 1400
-const BOX_W = 200
-const BOX_H = 90
+const BOX_W = 240
+const BOX_H = 110
 const FRAME_GAP = 200
 const APPEAR_MS = 260
 const OP_GAP_MS = 120
@@ -56,9 +56,9 @@ interface KindStyle {
   dash: string
 }
 const KIND_STYLE: Record<BoxKind, KindStyle> = {
-  service: { geo: 'rectangle', color: 'blue', fill: 'semi', dash: 'solid' },
-  datastore: { geo: 'ellipse', color: 'green', fill: 'semi', dash: 'solid' },
-  client: { geo: 'oval', color: 'violet', fill: 'semi', dash: 'solid' },
+  service: { geo: 'rectangle', color: 'blue', fill: 'solid', dash: 'solid' },
+  datastore: { geo: 'ellipse', color: 'green', fill: 'solid', dash: 'solid' },
+  client: { geo: 'oval', color: 'violet', fill: 'solid', dash: 'solid' },
   external: { geo: 'cloud', color: 'grey', fill: 'none', dash: 'dashed' },
   note: { geo: 'rectangle', color: 'yellow', fill: 'solid', dash: 'draw' },
 }
@@ -266,7 +266,7 @@ class BoardController {
       dash: style.dash,
       w: BOX_W,
       h: BOX_H,
-      size: 's',
+      size: 'm',
       font: 'sans',
       richText: toRichText(label),
     }
@@ -331,7 +331,7 @@ class BoardController {
         end: { x: b.center.x - a.center.x, y: b.center.y - a.center.y },
         richText: toRichText(label),
         color: 'grey',
-        size: 's',
+        size: 'm',
         font: 'sans',
       },
     } as TLShapePartial)
@@ -387,13 +387,13 @@ class BoardController {
         updates.push({
           id: box.shapeId,
           type: 'geo',
-          props: on ? { color: 'red', dash: 'solid', size: 'l' } : { color: base.color, dash: base.dash, size: 's' },
+          props: on ? { color: 'red', dash: 'solid', size: 'xl' } : { color: base.color, dash: base.dash, size: 'm' },
         } as TLShapePartial)
         continue
       }
       const edge = this.edges.get(id)
       if (edge) {
-        updates.push({ id: edge.shapeId, type: 'arrow', props: { color: on ? 'red' : 'grey', size: on ? 'l' : 's' } } as TLShapePartial)
+        updates.push({ id: edge.shapeId, type: 'arrow', props: { color: on ? 'red' : 'grey', size: on ? 'xl' : 'm' } } as TLShapePartial)
         continue
       }
       const sid = this.ids.get(id)
