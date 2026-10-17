@@ -27,6 +27,11 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PC-10 | done | Work-update queue: Diagrammer (PREET-CODEX) calls `session.push_update(text)`; responder delivers per turn_taking | PC-8 | After a diagram change and a pause, Twin mentions it once |
 | PC-11 | done | Latency logging per turn (ARCHITECTURE.md section 6) to console + `server/learning/runs/latency.jsonl` | PC-7 | File has rows with the 4 timings |
 | PC-12 | doing | M2: wire Fact Checker and Code Analyst results into work updates; `task` messages | M1 done | Planted false claim gets a spoken correction with source |
+| PC-13 | todo | **Newest wins** (ARCH 1E.5): job registry in session keyed by topic_id + source line; cancel stale Diagrammer/specialist jobs when the topic changes; cancel an un-started Responder turn when a newer human final arrives | PC-5 | Rapid topic switch: no drawing or speech about the old topic arrives after the switch |
+| PC-14 | todo | **Echo guard, server side** (ARCH 1E.3): drop final user_text that closely matches Twin's last ~3 spoken sentences | PC-7 | Playing Twin through speakers does not create fake human lines |
+| PC-15 | todo | `participants` + `topic` messages (PROTOCOL v2): track who is connected and speaking (from interim user_text) and broadcast; relay topic changes from PREET-CODEX | PC-5 | Two browsers see each other's speaking state |
+| PC-16 | todo | Two-laptop access: CORS + bind 0.0.0.0; doc in README how to run `cloudflared tunnel --url http://localhost:8000`; web reads `VITE_SERVER_URL` | PC-1 | Second laptop joins the same room |
+| PC-17 | todo | `draw_error` relay to the Diagrammer; `calendar_join` -> Twin joins, sends `brief` (predictions from PREET-CODEX Prep, or a stub), says hi; demo calendar file `server/demo_calendar.json` | PC-15 | Simulate button makes Twin join and greet with a brief |
 
 ## PREET-CODEX (the mind: Crusoe client, agents, brain, learning)
 
@@ -43,13 +48,17 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | PX-9 | todo | M2: `code_analyst.py`, `fact_checker.py`, `task_planner.py`; Conductor becomes LLM router on MODEL_SMART that spawns specialists in parallel with depth limit 3 and merges results (the recursion) | PX-7, PX-8 | One moment spawns a visible tree of jobs; answer cites files |
 | PX-10 | todo | M3: 12 scripted meetings JSON with ground truth (8 train, 2 validation, 2 locked test) about demo_project | PX-6 | Files exist, ground truth filled |
 | PX-11 | todo | M3: replay harness + `evaluate.py` metrics (ARCHITECTURE.md section 11) | PX-9, PX-10 | Prints scores for v1 on all splits |
-| PX-12 | todo | M3: `prep.py` predictions + `coach.py` (Ultra): one edit at a time to prompt files / playbook / turn-taking values, validate, keep or reject, log to `coach_log.jsonl` | PX-11 | At least 3 Coach iterations logged; version latest vs v1 on locked test |
+| PX-12 | todo | M3: `prep.py` predictions + `coach.py` (MODEL_COACH = Nemotron-3.5-Super-VL, no Ultra on Crusoe): one edit at a time to prompt files / playbook / turn-taking values, validate, keep or reject, log to `coach_log.jsonl` | PX-11 | At least 3 Coach iterations logged; version latest vs v1 on locked test |
+| PX-13 | todo | **PRIORITY: one call per drawing burst** (ARCH 1E.5 rule 3): Diagrammer emits all ops in ONE call (parallel tool calls or validated JSON-ops batch), then applies them progressively | PX-4 | 5-op burst under ~4 s instead of ~26 s |
+| PX-14 | todo | **Topic tracking** in Listener: every batch returns `topic_id`, `title`, `topic_changed`; Conductor tags jobs with topic; Diagrammer draws into that topic's `frame` and emits `focus` on switch | PX-3 | Switching topics creates a new frame and pans; returning pans back |
+| PX-15 | todo | **Rich drawing**: extend BoardState + Diagrammer tools with v2 ops (frame, focus, add_sticky, add_text, add_mermaid, add_chart, add_table, add_code, add_mock, sketch, update) + the choosing rule in ARCH 1E.4; fix Mermaid once on `draw_error` | PX-13 | "Walk me through the login sequence" draws a Mermaid sequence diagram; numbers produce a chart; "what would the screen look like" produces a mock |
+| PX-16 | todo | M2: `connect_repo`: build the code map from a public GitHub URL (shallow clone, size cap) | PX-7 | Pasting the demo repo URL builds the map |
 
 ## PARSH-CLAUDE (meeting page, look, mic, speech, audio)
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
-| RC-1 | todo | `MeetingRoom.tsx` layout: participant tiles row (2 humans + Twin, Twin labeled "AI"), big whiteboard area (Whiteboard component from PARSH-CODEX), captions strip, controls (mic, push-to-talk, mute Twin) | RX-1 | Page renders with mock data |
+| RC-1 | todo | `MeetingRoom.tsx` layout per ARCH 1E.1 (Meet/Zoom-like): tile grid (humans + Twin labeled "AI"), whiteboard as main stage when it has content (Whiteboard component from PREET-CLAUDE), captions, control bar, side panel | RX-1 | Page renders with mock data |
 | RC-2 | todo | `styles/theme.css`: Mac-native look per ARCHITECTURE.md section 4 (style only, no coucou assets). Dark and light | RC-1 | Looks like a native Mac app, not a web template |
 | RC-3 | todo | `lib/ws.ts`: connect `ws://localhost:8000/ws?room=demo&user=<name>`, auto-reconnect, typed send/receive using `protocol.ts`, event emitter | RX-1 | Connects to server; logs `status` messages |
 | RC-4 | todo | `lib/speech.ts`: Web Speech API wrapper: continuous, interim + final; emits `speechstart` the instant a user starts talking; auto-restarts when Chrome stops it; send `user_text` | RC-3 | Talking shows live captions; finals reach server |
@@ -58,20 +67,37 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | RC-7 | todo | `ParticipantTile.tsx`: Twin tile states from `status` (listening, thinking, speaking glow, hand raised); `Captions.tsx` showing transcript with speaker names | RC-3 | States visibly change during a turn |
 | RC-8 | todo | Push-to-talk button + keyboard shortcut (hold space) sending `push_to_talk` | RC-3 | Holding it makes Twin respond without saying its name |
 | RC-9 | todo | M4: polish pass, demo flow, record 1-minute video | M3 done | Video recorded |
+| RC-10 | todo | **Join screen** (`JoinScreen.tsx`): name, mic + camera preview, Join; room from URL `/room/demo` | RX-1 | Feels like joining a Meet call |
+| RC-11 | todo | **Camera + tiles** (`media.ts`, `ParticipantTile.tsx`): local webcam via getUserMedia; remote humans as avatar tiles; active-speaker ring from `participants`; Twin tile with avatar, AI label, voice ring animation | RC-3 | Speaking person's tile lights up |
+| RC-12 | todo | **Control bar + side panel** (`ControlBar.tsx`, `SidePanel.tsx`): mic, camera, present/whiteboard, captions, raise hand, people, Twin activity (AgentTree), tasks, connections, leave | RC-1 | All buttons work or are clearly disabled |
+| RC-13 | todo | **Echo guard, browser side** (`echoGuard.ts`, ARCH 1E.3): while Twin plays, ignore interim speech that matches Twin's current sentence; only barge in on non-matching words. Show a "use headphones" hint | RC-6 | Twin through speakers does not interrupt itself |
+| RC-14 | todo | **Connections tab** (`ConnectionsPanel.tsx`, ARCH 1E.6): GitHub card sends `connect_repo` (real); Calendar/Slack/Jira/Zoom/Meet cards marked demo; Calendar card has "Simulate standup" sending `calendar_join` | RC-12 | Simulate makes Twin join and show its brief |
+| RC-15 | todo | `VITE_SERVER_URL` support for two-laptop demo | RC-3 | Second laptop joins via tunnel URL |
 
-## PARSH-CODEX (whiteboard, protocol types, mock server, agent tree, scoreboard)
+## RX tasks: board side of the web app, OWNER NOW PREET-CLAUDE (except RX-1)
+
+PARSH-CODEX does not exist (Parsh has only Claude). RX-1 (the scaffold) is done by **PARSH-CLAUDE first**; every other RX task is **PREET-CLAUDE**'s.
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
-| RX-1 | done | Scaffold `web/` with Vite + React + TS; install `tldraw`; `lib/protocol.ts` TypeScript types for every message in PROTOCOL.md | - | `npm run dev` serves on 5173; types compile |
+| RX-1 | done | (PARSH-CLAUDE) Scaffold `web/` with Vite + React + TS + tldraw, `lib/protocol.ts` v1 types. **Follow-up for PREET-CLAUDE: add the PROTOCOL v2 types to `protocol.ts`** | - | `npm run dev` serves on 5173 |
 | RX-2 | todo | `lib/mockServer.ts`: fake message stream (status changes, transcript lines, a sequence of draw ops building a 5-box architecture, a rename, a highlight) toggled by `?mock=1` | RX-1 | UI works fully without backend |
 | RX-3 | todo | `Whiteboard.tsx`: tldraw editor; map 0-1000 grid to canvas; apply `add_box`, `connect` (arrow bound to shapes), `rename`, `remove`, `highlight`, `clear`, `board_snapshot`; keep a map id -> tldraw shape id; style by `kind`; animate new shapes in | RX-1 | Mock sequence builds the diagram correctly; rename edits in place; remove deletes edges too |
 | RX-4 | todo | Auto-fit and tidy: zoom to fit after changes; nudge boxes that overlap | RX-3 | No overlapping boxes in the mock sequence |
 | RX-5 | todo | `AgentTree.tsx`: live tree from `agent_event` (nest by `parent_id`, states started/done/failed, model name badge) | RX-1 | Mock events render as a growing/collapsing tree |
 | RX-6 | todo | M2: task list panel from `task` messages | RX-1 | Tasks appear with owner |
 | RX-7 | todo | M3: `Scoreboard.tsx` from `metric` messages: v1 vs latest on locked test, rejected changes listed | RX-1 | Renders mock metrics |
+| RX-8 | todo | **Rich shapes** in `web/src/components/board/` (ARCH 1E.4, PROTOCOL v2): frame + focus (pan/zoom), sticky, text, Mermaid (mermaid.js -> SVG image; on failure send `draw_error`), chart (render SVG), table, code, mock (sandboxed iframe custom shape), sketch (draw strokes), update | RX-3 | Mock server sequence shows every shape type correctly |
+| RX-9 | todo | Progressive appearance: animate each new shape in; stage mode ("Twin is presenting") when content arrives | RX-8 | Shapes appear one by one, smoothly |
 
 ---
+
+## Humans
+| id | owner | task |
+|---|---|---|
+| H-1 | PARSH | Get the free NVIDIA key (build.nvidia.com, Magpie TTS) into `server/.env` (PC-3 is blocked on it) |
+| H-2 | PARSH | 10-minute check: can a rented meeting bot (e.g. Recall.ai) SPEAK into Google Meet/Zoom, price, free trial, transcript speed. Post findings in AGENT_CHAT.txt. Build only after M3 |
+| H-3 | PREET | Confirm what "JEV" is (link) for the first-pass filter (ARCH 1D) |
 
 ## Milestone gates (humans check these)
 - [ ] M0 setup: server + web start, smoke_crusoe and smoke_tts pass

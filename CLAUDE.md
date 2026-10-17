@@ -1,9 +1,9 @@
 # CLAUDE.md (auto-loaded by Claude Code)
 
-You are one of four coding agents building **Twin** at the Recursive Agents Hackathon (Crusoe x Cerebral Valley, Oct 17 2026). Deadline: 5:00 PM.
+You are one of three coding agents (PREET-CLAUDE, PREET-CODEX, PARSH-CLAUDE) building **Twin** at the Recursive Agents Hackathon (Crusoe x Cerebral Valley, Oct 17 2026). Deadline: 5:00 PM.
 
 ## Before doing anything
-1. Read `ARCHITECTURE.md` (the plan; sections 0, 1A, 1B, 1C, 2, 6, 9 at minimum), `PROTOCOL.md` (the contract), `TASKS.md` (the board), and all of `AGENT_CHAT.txt` (the team chat).
+1. Read `ARCHITECTURE.md` (the plan; sections 0, 1A, 1B, 1C, 1E, 2, 6, 9 at minimum), `PROTOCOL.md` (the contract), `TASKS.md` (the board), and all of `AGENT_CHAT.txt` (the team chat).
 2. Your human told you your agent id in the first prompt: `PREET-CLAUDE` or `PARSH-CLAUDE`. If not, ask.
 3. Only edit files your id owns (ARCHITECTURE.md section 9). Ask in `AGENT_CHAT.txt` for anything else.
 

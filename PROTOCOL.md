@@ -3,9 +3,9 @@
 One WebSocket: `ws://localhost:8000/ws?room=demo&user=<name>`.
 Every message is one JSON object with a `type` field. Times are milliseconds since epoch (`ts`).
 Server mirror: `server/protocol.py` (pydantic). Web mirror: `web/src/lib/protocol.ts` (TypeScript).
-**Changing this file requires agreement from both PREET-CLAUDE and PARSH-CODEX in `AGENT_CHAT.txt`.** Bump `PROTOCOL_VERSION` when you change it.
+**Changing this file requires agreement from both PREET-CLAUDE and PARSH-CLAUDE in `AGENT_CHAT.txt`.** Bump `PROTOCOL_VERSION` when you change it.
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2  (v2 = v1 plus the additions at the bottom of this file; nothing in v1 changed)
 
 ---
 
@@ -124,3 +124,50 @@ For the live agent tree (M2/M4). `parent_id` lets the UI nest spawned jobs.
 **Barge-in:** browser stops playback, sends `barge_in` -> server cancels generation and TTS -> `stop_audio` -> `status:listening`.
 
 **Drawing:** `user_text(final)` -> (background) one or more `draw` messages -> later a Twin turn mentions the change.
+
+---
+
+## v2 additions (13:10, approved by the humans; see ARCHITECTURE.md section 1E)
+
+All v1 messages are unchanged. Every new draw op below may carry an optional `"frame":"<topic_id>"` to place it inside that topic's area. Coordinates stay on the 0 to 1000 grid. `w` and `h` are optional sizes on the same grid.
+
+### New draw ops (`type:"draw"`)
+```json
+{"type":"draw","op":"frame","id":"t_auth","title":"Auth redesign","x":0,"y":0,"w":1000,"h":1000}
+{"type":"draw","op":"focus","id":"t_auth"}
+{"type":"draw","op":"add_sticky","id":"s1","text":"Risk: session migration","color":"yellow","x":700,"y":120,"frame":"t_auth"}
+{"type":"draw","op":"add_text","id":"x1","text":"Login flow today","x":60,"y":40,"size":"l","frame":"t_auth"}
+{"type":"draw","op":"add_mermaid","id":"m1","code":"sequenceDiagram\n  Browser->>Auth: POST /login\n  Auth->>Redis: store session\n  Auth-->>Browser: cookie","x":100,"y":200,"w":600,"h":400,"frame":"t_auth"}
+{"type":"draw","op":"add_chart","id":"c1","chart":"bar","title":"p95 latency (ms)","labels":["v1","v2"],"series":[{"name":"p95","values":[420,180]}],"x":600,"y":500,"w":350,"h":250}
+{"type":"draw","op":"add_table","id":"tb1","columns":["Option","Cost","Risk"],"rows":[["JWT","low","token theft"],["Sessions","med","Redis outage"]],"x":100,"y":650}
+{"type":"draw","op":"add_code","id":"k1","language":"python","code":"def login(user, pw):\n    ...","x":550,"y":150,"w":400,"h":220}
+{"type":"draw","op":"add_mock","id":"u1","title":"New login screen","html":"<div style='font-family:system-ui;padding:16px'><h3>Sign in</h3><input placeholder='Email'/><button>Continue</button></div>","x":100,"y":100,"w":300,"h":400}
+{"type":"draw","op":"sketch","id":"sk1","strokes":[[[100,100],[200,120],[260,200]]],"color":"red","frame":"t_auth"}
+{"type":"draw","op":"update","id":"m1","code":"sequenceDiagram\n  Browser->>Auth: POST /login"}
+```
+- `add_mermaid`: browser renders with mermaid.js to SVG and places it as an image shape. `update` on a Mermaid id re-renders it.
+- `add_chart.chart`: `bar | line | pie | scatter`. For scatter, `series[].values` is a list of `[x, y]` pairs.
+- `add_mock.html`: shown in a sandboxed iframe (`sandbox=""`: no scripts, no forms, no network). Max 4 KB.
+- `sketch.strokes`: list of strokes; each stroke is a list of `[x, y]` grid points. `color`: `black | red | blue | green | orange | violet`.
+- `add_sticky.color`: `yellow | blue | green | pink | orange`.
+- `remove`, `highlight`, `rename` (for text-bearing shapes) and `clear` work on every shape type.
+- `frame` creates a topic area; `focus` pans/zooms the view to it.
+
+### New server -> browser messages
+```json
+{"type":"topic","topic_id":"t_auth","title":"Auth redesign","active":true,"changed":true}
+{"type":"participants","people":[{"name":"Preet","kind":"human","speaking":true},{"name":"Parsh","kind":"human","speaking":false},{"name":"Twin","kind":"ai","speaking":false}]}
+{"type":"brief","title":"Daily standup","predictions":["Auth migration status","Redis rollout risk"],"ts":1760731200000}
+```
+- `participants` is sent whenever someone joins, leaves, or starts/stops speaking (server derives speaking from recent `user_text` interim messages and Twin's own audio).
+- `brief` is Twin's pre-meeting brief (calendar auto-join demo, M2/M3).
+
+### New browser -> server messages
+```json
+{"type":"draw_error","id":"m1","op":"add_mermaid","error":"Parse error on line 2"}
+{"type":"calendar_join","meeting":"Daily standup","scheduled":"13:30"}
+{"type":"connect_repo","url":"https://github.com/someone/demo-project"}
+```
+- `draw_error`: a shape failed to render (bad Mermaid, bad chart data). The Diagrammer may fix it once.
+- `calendar_join`: the demo calendar (or a "simulate" button) tells Twin a scheduled meeting started; Twin joins, sends `brief`, and says hi.
+- `connect_repo`: Connections tab, GitHub card. Server builds the code map from this public repo (M2).

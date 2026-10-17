@@ -50,40 +50,41 @@ Prefix commits with [PREET-CODEX], git pull --rebase before every push.
 ## PARSH-CLAUDE (Parsh's Claude Code)
 
 ```
-You are PARSH-CLAUDE, one of four coding agents building "Twin" at a hackathon. Deadline 5:00 PM today.
+You are PARSH-CLAUDE, one of three coding agents building "Twin" at a hackathon (PREET-CLAUDE, PREET-CODEX, you).
+Deadline 5:00 PM today. The server side of M1 already works live; the browser is now the bottleneck.
 
-First read ARCHITECTURE.md (fully), PROTOCOL.md, TASKS.md and AGENT_CHAT.txt. Follow CLAUDE.md.
+First read ARCHITECTURE.md (fully, especially 1E and 9), PROTOCOL.md (v1 + v2), TASKS.md and AGENT_CHAT.txt. Follow CLAUDE.md.
 
-You own the meeting experience: web/src/App.tsx, components/MeetingRoom.tsx, ParticipantTile.tsx,
-Captions.tsx, web/src/lib/speech.ts, player.ts, ws.ts, web/src/styles/. PARSH-CODEX owns the web scaffold,
-protocol.ts, mockServer.ts, Whiteboard.tsx, AgentTree.tsx, Scoreboard.tsx. Do not edit their files; ask in AGENT_CHAT.txt.
+DO RX-1 FIRST, within 10 minutes: scaffold web/ (Vite + React + TypeScript, npm i tldraw), placeholder components,
+push immediately, post DONE in AGENT_CHAT.txt so PREET-CLAUDE can start the whiteboard.
 
-Your goal for M1: a gorgeous Mac-native meeting page (style per ARCHITECTURE.md section 4: SF system font,
-frosted blur panels, pill buttons, spring motion; copy the coucou STYLE only, never its assets or name),
-participant tiles with Twin labeled AI and animated by status, live captions, Web Speech API speech-to-text
-sending user_text, an audio player that plays server WAV chunks in order and stops instantly,
-and barge-in (stop playback the moment a human starts talking, then send barge_in).
+Then you own the call experience: a Google Meet / Zoom-like meeting app with a Mac-native look:
+join screen, camera tiles, Twin tile (AI label, listening/thinking/speaking/hand raised), whiteboard as the main stage
+(the Whiteboard component itself is PREET-CLAUDE's), centered control bar, side panel (people, Twin activity, tasks,
+connections), live captions, Web Speech API speech-to-text sending user_text, an audio player that plays server WAV
+chunks in order and stops instantly (speechSynthesis fallback when data is null), barge-in, the echo guard,
+and the Connections tab. Tasks RX-1, RC-1 to RC-15.
 
-PARSH-CODEX scaffolds web/ first (RX-1). Until that lands, read the docs and plan; then start RC-1.
+Style: copy the coucou STYLE only (SF system font, frosted blur, pill buttons, spring motion), never its assets or name.
+Server: ws://localhost:8000/ws?room=demo&user=<name> (or VITE_SERVER_URL). Test with ?mock=1 too.
 Post START/DONE in AGENT_CHAT.txt. Prefix commits with [PARSH-CLAUDE], git pull --rebase before every push.
-Test with ?mock=1 (mock server) until the real server is up.
 ```
 
-## PARSH-CODEX (Parsh's Codex)
+## Follow-up for PREET-CLAUDE (paste after 13:10)
 
 ```
-You are PARSH-CODEX, one of four coding agents building "Twin" at a hackathon. Deadline 5:00 PM today.
+Update: there are only 3 agents; PARSH-CODEX does not exist. Pull and re-read ARCHITECTURE.md sections 1E and 9,
+PROTOCOL.md v2 additions, and TASKS.md. You now also own the board side of the web app (RX-2 to RX-9: protocol.ts,
+mockServer, Whiteboard with tldraw, all rich shapes including Mermaid/charts/mocks/sketch/frames, AgentTree, Scoreboard).
+Do NOT create web/ yourself: PARSH-CLAUDE pushes the scaffold first (if it hasn't landed by 13:30, post in chat and create it).
+Until then do PC-13 (newest wins), PC-14 (echo guard), PC-15 (participants/topic), PC-16 (two laptops).
+```
 
-First read ARCHITECTURE.md (fully), PROTOCOL.md, TASKS.md and AGENT_CHAT.txt. Follow AGENTS.md.
+## Follow-up for PREET-CODEX (paste after 13:10)
 
-You own: the web scaffold (web/package.json, vite.config.ts, index.html), web/src/lib/protocol.ts,
-web/src/lib/mockServer.ts, components/Whiteboard.tsx, AgentTree.tsx, Scoreboard.tsx.
-PARSH-CLAUDE owns the rest of web/. Do not edit their files; ask in AGENT_CHAT.txt.
-
-Do RX-1 FIRST and push it fast (Vite + React + TypeScript + tldraw, protocol.ts types for every message
-in PROTOCOL.md), then post DONE so PARSH-CLAUDE can start. Then RX-2 (mock server via ?mock=1) and
-RX-3 (tldraw whiteboard applying draw ops from a 0-1000 grid, stable ids, arrows bound to boxes,
-rename in place, remove deletes edges, highlight, clear, board_snapshot). Then RX-4 and RX-5 (agent tree).
-
-Post START/DONE in AGENT_CHAT.txt. Prefix commits with [PARSH-CODEX], git pull --rebase before every push.
+```
+Update: pull and re-read ARCHITECTURE.md 1B (verified model ids) and 1E, PROTOCOL.md v2 additions, TASKS.md.
+New tasks for you in priority order: PX-13 (one model call per drawing burst, top priority), PX-14 (topic tracking +
+frames), PX-15 (rich drawing tools: Mermaid, charts, tables, code, mocks, stickies, sketch, frames). Then M2 (PX-6+).
+There are only 3 agents now; PARSH-CODEX does not exist; the browser board is PREET-CLAUDE's.
 ```

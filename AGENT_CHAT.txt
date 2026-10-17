@@ -236,4 +236,13 @@ session.push_update(text, urgent=False) now takes an optional urgent flag (backw
 @PREET-CODEX Fact Checker corrections should call session.push_update("Actually, X - source: memory/<file>", urgent=True):
 urgent skips the 30s interjection cooldown but still waits for 1.2s of silence. Task Planner: broadcast {"type":"task",...} per PROTOCOL and
 push_update("I made a task for Priya: ...") (non-urgent). Tell me if you want the responder to receive cited memory lines (build_messages has a memory= slot).
+[13:12] PREET -> ALL | CHANGE | -
+Big update, pull and re-read before your next task:
+1) Only THREE agents: PREET-CLAUDE, PREET-CODEX, PARSH-CLAUDE. PARSH-CODEX does not exist. Its RX tasks moved to
+   @PREET-CLAUDE (board side of the web app). @PARSH-CLAUDE already pushed RX-1 (web/ scaffold), thanks; @PREET-CLAUDE adds the v2 types to protocol.ts.
+2) ARCHITECTURE.md new section 1E: Meet/Zoom-like meeting app, two laptops, echo guard, rich drawing (Mermaid, charts,
+   tables, code, mocks, stickies, sketch, topic frames), speed rules (newest wins, topic tracking, ONE model call per
+   drawing burst), connections tab + calendar auto-join demo, real Meet/Zoom bot = stretch only.
+3) PROTOCOL.md is now v2 (pure additions, v1 unchanged). 4) Model table in 1B now uses the verified ids; no Ultra.
+5) New tasks: PC-13..17, PX-13..16, RC-10..15, RX-8..9, H-1..3. @PREET-CODEX PX-13 is the top priority.
 ---

@@ -90,14 +90,16 @@ Version N+1 (self-improvement, before/after score on unseen tasks). Memory acts 
 
 **NVIDIA Nemotron models hosted on Crusoe** (verify ids with `GET /v1/models` in `scripts/smoke_crusoe.py`):
 
-| Model id on Crusoe | What it is, in plain words | Where Twin uses it |
+**VERIFIED live on our account at 13:22 by PREET-CLAUDE (smoke_crusoe.py). These ids win over anything else in this file.**
+
+| Model id on Crusoe (verified) | What it is, in plain words | Where Twin uses it |
 |---|---|---|
-| `nvidia/nemotron-3.5-lightning-30b-a3b` | Fast instruct model, 1M token context | **Responder (the mouth)**: fastest spoken replies, thinking turned off |
-| `nvidia/Nemotron-3-Nano-30B-A3B` | Small, cheap, fast model, 262k context | **Listener**, first-pass filters, Librarian, fallback Responder |
-| `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B` | Small model that can take images and audio, answers in text | Optional: transcribe audio, read a whiteboard photo or screenshot |
-| `nvidia/Nemotron-3-Super-120B-A12B` | Mid-size reasoning model, good at tools | **Conductor, Diagrammer, Code Analyst, Fact Checker, Task Planner, Prep** |
-| `nvidia/Nemotron-3-Ultra-550B` | Largest, best reasoning, slowest | **Coach** only, after meetings (M3) |
-| `nvidia/Nemotron-3-VoiceChat` | Speech-to-speech, listens and talks at once | Not used: request format undocumented on Crusoe. Ask in #crusoe once. |
+| `nvidia/Nemotron-3.5-Lightning-30B-A3B` | Fast instruct model; no-think flag works | **Responder (the mouth)**. Note: sometimes returns 503 capacity_unavailable, so the Responder falls back to Nano |
+| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | Small, cheap, fast (about 0.7 s) | **Listener**, first-pass filters, Librarian, fallback Responder. Reasoning eats tokens: give it 1000+ max tokens |
+| `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B` | Small model that takes images and audio, answers in text | Optional: transcribe audio, read a whiteboard photo or screenshot |
+| `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B` | Mid-size reasoning model; tool calling and json_object both work | **Conductor, Diagrammer, Code Analyst, Fact Checker, Task Planner, Prep** |
+| `nvidia/NVIDIA-Nemotron-3.5-Super-VL` | Strongest model available to us, also sees images | **Coach** (stand-in: there is NO Ultra on our Crusoe account) |
+| `nvidia/Nemotron-3-VoiceChat` | Speech-to-speech | Not used: request format undocumented on Crusoe |
 
 Crusoe also hosts non-NVIDIA models (DeepSeek, Gemma, GLM, others). **We do not use them**: all-Nemotron is part of the pitch and our shot at the Best Use of Nemotron prize.
 
@@ -123,6 +125,59 @@ Crusoe also hosts non-NVIDIA models (DeepSeek, Gemma, GLM, others). **We do not 
 3. **Reasoning pass:** Nemotron Super reads only the shortlisted files and facts and answers, citing sources.
 
 Pitch line: the library can be any size; what lands on the model's desk stays small. We can show that on the scoreboard (tokens per answer stays flat as the codebase grows).
+
+---
+
+## 1E. Product decisions added at 13:07 (all agents read this)
+
+### 1. Our own meeting app that looks and feels like Google Meet / Zoom
+The live demo runs on OUR meeting page, built to feel like a real call app. Real Meet/Zoom comes later (see 5).
+- **Join screen:** name field, mic and camera preview, "Join now" button. Room from the URL (`/room/demo`).
+- **Call view:** grid of participant tiles. Each human tile shows their webcam (`getUserMedia`, local camera only on each laptop; remote humans show as an avatar tile with initials until real video exists). Active-speaker ring on whoever is talking (driven by `user_text` interim messages and the `participants` message). **Twin's tile** has its own avatar, an "AI" label, and states: listening, thinking, speaking (animated voice ring), hand raised.
+- **Stage:** when the whiteboard has content, it takes the main stage like a screen share ("Twin is presenting"), with tiles moved to a strip at the side.
+- **Bottom control bar, centered, pill buttons:** mic, camera, whiteboard/present, captions on/off, raise hand, people, Twin activity, leave (red). Hold-space push-to-talk.
+- **Side panel (toggleable tabs):** People, Twin activity (the agent tree), Tasks (M2), Connections.
+- **Captions:** live, at the bottom of the stage, speaker name in bold.
+- Look: Mac-native (section 4) but laid out like Meet.
+
+### 2. Two laptops in the same call
+- One laptop runs the server. The other connects over the network. Both browsers join the same room; each does its own speech recognition and sends `user_text` with its speaker name. The server broadcasts Twin's audio, transcript and drawings to everyone in the room.
+- Venue Wi-Fi may block laptop-to-laptop traffic. Fallback: a free tunnel (`cloudflared tunnel --url http://localhost:8000`, or ngrok) gives a public URL; the web app reads the server URL from `VITE_SERVER_URL`.
+- Real video between humans (WebRTC via a hosted service such as LiveKit or Daily) is a stretch goal only.
+
+### 3. Echo guard (very important for a live demo)
+Twin's voice comes out of the laptop speaker and goes back into the mic, so speech recognition hears Twin and thinks a human is talking, which triggers barge-in and garbage transcripts.
+- **Demo with headphones** on the laptop that plays Twin's voice.
+- Browser: while Twin audio plays, ignore interim speech whose words mostly match the sentence Twin is currently saying (similarity check); only barge in on words that do not match.
+- Server: drop any `final` user_text that closely matches Twin's last spoken sentences.
+
+### 4. Rich drawing: the board can draw much more than boxes
+The Diagrammer chooses the right visual for what is being discussed. The board is **tldraw** (open-source whiteboard inside our page). New draw ops (PROTOCOL.md v2):
+- **Live boxes and arrows** (`add_box`, `connect`, ...): architectures that change during the conversation. Stays the default for system diagrams because each piece can be renamed or highlighted live.
+- **Mermaid diagrams** (`add_mermaid`): sequence diagrams, flowcharts, state machines, ER/database diagrams, Gantt timelines, class diagrams. The model writes Mermaid code; the browser renders it with mermaid.js to SVG and places it on the board as an image. If the Mermaid code fails to render, the browser sends `draw_error` so the Diagrammer can fix it once.
+- **Charts** (`add_chart`): bar, line, pie, scatter from numbers mentioned or pulled from data. Rendered in the browser to SVG.
+- **Screen mockups** (`add_mock`): the model writes a small self-contained HTML snippet; the browser shows it in a sandboxed frame on the board (no scripts, no network).
+- **Sticky notes** (`add_sticky`), **text** (`add_text`), **tables** (`add_table`), **code snippets** (`add_code`).
+- **Freehand sketch** (`sketch`): simple strokes (lists of points on the 0-1000 grid) for rough drawings, arrows, circles around things.
+- **Topic areas** (`frame`, `focus`): every topic gets its own area (frame) on the board. When the conversation switches topic, Twin starts a new frame and the view pans there; when an old topic comes back, the view pans back.
+Choosing rule for the Diagrammer prompt: architecture or "how things connect" -> boxes/arrows; a process over time or between parties -> Mermaid sequence/flow; data or numbers -> chart; "what would the screen look like" -> mock; ideas/decisions/risks -> stickies; comparison -> table; a specific function -> code.
+
+### 5. Speed rules (humans switch topics fast; Twin must keep up)
+1. **Newest wins.** Every job is tagged with the topic and the transcript line that caused it. When a newer line arrives that changes the topic or contradicts the job's input, cancel the stale job. The Responder generation for an old turn is cancelled when a new human final arrives before Twin started speaking.
+2. **Topic tracking.** The Listener returns a `topic_id` and `topic_changed` flag with every batch. The server keeps the active topic, sends a `topic` message, and the Diagrammer draws into that topic's frame.
+3. **One model call per drawing burst.** The Diagrammer must emit ALL ops for a burst in ONE call (parallel tool calls or JSON-ops batch), then apply them one by one with a tiny delay so they appear progressively. Measured problem at 13:40: one round trip per op took about 26 s for 5 ops. Target: under about 3 to 4 s per burst.
+4. **Fast models for live work.** Lightning/Nano for mouth and Listener, Super for drawing, Super-VL only offline.
+5. **Instant acknowledgment.** When a slow answer or drawing is coming, Twin says a 2 to 4 word ack ("yeah, sketching it") right away.
+6. **Prep before the meeting** (M2/M3): load code map and memory so live answers are lookups.
+7. **Measure.** Every stage logs latency (already in `latency.jsonl`); show the numbers in the demo.
+
+### 6. Connections page and calendar auto-join
+- **Connections tab:** cards for GitHub (REAL: paste a public repo URL, Twin builds its code map from it; M2), Google Calendar, Slack, Jira, Zoom, Google Meet (DEMO cards, clearly marked "demo data" or "coming soon"; never claim they are live).
+- **Calendar auto-join (demo):** a demo calendar file lists meetings (e.g. "Daily standup, 1:30 PM"). At meeting time (or on a "simulate" button), Twin automatically joins our meeting room, posts its pre-meeting brief and predictions, and says hi. This shows the "it detects your standup and joins" behavior honestly.
+- Must never become a dashboard-first product (banned). Connections is a settings tab; the main feature is Twin in the call.
+
+### 7. Real Google Meet / Zoom (stretch, only after M3)
+How note-takers do it: a bot (a hidden browser logged into its own account) joins the meeting link, gets admitted by the host, captures the call audio, and, to speak, plays audio through a fake microphone. Building that ourselves today is too risky. Option to RENT: a meeting-bot service (for example Recall.ai). PARSH evaluates in 10 minutes: can its bot SPEAK into the call (not only listen), what does it cost, is there a free trial, how fast is the live transcript. Only start if all are yes and M3 is done. Pitch line either way: "Twin joins Zoom, Meet and Teams through a meeting bot, the same way note-takers do."
 
 ---
 
@@ -417,18 +472,21 @@ Draw tool schemas (also in `PROTOCOL.md` as draw ops):
 
 ---
 
-## 9. Who does what (4 coding agents, 2 humans)
+## 9. Who does what (3 coding agents, 2 humans)
+
+**Update 13:08: there are only THREE coding agents. Parsh has no Codex. `PARSH-CODEX` does not exist; its work moved to `PREET-CLAUDE` (server M1 is done, so it now also owns the board side of the web app).** The `RX-*` task ids are unchanged; their owner is now PREET-CLAUDE.
 
 Agent ids (use them in commits, `TASKS.md`, and `AGENT_CHAT.txt`):
 
 | Agent id | Human | Tool | Owns folders | Focus |
 |---|---|---|---|---|
-| `PREET-CLAUDE` | Preet | Claude Code | `server/app.py`, `server/session.py`, `server/protocol.py`, `server/turn_taking.py`, `server/voice/`, `server/agents/responder.py`, `server/agents/prompts/responder.md`, `server/scripts/` | Server core: WebSocket, session, the mouth, TTS streaming, barge-in, work-update queue |
-| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `server/config.py`, `server/board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | The mind: Crusoe client, tool loop, Listener, Conductor, Diagrammer, then Brain (M2) and Learning (M3) |
-| `PARSH-CLAUDE` | Parsh | Claude Code | `web/src/App.tsx`, `web/src/components/MeetingRoom.tsx`, `ParticipantTile.tsx`, `Captions.tsx`, `web/src/lib/speech.ts`, `web/src/lib/player.ts`, `web/src/lib/ws.ts`, `web/src/styles/` | Meeting page, Mac-native look, mic and speech recognition, audio playback, barge-in |
-| `PARSH-CODEX` | Parsh | Codex | `web/src/components/Whiteboard.tsx`, `AgentTree.tsx`, `Scoreboard.tsx`, `web/src/lib/protocol.ts`, `web/src/lib/mockServer.ts`, web project scaffold (`package.json`, `vite.config.ts`) | Whiteboard (tldraw) applying draw ops, mock server, protocol types, agent tree, scoreboard |
+| `PREET-CLAUDE` | Preet | Claude Code | Server core: `server/app.py`, `server/session.py`, `server/mouth.py`, `server/protocol.py`, `server/turn_taking.py`, `server/voice/`, `server/agents/responder.py`, `server/agents/prompts/responder.md`, `server/scripts/`. **Plus the board side of the web app:** `web/src/components/Whiteboard.tsx`, `web/src/components/board/` (all rich shapes), `AgentTree.tsx`, `Scoreboard.tsx`, `TaskPanel.tsx`, `web/src/lib/protocol.ts`, `web/src/lib/mockServer.ts` | Server core, then whiteboard + rich drawing in the browser, protocol types, mock server, agent tree, scoreboard |
+| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `server/config.py`, `server/board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | The mind: Crusoe client, Listener, Conductor, Diagrammer (incl. rich drawing choices + topics + speed), Brain (M2), Learning (M3) |
+| `PARSH-CLAUDE` | Parsh | Claude Code | **The web app scaffold** (`web/package.json`, `vite.config.ts`, `index.html`, `main.tsx`) and the call experience: `web/src/App.tsx`, `JoinScreen.tsx`, `MeetingRoom.tsx`, `ParticipantTile.tsx`, `ControlBar.tsx`, `SidePanel.tsx`, `Captions.tsx`, `ConnectionsPanel.tsx`, `web/src/lib/speech.ts`, `player.ts`, `ws.ts`, `media.ts`, `echoGuard.ts`, `web/src/styles/` | Meet/Zoom-like meeting app, Mac-native look, camera, mic and speech recognition, audio playback, barge-in, echo guard, connections tab |
 
-Shared files: `PROTOCOL.md` (change only with agreement in chat), `requirements.txt` (PREET-CLAUDE owns; others request additions in chat), `web/package.json` (PARSH-CODEX owns; others request).
+Shared files: `PROTOCOL.md` (change only with agreement in chat from PREET-CLAUDE and PARSH-CLAUDE), `requirements.txt` (PREET-CLAUDE owns; others request additions in chat), `web/package.json` (PARSH-CLAUDE owns; PREET-CLAUDE may add `tldraw`, `mermaid` and a chart library itself and must post a CHANGE in the chat when it does).
+
+**Order matters:** PARSH-CLAUDE pushes the `web/` scaffold FIRST (RX-1, within 10 minutes). PREET-CLAUDE does not create `web/` itself; until the scaffold lands it works on server tasks (PC-13 onward). If the scaffold has not landed by 13:30, PREET-CLAUDE posts in the chat and creates it.
 
 ### Humans
 - **Parsh:** gets all API keys and credits working first (Crusoe org + API key, $50 credit form, NVIDIA build.nvidia.com key for Magpie), shares keys with Preet privately (NOT in the repo, NOT in chat files), asks Crusoe in Discord #crusoe about VoiceChat once. Then drives the web agents.
