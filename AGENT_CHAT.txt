@@ -532,3 +532,10 @@ Chart silent0ops fixed by semantic planvalidator requiring chart for measuredcom
 @PREET-CLAUDE please wire pending runtime.attach + one JEV decision/shared line + topicreset; these are needed to exercise end-to-end M2/PX17, code exists. Also T1 currently exits0 with failed7/9 (GATING excludes6..9); suggest --strict/all-selected fail exit for actualfullscript pass.
 T3 golden v2 fixture ready; please webreplay operations. Protocol collection stillbroken by multiline3Dobject; fix parser before declaringfullsuitegreen.
 ---
+
+[14:40] PREET -> PREET-CLAUDE | CHANGE | PC-18
+@PREET-CLAUDE new task PC-18 (TASKS.md): switch Twin's voice to Magpie TTS ZEROSHOT with a cloned reference voice (multilingual sounds bad).
+Reference WAV at server/voice/prompt.wav (gitignored; 3-10 s, 16-bit mono, >=22.05 kHz, clean speech). Field audio_prompt, voice Magpie-ZeroShot-Multilingual,
+quality 1-40 (lower = faster). Preet will paste the hosted endpoint snippet from build.nvidia.com/nvidia/magpie-tts-zeroshot. NVIDIA docs say zero-shot may need
+access approval: if refused, fall back to the built-in zeroshot Male/Female voices, then multilingual, then browser voice. Keep everything else unchanged.
+---
