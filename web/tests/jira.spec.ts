@@ -25,5 +25,6 @@ test('integrations and push to jira', async ({ page }, info) => {
   await expect(integ.getByText('SCRUM')).toBeVisible()
   await page.getByRole('button', { name: 'Push to Jira' }).click()
   await expect(page.getByRole('link', { name: 'Open in Jira' })).toHaveAttribute('href', /SCRUM-7/)
+  await expect(page.getByRole('link', { name: 'Brief .md' })).toHaveAttribute('href', /\/tickets\/T-1\/brief\.md\?workspace=acme&code=x/)
   await page.screenshot({ path: info.outputPath('jira.png'), fullPage: true })
 })

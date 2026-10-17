@@ -282,6 +282,17 @@ export default function Dashboard({
                             <span style={{ flex: 1 }}>{t.title}</span>
                             {t.owner && <span className="hint">{t.owner}</span>}
                             {t.status && <span className="tag">{t.status}</span>}
+                            {t.id && (
+                              <a
+                                className="pill small"
+                                title="Markdown brief for a coding agent: goal, discussion, analysis, diagrams, files, acceptance"
+                                href={`${serverHttpBase()}/tickets/${encodeURIComponent(t.id)}/brief.md?${new URLSearchParams({ workspace: session.workspace, code: session.code })}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Brief .md
+                              </a>
+                            )}
                             {t.agent_prompt && (
                               <button
                                 className="pill small"

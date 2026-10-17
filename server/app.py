@@ -58,6 +58,24 @@ async def tickets_list(workspace: str = "", code: str = "", room: str = ""):
     return {"tickets": integrations.list_tickets(_ticket_scope(workspace, code, room), room or None)}
 
 
+@app.get("/tickets/{ticket_id}/brief.md")
+async def ticket_brief(ticket_id: str, workspace: str = "", code: str = "", room: str = ""):
+    """Markdown agent brief for one ticket (same content that is attached to the Jira issue)."""
+    from fastapi.responses import JSONResponse, PlainTextResponse
+    import integrations
+    trusted = _ticket_scope(workspace, code, room)
+    try:
+        ticket, session, meeting = integrations.find_ticket(ticket_id, trusted, room or None)
+    except integrations.TicketError as e:
+        return JSONResponse({"error": str(e)}, status_code=e.status)
+    key = ticket.get("jira_key")
+    issue = {"key": key, "url": (ticket.get("links") or {}).get("jira")} if key else None
+    md = integrations.agent_brief_markdown(ticket, session, meeting, trusted, issue)
+    name = f"{key or ticket_id}-agent-brief.md"
+    return PlainTextResponse(md, media_type="text/markdown; charset=utf-8",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @app.post("/tickets/{ticket_id}/push_jira")
 async def tickets_push_jira(ticket_id: str, workspace: str = "", code: str = "", room: str = ""):
     from fastapi.responses import JSONResponse

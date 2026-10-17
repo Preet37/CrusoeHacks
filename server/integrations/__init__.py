@@ -210,8 +210,10 @@ def _mermaid_codes(ticket: dict, session) -> list[str]:
     return [s["code"] for s in (scoped or ([] if frame else shapes))][:3]
 
 
-def _contribution(ticket: dict, session) -> dict | None:
+def _contribution(ticket: dict, session, meeting: dict | None = None) -> dict | None:
     contrib = getattr(session, "latest_contribution", None) if session is not None else None
+    if not isinstance(contrib, dict):
+        contrib = (meeting or {}).get("contribution")
     if not isinstance(contrib, dict):
         return None
     topic, ctopic = ticket.get("topic"), contrib.get("topic_id")
@@ -249,7 +251,7 @@ def build_jira_description(ticket: dict, session=None, meeting: dict | None = No
         content.append(jira.bullet_list([[jira._text(
             f"{str(l.get('speaker') or 'Participant')}: {str(l.get('text')).strip()}"[:600])]
             for l in window]))
-    contrib = _contribution(ticket, session)
+    contrib = _contribution(ticket, session, meeting)
     if contrib:
         items = []
         if contrib.get("current"):
@@ -273,6 +275,11 @@ def build_jira_description(ticket: dict, session=None, meeting: dict | None = No
             items.append([jira._text(label, link)])
         content += [jira.heading("Relevant files"), jira.bullet_list(items)]
     codes = _mermaid_codes(ticket, session)
+    if not codes:
+        from integrations import agent_brief
+        snap = agent_brief.board_snapshot(session, meeting)
+        frame = ticket.get("topic") or (snap or {}).get("active_frame")
+        codes = [code for _, code in agent_brief.diagrams(snap, frame)]
     if codes:
         content.append(jira.heading("Diagram (Mermaid)"))
         content += [jira.code_block(code, "mermaid") for code in codes]
@@ -287,6 +294,9 @@ def build_jira_description(ticket: dict, session=None, meeting: dict | None = No
     source = ticket.get("source")
     if source:
         content.append(jira.paragraph(jira._text(f"Source: {source}")))
+    content.append(jira.paragraph(jira._text(
+        "Full agent brief (Markdown: goal, discussion, analysis, diagrams, files, acceptance, instructions) "
+        "is attached to this issue.")))
     if not content:
         content.append(jira.paragraph(jira._text(str(ticket.get("body") or ticket.get("title") or ""))))
     return jira.doc(content), speaker
@@ -334,6 +344,40 @@ async def apply_action(ticket_id: str, action: str, *, workspace: str | None,
         ticket["links"] = {"jira": None, "slack": None, "agent": None, **links,
                            "jira": issue["url"]}
         ticket["jira_key"] = issue["key"]
+        try:
+            ticket["attachments"] = await attach_agent_brief(ticket, session, meeting, workspace, issue)
+        except Exception:  # noqa: BLE001 - the issue exists; a missing attachment must not fail the push
+            log.exception("attaching agent brief to %s failed", issue.get("key"))
         ticket["status"] = "sent"
     _persist(session, meeting)
     return ticket, session
+
+
+def agent_brief_markdown(ticket: dict, session=None, meeting: dict | None = None,
+                         workspace: str | None = None, issue: dict | None = None) -> str:
+    """Markdown brief for a coding agent (see integrations/agent_brief.py)."""
+    from integrations import agent_brief
+    history = getattr(session, "history", None) if session is not None else None
+    if not isinstance(history, list):
+        history = (meeting or {}).get("notes") or ticket.get("context") or []
+    window, _speaker = _context_lines(ticket, list(history))
+    contrib = _contribution(ticket, session, meeting)
+    return agent_brief.build_brief(
+        ticket, session=session, meeting=meeting, repo_url=_repo_url(session, meeting, workspace),
+        contribution=contrib, context=window, files=_file_refs(ticket, contrib),
+        jira_key=(issue or {}).get("key"), jira_url=(issue or {}).get("url"))
+
+
+async def attach_agent_brief(ticket: dict, session, meeting: dict | None, workspace: str | None,
+                             issue: dict) -> list[str]:
+    """Attach TWIN-<KEY>-brief.md (+ one .mmd per diagram) to the Jira issue."""
+    from integrations import agent_brief, jira
+    key = str(issue.get("key") or ticket.get("id") or "ticket")
+    files = [(f"{key}-agent-brief.md",
+              agent_brief_markdown(ticket, session, meeting, workspace, issue).encode("utf-8"),
+              "text/markdown")]
+    snap = agent_brief.board_snapshot(session, meeting)
+    frame = ticket.get("topic") or (snap or {}).get("active_frame")
+    for i, (_name, code) in enumerate(agent_brief.diagrams(snap, frame), start=1):
+        files.append((f"{key}-diagram-{i}.mmd", code.encode("utf-8"), "text/plain"))
+    return await jira.attach_files(key, files)

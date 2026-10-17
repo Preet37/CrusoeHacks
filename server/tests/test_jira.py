@@ -125,7 +125,9 @@ def test_routes_push_live_ticket(jira_env):
     assert sent and sent[0]["type"] == "ticket" and sent[0]["status"] == "sent"
     # Pushed again: no duplicate issue.
     client.post("/tickets/T-1/push_jira", params=params)
-    assert len([c for c in jira_env if c.method == "POST"]) == 1
+    assert len([c for c in jira_env if c.method == "POST" and c.url.path.endswith("/issue")]) == 1
+    # The agent brief is attached once, to the created issue.
+    assert [c.url.path for c in jira_env if c.url.path.endswith("/attachments")] == ["/rest/api/3/issue/SCRUM-7/attachments"]
     # Persisted via the meeting store too.
     from brain.meeting_store import list_tickets
     assert list_tickets("acme")[0]["links"]["jira"].endswith("SCRUM-7")

@@ -91,6 +91,17 @@ def save_meeting(session) -> dict | None:
                "title": title, "ended_at": ended_at, "summary": summary,
                "notes": lines[:100], "decisions": decisions[:30],
                "todos": todos, "tickets": tickets}
+    # Board + Twin's take, so tickets pushed after the meeting still carry the diagram and analysis.
+    board = getattr(session, "board", None)
+    try:
+        snap = board.snapshot() if board is not None else None
+    except Exception:  # noqa: BLE001 - best effort
+        snap = None
+    if isinstance(snap, dict) and (snap.get("boxes") or snap.get("shapes")):
+        payload["board"] = snap
+    contribution = getattr(session, "latest_contribution", None)
+    if isinstance(contribution, dict):
+        payload["contribution"] = contribution
     with _connect() as db:
         result = db.execute("""INSERT INTO meetings(id, workspace, ended_at, payload_json) VALUES(?,?,?,?)
             ON CONFLICT(id) DO UPDATE SET ended_at=excluded.ended_at,

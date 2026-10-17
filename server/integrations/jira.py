@@ -181,3 +181,17 @@ async def create_issue(title: str, body: str, owner: str | None = None,
     except (ValueError, KeyError, TypeError):
         raise JiraError("Jira created no issue key") from None
     return {"key": key, "url": f"{base}/browse/{key}"}
+
+
+async def attach_files(key: str, files: list[tuple[str, bytes, str]]) -> list[str]:
+    """Attach [(filename, data, mime)] to an issue; returns the attached filenames. Raises JiraError."""
+    if not configured() or not files:
+        return []
+    async with _client() as client:
+        resp = await _request(client, "POST", f"/rest/api/3/issue/{key}/attachments",
+                              headers={"X-Atlassian-Token": "no-check"},
+                              files=[("file", (name, data, mime)) for name, data, mime in files])
+    try:
+        return [str(a.get("filename")) for a in resp.json() if isinstance(a, dict)]
+    except (ValueError, TypeError):
+        return [name for name, _, _ in files]
