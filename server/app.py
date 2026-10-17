@@ -49,7 +49,19 @@ async def integrations_status(workspace: str = "", code: str = ""):
         except Exception:  # noqa: BLE001
             log.exception("workspace repo lookup failed")
     return {"jira": await jira.status(), "github": github,
-            "slack": {"connected": bool(os.getenv("SLACK_WEBHOOK_URL"))}}
+            "slack": {"connected": bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))}}
+
+
+@app.post("/meetings/{meeting_id}/post_slack")
+async def meetings_post_slack(meeting_id: str, workspace: str = "", code: str = "", room: str = ""):
+    """Manually (re)post the end-of-meeting recap to Slack #standup."""
+    from fastapi.responses import JSONResponse
+    from integrations import slack
+    trusted = _ticket_scope(workspace, code, room)
+    meeting = slack.find_meeting(meeting_id, trusted, room or None)
+    if meeting is None:
+        return JSONResponse({"ok": False, "error": f"Unknown meeting {meeting_id}"}, status_code=404)
+    return await slack.post_meeting_recap(dict(meeting), wait=False, force=True)
 
 
 @app.get("/tickets")
@@ -330,11 +342,17 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest", wo
         if not session.sockets:
             await mouth.detach(session)
             if not session.sockets:
+                saved = None
                 try:
                     from brain.meeting_store import save_meeting
-                    save_meeting(session)
+                    saved = save_meeting(session)
                 except Exception:
                     log.exception('[%s] could not save meeting summary', room)
+                try:  # end-of-meeting #standup recap (background; waits for auto Jira links)
+                    from integrations import slack
+                    slack.schedule_meeting_recap(session, saved)
+                except Exception:  # noqa: BLE001
+                    log.exception('[%s] could not schedule slack recap', room)
                 # Nobody left: the next join is a brand-new meeting (fresh history, board, topic).
                 # The summary is already saved; the workspace repo/memory reload on join.
                 if not session.sockets and SESSIONS.get(room) is session:
