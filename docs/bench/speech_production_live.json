@@ -1,0 +1,770 @@
+{
+  "base": "https://crusoehacks.vercel.app",
+  "workspace": "speechqa-1792278718033",
+  "start": 1792278730408,
+  "errors": [
+    "Failed to load resource: the server responded with a status of 404 ()"
+  ],
+  "board": {
+    "renderer": "native",
+    "renderedBoxes": 22,
+    "renderedEdges": 1
+  },
+  "sockets": [
+    "wss://version-anywhere-propecia-metals.trycloudflare.com/ws",
+    "wss://version-anywhere-propecia-metals.trycloudflare.com/ws"
+  ],
+  "playback": [
+    {
+      "at": 1792278731747,
+      "scheduledAt": 1792278731747,
+      "bytes": 147500,
+      "duration": 1.6718333333333333,
+      "state": "running"
+    },
+    {
+      "at": 1792278738907,
+      "scheduledAt": 1792278738907,
+      "bytes": 1699884,
+      "duration": 19.272541666666665,
+      "state": "running"
+    },
+    {
+      "at": 1792278739114,
+      "scheduledAt": 1792278758183.875,
+      "bytes": 299052,
+      "duration": 3.3901041666666667,
+      "state": "running"
+    },
+    {
+      "at": 1792278742377,
+      "scheduledAt": 1792278761572.9792,
+      "bytes": 376876,
+      "duration": 4.272458333333334,
+      "state": "running"
+    }
+  ],
+  "events": [
+    {
+      "at": 1792278730446,
+      "type": "status",
+      "state": "listening"
+    },
+    {
+      "at": 1792278731746,
+      "type": "audio",
+      "say_id": "s_1",
+      "seq": 0,
+      "format": "wav",
+      "sample_rate": 44100,
+      "text": "Got it, sketching that now.",
+      "last": true,
+      "audio_base64_bytes": 196668
+    },
+    {
+      "at": 1792278732026,
+      "type": "draw",
+      "op": "add_sticky",
+      "id": "ghost_1",
+      "text": "Twin is sketching\u2026",
+      "color": "blue",
+      "x": 820,
+      "y": 80,
+      "by": "Twin"
+    },
+    {
+      "at": 1792278732297,
+      "type": "agent_event",
+      "event_id": "ev_bb8a99424d40",
+      "parent_id": null,
+      "agent": "Listener",
+      "model": "NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "state": "started",
+      "detail": "1 transcript line(s)",
+      "ts": 1792278732192
+    },
+    {
+      "at": 1792278732297,
+      "type": "agent_event",
+      "event_id": "ev_7e68a02f107c",
+      "parent_id": "ev_bb8a99424d40",
+      "agent": "Conductor",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "started",
+      "detail": "route 1 moment(s) lines=ln_ae74dbd684fd",
+      "ts": 1792278732193
+    },
+    {
+      "at": 1792278732297,
+      "type": "agent_event",
+      "event_id": "ev_e21324d58e8f",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Diagrammer",
+      "model": "code_map",
+      "state": "started",
+      "detail": "draw 1 system fact(s) lines=ln_ae74dbd684fd",
+      "ts": 1792278732194
+    },
+    {
+      "at": 1792278732298,
+      "type": "agent_event",
+      "event_id": "ev_864b0fa42395",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Contributor",
+      "model": "NVIDIA-Nemotron-3.5-Super-VL",
+      "state": "started",
+      "detail": "sourced visual contribution",
+      "ts": 1792278732194
+    },
+    {
+      "at": 1792278732298,
+      "type": "agent_event",
+      "event_id": "ev_de9a20624ca9",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Conductor router",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "started",
+      "detail": "route 1 M2 moment(s)",
+      "ts": 1792278732195
+    },
+    {
+      "at": 1792278732299,
+      "type": "draw",
+      "op": "frame",
+      "id": "repo_477c279f_overview",
+      "x": 0,
+      "y": 0,
+      "w": 1000,
+      "h": 1000,
+      "title": "Repository architecture"
+    },
+    {
+      "at": 1792278732299,
+      "type": "draw",
+      "op": "frame",
+      "id": "repo_477c279f_r0",
+      "frame": "repo_477c279f_overview",
+      "x": 20,
+      "y": 40,
+      "w": 960,
+      "h": 208,
+      "title": "app/editor / app/editor/components / app/dashboard / app / lib"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n0",
+      "label": "app/editor/PhysicsScene.jsx\nOwner: Preet37",
+      "x": 50,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r0"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "remove",
+      "id": "ghost_1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n1",
+      "label": "app/editor/components/GenericVisual.jsx\nOwner: Preet37",
+      "x": 245,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r0"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n2",
+      "label": "app/dashboard/page.tsx\nOwner: Preet37",
+      "x": 440,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r0"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n3",
+      "label": "app/page.tsx\nOwner: Preet37",
+      "x": 635,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r0"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n4",
+      "label": "lib/specSheet.ts\nOwner: Preet37",
+      "x": 830,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r0"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "frame",
+      "id": "repo_477c279f_r1",
+      "frame": "repo_477c279f_overview",
+      "x": 20,
+      "y": 260,
+      "w": 960,
+      "h": 208,
+      "title": "app/components / render-worker / Backend/lib / app/api/agent-pipeline / app/api/analyze_document"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n5",
+      "label": "app/components/FeatureCard.tsx\nOwner: Preet37",
+      "x": 50,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n6",
+      "label": "render-worker/binPaths.js\nOwner: Preet37",
+      "x": 245,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n7",
+      "label": "Backend/lib/physics-config.ts\nOwner: Preet37",
+      "x": 440,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n8",
+      "label": "app/api/agent-pipeline/route.ts\nOwner: Preet37",
+      "x": 635,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n9",
+      "label": "app/api/analyze_document/route.ts\nOwner: Preet37",
+      "x": 830,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r1"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "frame",
+      "id": "repo_477c279f_r2",
+      "frame": "repo_477c279f_overview",
+      "x": 20,
+      "y": 480,
+      "w": 960,
+      "h": 208,
+      "title": "app/api/analyze_video / app/api/ask / app/api/auth/[auth0] / app/api/compile-wiki / app/api/explain-failure"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n10",
+      "label": "app/api/analyze_video/route.ts\nOwner: Preet37",
+      "x": 50,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r2"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n11",
+      "label": "app/api/ask/route.ts\nOwner: Preet37",
+      "x": 245,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r2"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n12",
+      "label": "app/api/auth/[auth0]/route.ts\nOwner: Preet37",
+      "x": 440,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r2"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n13",
+      "label": "app/api/compile-wiki/route.ts\nOwner: Preet37",
+      "x": 635,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r2"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n14",
+      "label": "app/api/explain-failure/route.ts\nOwner: Preet37",
+      "x": 830,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r2"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "frame",
+      "id": "repo_477c279f_r3",
+      "frame": "repo_477c279f_overview",
+      "x": 20,
+      "y": 700,
+      "w": 960,
+      "h": 208,
+      "title": "app/api/extract / app/api/flashcards / app/api/generate-3d-model / app/api/generate-3d / app/api/generate-artifacts"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n15",
+      "label": "app/api/extract/route.ts\nOwner: Preet37",
+      "x": 50,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r3"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n16",
+      "label": "app/api/flashcards/route.ts\nOwner: Preet37",
+      "x": 245,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r3"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n17",
+      "label": "app/api/generate-3d-model/route.ts\nOwner: Preet37",
+      "x": 440,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r3"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n18",
+      "label": "app/api/generate-3d/route.ts\nOwner: Preet37",
+      "x": 635,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r3"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_box",
+      "id": "repo_477c279f_n19",
+      "label": "app/api/generate-artifacts/route.ts\nOwner: Preet37",
+      "x": 830,
+      "y": 380,
+      "kind": "service",
+      "frame": "repo_477c279f_r3"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "connect",
+      "id": "repo_477c279f_e0",
+      "from_id": "repo_477c279f_n3",
+      "to_id": "repo_477c279f_n5",
+      "label": "imports",
+      "frame": "repo_477c279f_overview"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "add_text",
+      "id": "repo_477c279f_legend",
+      "frame": "repo_477c279f_overview",
+      "x": 30,
+      "y": 950,
+      "w": 940,
+      "h": 40,
+      "text": "Repository map: 20 of 109 indexed files. Arrows = imports; runtime / PR workflow is not inferred.",
+      "size": "s"
+    },
+    {
+      "at": 1792278732300,
+      "type": "draw",
+      "op": "focus",
+      "id": "repo_477c279f_overview"
+    },
+    {
+      "at": 1792278732300,
+      "type": "agent_event",
+      "event_id": "ev_e21324d58e8f",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Diagrammer",
+      "model": "code_map",
+      "state": "done",
+      "detail": "28 draw operation(s)",
+      "ts": 1792278732233
+    },
+    {
+      "at": 1792278733699,
+      "type": "agent_event",
+      "event_id": "ev_de9a20624ca9",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Conductor router",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "done",
+      "detail": "1 route(s)",
+      "ts": 1792278733630
+    },
+    {
+      "at": 1792278733699,
+      "type": "agent_event",
+      "event_id": "ev_4b7c8da40fe3",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Code Analyst",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "started",
+      "detail": "impact of if",
+      "ts": 1792278733633
+    },
+    {
+      "at": 1792278733699,
+      "type": "agent_event",
+      "event_id": "ev_47e5a384e2ef",
+      "parent_id": "ev_4b7c8da40fe3",
+      "agent": "Code Analyst module",
+      "model": "code_map",
+      "state": "started",
+      "detail": "inspect app/api/generate-artifacts/route.ts",
+      "ts": 1792278733635
+    },
+    {
+      "at": 1792278733699,
+      "type": "agent_event",
+      "event_id": "ev_fa3337c6d046",
+      "parent_id": "ev_4b7c8da40fe3",
+      "agent": "Code Analyst module",
+      "model": "code_map",
+      "state": "started",
+      "detail": "inspect app/api/verify-model/route.ts",
+      "ts": 1792278733635
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_f8d2cb64ea6e",
+      "parent_id": "ev_47e5a384e2ef",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "started",
+      "detail": "read app/api/generate-artifacts/route.ts section",
+      "ts": 1792278733636
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_dbb91bb85725",
+      "parent_id": "ev_47e5a384e2ef",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "started",
+      "detail": "read app/api/generate-artifacts/route.ts section",
+      "ts": 1792278733636
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_1007307c03df",
+      "parent_id": "ev_fa3337c6d046",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "started",
+      "detail": "read app/api/verify-model/route.ts section",
+      "ts": 1792278733636
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_6797075b23ee",
+      "parent_id": "ev_fa3337c6d046",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "started",
+      "detail": "read app/api/verify-model/route.ts section",
+      "ts": 1792278733636
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_f8d2cb64ea6e",
+      "parent_id": "ev_47e5a384e2ef",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "done",
+      "detail": "read 1000 characters",
+      "ts": 1792278733637
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_dbb91bb85725",
+      "parent_id": "ev_47e5a384e2ef",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "done",
+      "detail": "read 1000 characters",
+      "ts": 1792278733637
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_1007307c03df",
+      "parent_id": "ev_fa3337c6d046",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "done",
+      "detail": "read 1000 characters",
+      "ts": 1792278733637
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_6797075b23ee",
+      "parent_id": "ev_fa3337c6d046",
+      "agent": "Code Analyst section",
+      "model": "code_map",
+      "state": "done",
+      "detail": "read 1000 characters",
+      "ts": 1792278733637
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_47e5a384e2ef",
+      "parent_id": "ev_4b7c8da40fe3",
+      "agent": "Code Analyst module",
+      "model": "code_map",
+      "state": "done",
+      "detail": "inspected app/api/generate-artifacts/route.ts",
+      "ts": 1792278733638
+    },
+    {
+      "at": 1792278733700,
+      "type": "agent_event",
+      "event_id": "ev_fa3337c6d046",
+      "parent_id": "ev_4b7c8da40fe3",
+      "agent": "Code Analyst module",
+      "model": "code_map",
+      "state": "done",
+      "detail": "inspected app/api/verify-model/route.ts",
+      "ts": 1792278733638
+    },
+    {
+      "at": 1792278734787,
+      "type": "agent_event",
+      "event_id": "ev_864b0fa42395",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Contributor",
+      "model": "NVIDIA-Nemotron-3.5-Super-VL",
+      "state": "done",
+      "detail": "3 verified source(s)",
+      "ts": 1792278734700
+    },
+    {
+      "at": 1792278734787,
+      "type": "contribution",
+      "id": "contrib_629fb68a8d21",
+      "topic_id": null,
+      "show": "Layered diagram of repo_477c279f: API route (app/api/geometry-render/route.ts:1-24) calls LLM research (lib/specSheet), validates structure via lib/geometryPlan",
+      "current": "lib/geometryPlan (lines 1-24) validates LLM-generated structural geometry plans with deterministic rules and rejects blob-like plans before polygon generation.",
+      "impact": [
+        "Invalid or blob-like CAD geometry could reach rendering",
+        "Downstream checks could pass on incorrect models"
+      ],
+      "risks": [
+        "Users receive wrong or unusable geometry",
+        "Silent acceptance of invalid plans"
+      ],
+      "question": "What owner and review step should gate any bypass of geometry validation?",
+      "sources": [
+        "lib/geometryPlan.ts:1-24",
+        "lib/specToCad.ts:28-51",
+        "app/api/geometry-render/route.ts:1-24"
+      ]
+    },
+    {
+      "at": 1792278737103,
+      "type": "agent_event",
+      "event_id": "ev_4b7c8da40fe3",
+      "parent_id": "ev_7e68a02f107c",
+      "agent": "Code Analyst",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "done",
+      "detail": "2 sourced file(s)",
+      "ts": 1792278737078
+    },
+    {
+      "at": 1792278737103,
+      "type": "draw",
+      "op": "add_box",
+      "id": "file_61cfbe619883",
+      "label": "app/api/generate-artifacts/route.ts",
+      "x": 30,
+      "y": 650,
+      "kind": "note",
+      "frame": "repo_477c279f_overview"
+    },
+    {
+      "at": 1792278737104,
+      "type": "draw",
+      "op": "add_box",
+      "id": "file_932d20877886",
+      "label": "app/api/verify-model/route.ts",
+      "x": 350,
+      "y": 650,
+      "kind": "note",
+      "frame": "repo_477c279f_overview"
+    },
+    {
+      "at": 1792278737105,
+      "type": "draw",
+      "op": "highlight",
+      "ids": [
+        "file_61cfbe619883",
+        "file_932d20877886"
+      ],
+      "on": true
+    },
+    {
+      "at": 1792278737106,
+      "type": "agent_event",
+      "event_id": "ev_7e68a02f107c",
+      "parent_id": "ev_bb8a99424d40",
+      "agent": "Conductor",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "done",
+      "detail": "routed 0 system fact(s) and visual request",
+      "ts": 1792278737079
+    },
+    {
+      "at": 1792278737106,
+      "type": "agent_event",
+      "event_id": "ev_bb8a99424d40",
+      "parent_id": null,
+      "agent": "Listener",
+      "model": "NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "state": "done",
+      "detail": "1 moment(s)",
+      "ts": 1792278737079
+    },
+    {
+      "at": 1792278737629,
+      "type": "status",
+      "state": "speaking"
+    },
+    {
+      "at": 1792278738923,
+      "type": "audio",
+      "say_id": "s_2",
+      "seq": 0,
+      "format": "wav",
+      "sample_rate": 44100,
+      "text": "Left is app/editor/PhysicsScene.jsx, then app/components/FeatureCard.tsx. lib/geometryPlan (lines 1-24) validates LLM-generated structural geometry plans with deterministic rules and rejects blob-like plans before polygon generation.",
+      "last": false,
+      "audio_base64_bytes": 2266512
+    },
+    {
+      "at": 1792278739116,
+      "type": "audio",
+      "say_id": "s_2",
+      "seq": 1,
+      "format": "wav",
+      "sample_rate": 44100,
+      "text": "Invalid or blob-like CAD geometry could reach rendering.",
+      "last": false,
+      "audio_base64_bytes": 398736
+    },
+    {
+      "at": 1792278742379,
+      "type": "audio",
+      "say_id": "s_2",
+      "seq": 2,
+      "format": "wav",
+      "sample_rate": 44100,
+      "text": "What owner and review step should gate any bypass of geometry validation?",
+      "last": true,
+      "audio_base64_bytes": 502504
+    },
+    {
+      "at": 1792278742380,
+      "type": "status",
+      "state": "listening"
+    }
+  ],
+  "verification": {
+    "date": "2026-10-17",
+    "deployment": "dpl_342NNGXzVWVy7GmjgmjBkPxH4E1P",
+    "frontend_commit": "56f18dc",
+    "result": "PASS",
+    "total_test_seconds": 46.5,
+    "request_to_question_playback_ms": 31482,
+    "backend_tests_passed": 591,
+    "backend_subtests_passed": 21,
+    "native_renderer_tests_passed": 2,
+    "native_renderer_persistence_seconds": 7.1,
+    "audio_check": "Actual running AudioContext buffer playback matched delivered WAV byte lengths for current-state explanation and question; saved WAV RMS 1427.2 (16-bit mono 44.1kHz).",
+    "limitations": [
+      "Native fallback supports basic diagrams and existing 3D view; advanced rich shapes use labeled cards and freehand editing requires a valid tldraw license.",
+      "Repository overview samples 20 indexed files; arrows represent indexed literal relative imports, not inferred runtime flow.",
+      "Backend remains on the laptop through Cloudflare tunnel.",
+      "One nonblocking HTTP 404 was captured (permissions endpoint)."
+    ]
+  }
+}
