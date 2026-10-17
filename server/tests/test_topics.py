@@ -30,7 +30,175 @@ def batch(topic_id, title, text, changed=True):
                                     "entities": [title]}]})
 
 
+def reflex(*, kind="system_fact", kind_confidence=0.95, topic_changed=0.0,
+           wants_visual="none", visual_confidence=0.95, is_echo=0.0):
+    return {
+        "kind": {"type": "choice", "choice": kind, "confidence": kind_confidence},
+        "topic_changed": {"type": "noul", "noul": topic_changed},
+        "wants_visual": {"type": "choice", "choice": wants_visual,
+                         "confidence": visual_confidence},
+        "is_echo": {"type": "noul", "noul": is_echo},
+    }
+
+
 class TopicTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reflex_skips_confident_small_talk_but_fails_open_on_uncertainty(self):
+        session = FakeSession()
+        seen = []
+
+        async def chat(model, messages, **kw):
+            seen.extend(line["text"] for line in json.loads(messages[-1]["content"])["new_lines"])
+            return batch("t_auth", "Auth", "auth uses Redis")
+
+        class NoopConductor:
+            async def handle(self, *args, **kw):
+                return None
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, conductor=NoopConductor(), debounce_seconds=0)
+            listener.submit("Preet", "nice weather", decision=reflex(kind="small_talk"))
+            self.assertIsNone(listener._worker)
+            listener.submit("Preet", "auth uses Redis", decision=reflex(
+                kind="small_talk", kind_confidence=0.79))
+            await asyncio.wait_for(listener.wait_idle(), 1)
+            listener.submit("Preet", "partial decision", decision={
+                "kind": {"type": "choice", "choice": "small_talk", "confidence": 0.99},
+            })
+            await asyncio.wait_for(listener.wait_idle(), 1)
+            malformed_topic = reflex(kind="small_talk")
+            malformed_topic["topic_changed"]["noul"] = float("nan")
+            listener.submit("Preet", "uncertain topic", decision=malformed_topic)
+            await asyncio.wait_for(listener.wait_idle(), 1)
+            uncertain_visual = reflex(kind="small_talk", visual_confidence=0.69)
+            listener.submit("Preet", "uncertain visual", decision=uncertain_visual)
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(seen, ["auth uses Redis", "partial decision",
+                                "uncertain topic", "uncertain visual"])
+
+    async def test_reflex_visual_hint_overrides_small_talk_and_reaches_diagrammer(self):
+        session = FakeSession()
+        calls = []
+
+        async def chat(*args, **kw):
+            return batch("t_auth", "Auth", "show the auth sequence")
+
+        class RecordingDiagrammer:
+            async def handle(self, session, facts, parent_id=None, **kw):
+                calls.append(kw)
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, conductor=Conductor(RecordingDiagrammer()),
+                                debounce_seconds=0)
+            listener.submit("Preet", "show the auth sequence", decision=reflex(
+                kind="small_talk", wants_visual="sequence"))
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(calls[0]["source_lines"][0]["wants_visual"], "sequence")
+
+    async def test_confident_reflex_topic_switch_cancels_job_before_nano_returns(self):
+        session = FakeSession()
+        old_job_started = asyncio.Event()
+        old_job_cancelled = asyncio.Event()
+        new_model_release = asyncio.Event()
+
+        async def chat(model, messages, **kw):
+            line = json.loads(messages[-1]["content"])["new_lines"][0]["text"]
+            if line == "billing starts":
+                await new_model_release.wait()
+                return batch("t_billing", "Billing", line)
+            return batch("t_auth", "Auth", line)
+
+        class SlowConductor:
+            async def handle(self, session, moments, parent_id=None, **kw):
+                if kw["topic_id"] == "t_auth":
+                    old_job_started.set()
+                    try:
+                        await asyncio.Event().wait()
+                    except asyncio.CancelledError:
+                        old_job_cancelled.set()
+                        raise
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, conductor=SlowConductor(), debounce_seconds=0)
+            listener.submit("Preet", "auth exists")
+            await asyncio.wait_for(old_job_started.wait(), 1)
+            listener.submit("Preet", "billing starts", decision=reflex(topic_changed=0.7))
+            await asyncio.wait_for(old_job_cancelled.wait(), 1)
+            self.assertEqual(session.active_topic["topic_id"], "t_auth")
+            new_model_release.set()
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(session.active_topic["topic_id"], "t_billing")
+
+    async def test_weak_reflex_topic_switch_keeps_current_job_running(self):
+        session = FakeSession()
+        old_job_started = asyncio.Event()
+        release_old_job = asyncio.Event()
+        second_model_started = asyncio.Event()
+        release_second_model = asyncio.Event()
+        cancelled = False
+
+        async def chat(model, messages, **kw):
+            line = json.loads(messages[-1]["content"])["new_lines"][0]["text"]
+            if line == "auth also uses Redis":
+                second_model_started.set()
+                await release_second_model.wait()
+            return batch("t_auth", "Auth", line)
+
+        class SlowConductor:
+            async def handle(self, session, moments, parent_id=None, **kw):
+                nonlocal cancelled
+                if moments[0]["text"] == "auth uses Postgres":
+                    old_job_started.set()
+                    try:
+                        await release_old_job.wait()
+                    except asyncio.CancelledError:
+                        cancelled = True
+                        raise
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, conductor=SlowConductor(), debounce_seconds=0)
+            listener.submit("Preet", "auth uses Postgres")
+            await asyncio.wait_for(old_job_started.wait(), 1)
+            listener.submit("Preet", "auth also uses Redis", decision=reflex(
+                topic_changed=0.69))
+            await asyncio.wait_for(second_model_started.wait(), 1)
+            self.assertFalse(cancelled)
+            release_second_model.set()
+            release_old_job.set()
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertFalse(cancelled)
+
+    async def test_reflex_echo_requires_lexical_agreement_and_invalid_scores_fail_open(self):
+        class EchoSession(FakeSession):
+            def is_echo(self, text):
+                return text == "Twin said this"
+
+        session = EchoSession()
+        seen = []
+
+        async def chat(model, messages, **kw):
+            seen.extend(line["text"] for line in json.loads(messages[-1]["content"])["new_lines"])
+            return batch("t_auth", "Auth", "human says auth")
+
+        class NoopConductor:
+            async def handle(self, *args, **kw):
+                return None
+
+        with patch("agents.listener.llm.chat", chat):
+            listener = Listener(session, conductor=NoopConductor(), debounce_seconds=0)
+            listener.submit("Preet", "Twin said this", decision=reflex(is_echo=0.9))
+            self.assertIsNone(listener._worker)
+            listener.submit("Preet", "human says auth", decision=reflex(is_echo=0.9))
+            await asyncio.wait_for(listener.wait_idle(), 1)
+            listener.submit("Preet", "invalid score", decision=reflex(
+                kind="small_talk", kind_confidence=float("nan")))
+            await asyncio.wait_for(listener.wait_idle(), 1)
+
+        self.assertEqual(seen, ["human says auth", "invalid score"])
+
     async def test_session_set_topic_owns_publication_without_duplicate_broadcast(self):
         class SessionWithTopic(FakeSession):
             def __init__(self):

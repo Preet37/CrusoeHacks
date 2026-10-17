@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import json
 import logging
+import math
 import re
 from collections import deque
 from pathlib import Path
@@ -20,6 +21,7 @@ MOMENT_TYPES = {"system_fact", "decision", "question", "claim", "task"}
 _RENAME = re.compile(r"\brename\s+([a-z][a-z0-9_-]*)\s+to\s+(.+?)[.!?]?\s*$", re.I)
 _TOPIC_ID = re.compile(r"t_[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
 _CONTRADICTION = re.compile(r"\b(actually|instead|scratch that|not that|change (?:it|that) to|replace (?:it|that) with)\b", re.I)
+_VISUAL_HINTS = {"architecture", "sequence", "chart", "mockup", "table", "code"}
 
 
 def _parse_moments(raw: str) -> list[dict]:
@@ -79,6 +81,38 @@ def _slug(title: str) -> str:
     return f"t_{stem or 'general'}"
 
 
+def _probability(value) -> float | None:
+    """Keep missing or malformed scores distinct from an explicit zero."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        score = float(value)
+    except (OverflowError, ValueError):
+        return None
+    return score if math.isfinite(score) and 0 <= score <= 1 else None
+
+
+def _confidence(value) -> float:
+    return _probability(value) or 0.0
+
+
+def _noul(decision: dict | None, key: str) -> float | None:
+    answer = decision.get(key) if isinstance(decision, dict) else None
+    if not isinstance(answer, dict) or answer.get("type") != "noul":
+        return None
+    return _probability(answer.get("noul"))
+
+
+def _choice(decision: dict | None, key: str) -> tuple[str | None, float]:
+    answer = decision.get(key) if isinstance(decision, dict) else None
+    if not isinstance(answer, dict) or answer.get("type") != "choice":
+        return None, 0.0
+    value = answer.get("choice")
+    if not isinstance(value, str):
+        return None, 0.0
+    return value, _confidence(answer.get("confidence"))
+
+
 class Listener:
     def __init__(self, session, conductor=None, debounce_seconds: float = 0.25):
         self.session = session
@@ -96,17 +130,40 @@ class Listener:
         self._active_topic: str | None = active.get("topic_id") if isinstance(active, dict) else None
         self._closed = False
 
-    def submit(self, speaker: str, text: str) -> None:
-        """Queue a final transcript line immediately; never start concurrent calls."""
+    def submit(self, speaker: str, text: str, *, decision: dict | None = None) -> None:
+        """Queue a final line; optional reflex answers may skip it or preempt stale jobs."""
         if self._closed:
             return
         text = text.strip()
         if not text:
             return
+        # Echoes need both a confident reflex answer and the Session's lexical
+        # guard. A mistaken single model score must not discard human input.
+        echo_score = _noul(decision, "is_echo")
+        if echo_score is not None and echo_score >= 0.9:
+            is_echo = getattr(self.session, "is_echo", None)
+            if callable(is_echo):
+                try:
+                    if is_echo(text):
+                        return
+                except Exception:
+                    log.exception("echo check failed; keeping transcript line")
+        topic_score = _noul(decision, "topic_changed")
+        topic_switch = topic_score is not None and topic_score >= 0.7
+        visual, visual_confidence = _choice(decision, "wants_visual")
+        visual_hint = visual if visual in _VISUAL_HINTS and visual_confidence >= 0.7 else None
+        kind, kind_confidence = _choice(decision, "kind")
+        if (kind in {"none", "small_talk"} and kind_confidence >= 0.8
+                and topic_score is not None and topic_score < 0.7
+                and visual == "none" and visual_confidence >= 0.7
+                and not _CONTRADICTION.search(text)):
+            return
         line = {"speaker": speaker, "text": text, "line_id": f"ln_{uuid4().hex[:12]}"}
+        if visual_hint is not None:
+            line["wants_visual"] = visual_hint
         self._pending.append(line)
         self._recent.append(line)
-        if _CONTRADICTION.search(text):
+        if topic_switch or _CONTRADICTION.search(text):
             self._cancel_jobs(contradiction=True)
         self._pending_changed.set()
         if self._worker is None or self._worker.done():

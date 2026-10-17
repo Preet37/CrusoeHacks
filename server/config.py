@@ -15,6 +15,7 @@ MODEL_RESPONDER = os.getenv("MODEL_RESPONDER", "nvidia/Nemotron-3.5-Lightning-30
 MODEL_FAST = os.getenv("MODEL_FAST", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
 MODEL_OMNI = os.getenv("MODEL_OMNI", "nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B")
 MODEL_SMART = os.getenv("MODEL_SMART", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B")
+MODEL_JEV = os.getenv("MODEL_JEV", "jev-latest")
 MODEL_COACH = os.getenv("MODEL_COACH", "nvidia/NVIDIA-Nemotron-3.5-Super-VL")
 
 TWIN_NAME = os.getenv("TWIN_NAME", "Twin")
