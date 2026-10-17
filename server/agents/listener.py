@@ -15,6 +15,7 @@ import config
 import llm
 from agents.conductor import Conductor, _wants_visual
 from agents.diagrammer import StaleBoardError, emit_event
+from agents.repo_diagram import repo_architecture_request
 
 log = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "listener.md"
@@ -25,6 +26,15 @@ _CONTRADICTION = re.compile(r"\b(actually|instead|scratch that|not that|change (
 _TOPIC_SWITCH = re.compile(r"(?:different topic\s*[:,]?\s*(?:let(?: us|['’]s) talk about\s+)?|switching to\s+|back to\s+)([^.!?;:]{1,60})", re.I)
 _DECISION = re.compile(r"\b(?:we (?:have )?decided|we agreed|decision is|let['’]s (?:move|migrate|switch|use|adopt)|will own (?:it|this))\b", re.I)
 _VISUAL_HINTS = {"architecture", "sequence", "chart", "mockup", "table", "code", "3d"}
+_MODEL_TIMEOUTS = (4.0, 7.0)
+_NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
+
+
+def _indexed_repo_request(session, lines: list[dict]) -> str | None:
+    files = getattr(getattr(session, "code_map", None), "files", None)
+    if not isinstance(files, dict) or not files:
+        return None
+    return repo_architecture_request([], lines)
 
 
 def _parse_moments(raw: str) -> list[dict]:
@@ -116,9 +126,9 @@ def _choice(decision: dict | None, key: str) -> tuple[str | None, float]:
     return value, _confidence(answer.get("confidence"))
 
 
-def _log_model_latency(started: float, count: int) -> None:
+def _log_model_latency(started: float, count: int, model: str = config.MODEL_FAST) -> None:
     row = {"ts": int(time.time() * 1000), "stage": "listener",
-           "model": config.MODEL_FAST, "reasoning": False,
+           "model": model, "reasoning": False,
            "latency_ms": round((time.monotonic() - started) * 1000),
            "lines": count}
     try:
@@ -128,6 +138,41 @@ def _log_model_latency(started: float, count: int) -> None:
             out.write(json.dumps(row, separators=(",", ":")) + "\n")
     except OSError:
         log.warning("Listener latency log unavailable")
+
+
+async def _extract_batch(messages: list[dict], line_count: int) -> tuple[list[dict], dict | None]:
+    """Try each distinct model once for transport failures, with bounded JSON repair."""
+    models = list(dict.fromkeys((config.MODEL_FAST, config.MODEL_COACH)))
+    last_error: Exception | None = None
+    for index, model in enumerate(models):
+        timeout = _MODEL_TIMEOUTS[min(index, len(_MODEL_TIMEOUTS) - 1)]
+        started = time.monotonic()
+        try:
+            async def request_and_parse():
+                raw = await llm.chat(model, messages, max_tokens=1600, extra_body=_NO_THINK)
+                try:
+                    return _parse_batch(raw)
+                except (ValueError, json.JSONDecodeError):
+                    # Preserve the existing single JSON repair. The outer
+                    # timeout covers both calls to this model together.
+                    repaired = await llm.chat(model, messages + [
+                        {"role": "assistant", "content": raw},
+                        {"role": "user", "content": "Return the complete JSON moment array only."},
+                    ], max_tokens=2400, extra_body=_NO_THINK)
+                    return _parse_batch(repaired)
+
+            result = await asyncio.wait_for(request_and_parse(), timeout)
+            _log_model_latency(started, line_count, model)
+            return result
+        except Exception as exc:
+            if not isinstance(exc, TimeoutError) and not llm._retryable(exc):
+                raise
+            last_error = exc
+            if index + 1 < len(models):
+                log.warning("Listener model fallback %s -> %s after %s",
+                            model, models[index + 1], type(exc).__name__)
+    assert last_error is not None
+    raise last_error
 
 
 class Listener:
@@ -170,13 +215,16 @@ class Listener:
         visual, visual_confidence = _choice(decision, "wants_visual")
         visual_hint = visual if visual in _VISUAL_HINTS and visual_confidence >= 0.7 else None
         kind, kind_confidence = _choice(decision, "kind")
+        repo_request = _indexed_repo_request(self.session, [{"text": text}]) is not None
         if (kind in {"none", "small_talk"} and kind_confidence >= 0.8
                 and topic_score is not None and topic_score < 0.7
                 and visual == "none" and visual_confidence >= 0.7
-                and not _CONTRADICTION.search(text)):
+                and not _CONTRADICTION.search(text) and not repo_request):
             return
         line = {"speaker": speaker, "text": text, "line_id": f"ln_{uuid4().hex[:12]}"}
-        if visual_hint is not None:
+        if repo_request:
+            line["wants_visual"] = "architecture"
+        elif visual_hint is not None:
             line["wants_visual"] = visual_hint
         self._pending.append(line)
         self._recent.append(line)
@@ -318,21 +366,15 @@ class Listener:
                                              for topic_id, title in self._topics.items()],
                         })},
                     ]
-                    model_started = time.monotonic()
-                    raw = await llm.chat(config.MODEL_FAST, messages, max_tokens=1600,
-                                         extra_body={"chat_template_kwargs": {"enable_thinking": False}})
-                    try:
-                        moments, topic_meta = _parse_batch(raw)
-                    except (ValueError, json.JSONDecodeError):
-                        # A reasoning-heavy Nano reply can hit its output cap
-                        # mid-JSON. Retry once only when parsing actually fails.
-                        repaired = await llm.chat(config.MODEL_FAST, messages + [
-                            {"role": "assistant", "content": raw},
-                            {"role": "user", "content": "Return the complete JSON moment array only."},
-                        ], max_tokens=2400,
-                            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
-                        moments, topic_meta = _parse_batch(repaired)
-                    _log_model_latency(model_started, len(lines))
+                    repo_request = _indexed_repo_request(self.session, lines)
+                    if repo_request:
+                        # The deterministic repository graph uses indexed files;
+                        # extraction adds no evidence and must not block the draw.
+                        moments = [{"type": "task", "text": repo_request,
+                                    "entities": []}]
+                        topic_meta = None
+                    else:
+                        moments, topic_meta = await _extract_batch(messages, len(lines))
                     # Short imperative edits are often classified as tasks by
                     # Nano. If the named component is already on this board,
                     # make the requested diagram change a routed system fact.
