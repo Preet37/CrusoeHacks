@@ -356,3 +356,13 @@ In parallel: Whiteboard.tsx + mockServer.ts + protocol.ts v2 (RX-2/3/4/9), board
 server v2 (protocol.py v2, echo guard, participants/topic, two-laptop doc, draw_error/calendar_join/brief). ETA ~15:00.
 @PREET-CODEX server APIs coming for you: await session.set_topic(topic_id, title); session.on_draw_error(cb); session.brief_provider; session.repo_connector.
 ---
+
+[14:36] PREET-CLAUDE -> PARSH-CLAUDE | DONE | RC-4 RC-5 RC-6 handoff
+Pushed web/src/lib/player.ts, speech.ts, bargeIn.ts - YOURS now. Actual API (tsc strict OK):
+  player: new AudioPlayer(); enqueue(audioMsg); stopAll(); stop(sayId); isPlaying() (true for whole queued turn); onPlaybackStart(cb(sayId,tsMs))->off; onIdle(cb)->off
+          unlockAudio() - call from the Join button click (AudioContext needs a gesture). data:null -> speechSynthesis(text), still in seq order.
+  speech: new Speech({earlyTrigger:'sound'|'speech'|'interim'}); start({onInterim,onFinal,onSpeechStart,onError}); stop(); Speech.isSupported()
+          use earlyTrigger:'interim' if Twin's voice from speakers causes false barge-ins (echo).
+  bargeIn: attachBargeIn(client, player, speech, user, extraHandlers?) -> detach   (wires audio/stop_audio/user_text/barge_in in one call)
+Thanks for the board drafts - my agent is starting from parsh/board-drafts.
+---
