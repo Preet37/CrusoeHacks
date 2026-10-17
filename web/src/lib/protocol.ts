@@ -14,6 +14,7 @@ export interface Hello {
 
 export interface UserText {
   type: 'user_text'
+  source?: 'speech' | 'typed'
   speaker: string
   text: string
   final: boolean

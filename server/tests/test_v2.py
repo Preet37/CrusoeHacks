@@ -388,3 +388,16 @@ def test_muted_user_is_ignored_and_shown_muted():
         assert len(s.history) == 1
 
     _a.run(run())
+
+
+@pytest.mark.asyncio
+async def test_muted_microphone_keeps_explicit_typed_specs_actionable():
+    s = Session("typed-spec")
+    ws = FakeWS()
+    s.add_socket(ws, "Preet")
+    await s.handle_message(ws, "Preet", protocol.parse({"type": "control", "action": "mic_off"}))
+    await s.handle_message(ws, "Preet", protocol.parse({"type": "user_text", "speaker": "Preet", "text": "mic noise", "final": True}))
+    assert s.history == []
+    await s.handle_message(ws, "Preet", protocol.parse({"type": "user_text", "source": "typed", "speaker": "Preet", "text": "Twin, draw my pasted spec", "final": True}))
+    assert [line["text"] for line in s.history] == ["Twin, draw my pasted spec"]
+    assert "Preet" in s.mic_muted

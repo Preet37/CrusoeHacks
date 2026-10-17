@@ -76,6 +76,7 @@ export default function MeetingRoom({
       type: 'user_text',
       speaker: user,
       text: `Twin, draw this spec as a detailed layered architecture diagram: ${text}`,
+      source: 'typed',
       final: true,
       ts: Date.now(),
     })

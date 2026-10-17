@@ -43,6 +43,7 @@ class Hello(Msg):
 
 class UserText(Msg):
     type: Literal["user_text"] = "user_text"
+    source: Optional[Literal["speech", "typed"]] = None
     speaker: str
     text: str
     final: bool = False

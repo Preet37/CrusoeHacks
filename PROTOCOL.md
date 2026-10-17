@@ -218,3 +218,5 @@ screen-share stage, fades after `ttl_s` unless pinned. `kind`: `box | arrow | te
 {"type":"ticket_action","id":"T-12","action":"send_to_agent"}
 ```
 `ticket_action` (Browser -> Server) `action`: `approve | push_jira | post_slack | send_to_agent | dismiss`.
+
+Typed spec input: `user_text` accepts optional `source: "speech" | "typed"` (default `speech`). Microphone mute discards speech results; an explicit typed spec remains actionable. Twin mode controls still apply.

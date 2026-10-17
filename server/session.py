@@ -596,8 +596,8 @@ class Session:
                 self.sockets[ws] = msg.user
                 await self.broadcast_participants()
         elif t == "user_text":
-            if (msg.speaker or user) in self.mic_muted or user in self.mic_muted:
-                return  # muted mic: Twin must not hear, show or act on anything from this person
+            if msg.source != "typed" and ((msg.speaker or user) in self.mic_muted or user in self.mic_muted):
+                return  # mute drops microphone results; explicit typed requests remain usable
             text = msg.text.strip()
             if self.is_echo(text, bool(msg.final)):
                 # PC-14: the mic heard Twin. No history, hooks, transcript or speaking state.
