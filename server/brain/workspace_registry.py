@@ -38,12 +38,17 @@ class WorkspaceRegistry:
         self._generation: dict[str, object] = {}
         self._current: dict[str, Repository] = {}
         self._sessions: dict[str, weakref.WeakSet] = {}
+        self._membership: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
     def register(self, session) -> Repository | None:
         key = workspace_key(session)
-        if key is None:
-            return None
         with self._lock:
+            prior = self._membership.get(session)
+            if prior is not None and prior != key:
+                raise ValueError("session workspace cannot change after registration")
+            if key is None:
+                return None
+            self._membership[session] = key
             self._sessions.setdefault(key, weakref.WeakSet()).add(session)
             current = self._current.get(key)
             if current is not None:
@@ -70,7 +75,8 @@ class WorkspaceRegistry:
             current = Repository(code_map, url, code_fact_scope)
             self._current[key] = current
             for session in tuple(self._sessions.get(key, ())):
-                self._apply(session, current)
+                if getattr(session, "workspace", None) == key:
+                    self._apply(session, current)
             return True
 
     def current(self, key: str) -> Repository | None:

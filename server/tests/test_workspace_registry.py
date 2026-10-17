@@ -128,3 +128,25 @@ def test_workspace_key_rejects_untrusted_shape_and_never_parses_room():
     assert workspace_registry.workspace_key(Session("acme-lobby")) is None
     with pytest.raises(ValueError):
         workspace_registry.workspace_key(Session("room", "../acme"))
+
+
+def test_registered_session_cannot_move_between_workspaces(registry, tmp_path):
+    session = Session("acme-lobby", "acme")
+    registry.register(session)
+    registry.register(session)  # Same trusted identity remains idempotent.
+
+    session.workspace = "other"
+    with pytest.raises(ValueError, match="cannot change"):
+        registry.register(session)
+
+    class Map:
+        pass
+
+    generation = registry.claim("acme")
+    registry.publish("acme", generation, Map(), "https://example.test/repo.git",
+                     "acme:code", tmp_path / "checkout")
+    assert session.code_map == "demo"  # Old membership cannot leak a map after mutation.
+
+    session.workspace = None
+    with pytest.raises(ValueError, match="cannot change"):
+        registry.register(session)
