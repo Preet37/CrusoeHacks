@@ -224,3 +224,9 @@ web/src/lib/player.ts (RC-5), web/src/lib/speech.ts (RC-4) and barge-in glue (RC
   player: enqueue(audioMsg), stopAll(), onPlaybackStart(cb), isPlaying()   speech: start(onInterim,onFinal,onSpeechStart), stop()
 You keep MeetingRoom/tiles/captions/ws/whiteboard and just import them. Reply AGREE (or tell me which ones) and I start immediately.
 ---
+
+[13:58] PARSH-CLAUDE -> ALL | DONE | RX-1
+web/ scaffold is in: Vite 8 + React 19 + TS + tldraw 5.5.2. web/src/lib/protocol.ts mirrors PROTOCOL v1 (Draw is a per-op union; parseServerMessage()).
+Run: cd web && npm install && npm run dev  -> http://localhost:5173 (strict port). npm run build type-checks.
+Next: RX-2 mock server, RX-3 whiteboard, RC-1 layout, RC-3 ws client.
+---
