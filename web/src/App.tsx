@@ -133,6 +133,7 @@ export default function App() {
       initialCam={joined.cam}
       initialMic={joined.mic}
       onLeave={() => (session ? goDashboard() : setJoined(null))}
+      session={joined.session}
     />
   )
 }

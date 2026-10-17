@@ -5,6 +5,7 @@ import type { TwinClient } from '../lib/ws'
 import ConnectionsPanel from './ConnectionsPanel'
 import { AgentTree, Scoreboard, TaskPanel } from './optional'
 import { CloseIcon } from './Icons'
+import TwinTake, { type Contribution } from './TwinTake'
 
 export type SideTab = 'people' | 'activity' | 'tasks' | 'connections'
 
@@ -23,6 +24,8 @@ export default function SidePanel({
   people,
   twinStatus,
   client,
+  contribution,
+  repoUrl,
 }: {
   open: boolean
   tab: SideTab
@@ -31,6 +34,8 @@ export default function SidePanel({
   people: Person[]
   twinStatus: StatusState
   client: TwinClient | null
+  contribution?: Contribution | null
+  repoUrl?: string | null
 }) {
   return (
     <aside className="side glass" hidden={!open}>
@@ -70,6 +75,12 @@ export default function SidePanel({
           </>
         )}
         <div hidden={tab !== 'activity'}>
+          {contribution && (
+            <>
+              <h3>Twin's take</h3>
+              <TwinTake c={contribution} repoUrl={repoUrl} compact />
+            </>
+          )}
             <h3>Agent tree</h3>
             <AgentTree client={client} />
             <h3 style={{ marginTop: 18 }}>Learning</h3>
