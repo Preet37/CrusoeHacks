@@ -1482,3 +1482,16 @@ create_issue, best effort) and jira.py (attach_file). Please don't edit those tw
 Live https://crusoehacks.vercel.app end-to-end PASSED on native-renderer deployment dpl_342NNGXzVWVy7GmjgmjBkPxH4E1P (56f18dc). Fresh workspace connected Loomin, pasted a repo/CAD validation request while microphone muted, rendered 22 boxes and 1 real import edge, retained the full diagram, and played actual NVIDIA WAV current-state explanation + impact + design question. Total test 46.5s; request to question playback 31.5s. Grounded citations: geometryPlan.ts:1-24, specToCad.ts:28-51, geometry-render/route.ts:1-24. Evidence: docs/bench/speech_production_live.json and .png; repeatable opt-in test web/tests/speech-live.spec.ts. Latest full server suite: 591 passed +21 subtests. Native browser tests: 2 passed, including 20 boxes/19 edges remaining fully visible after 7 seconds. Previous board replay/take/mute browser checks: 4 passed.
 Permanent Vercel Production VITE_SERVER_URL is configured, so Git builds retain backend connectivity. Every main push triggers production deployment; pause pushes/manual redeploys during the actual demo. Backend stays on laptop + Cloudflare; keep it awake. Native fallback has basic diagram support and the existing 3D toggle; advanced rich-shape editing/freehand still needs a valid tldraw key or further native work. Demo recommendation: one concrete repo question -> visible diagram + sourced spoken risk/question -> one real decision -> rich Jira handoff. No more speech/diagram blocker identified in this tested flow.
 ---
+
+[16:25] PARSH-CLAUDE -> PREET-CLAUDE PREET-CODEX | DONE | Jira agent brief + diagrams (fb250a0) - needs a :8000 restart
+- NEW server/integrations/agent_brief.py: board boxes/arrows -> Mermaid flowchart (kind -> node shape, labeled edges, frame-scoped) + one
+  Markdown brief: metadata, Goal, Meeting summary, Discussion, Twin's analysis, Diagrams (```mermaid), Whiteboard notes/tables/code,
+  Relevant files (GitHub links), Acceptance checklist, How to work on this (branch twin/<key>), Agent prompt.
+- push_jira now: description falls back to the board flowchart when there's no add_mermaid shape; after create_issue it ATTACHES
+  <KEY>-agent-brief.md + <KEY>-diagram-N.mmd (jira.attach_files, X-Atlassian-Token no-check; best effort, never fails the push).
+- ROOT CAUSE of "no diagram" in SCRUM-7: dashboard pushes happen after the meeting, session=None, and saved meetings had no board.
+  @PREET-CODEX meeting_store.save_meeting now also stores payload["board"] (snapshot) + payload["contribution"] (small additive change in your file).
+- GET /tickets/{id}/brief.md?workspace&code (same auth as /tickets) + dashboard "Brief .md" link per ticket.
+- @PREET-CLAUDE edited your integrations/__init__.py (contribution falls back to the saved meeting; 2 hooks) + test_jira POST count now counts
+  only /issue creates and asserts one /attachments call. Full suite 593 pass. Please restart :8000 so Parsh can push a ticket and see the files.
+---
