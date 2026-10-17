@@ -114,26 +114,32 @@ flowchart TB
 
 ---
 
-## Testing and benchmarks
+## How hard we pushed the models
 
-How hard we tested the models and the system (numbers from today's live runs and logs):
+We did not just call one model. Each Nemotron model got the job it is best at, and we measured where each one breaks.
 
-| What | Result |
-|---|---|
-| Automated server tests | 436 passing at the 3:12 freeze (`cd server && .venv/bin/pytest -q`): protocol round-trips of every PROTOCOL.md example, turn-taking, barge-in, echo guard, TTS streaming, workspace auth, human edits, golden draw ops |
-| Live end-to-end spoken script (`server/scripts/e2e_text.py --url ws://localhost:8000 --strict`) | real meeting over WebSocket against live Nemotron: 12/12 in the 14:08 strict run, 11/12 in later runs |
-| Browser tests | `npm run test:e2e` (Playwright mock smoke + live dashboard flow); `npx tsc -b` type-checks the app |
-| First sound after Twin is asked | 16 to 18 ms (was 2.7 s) |
-| Stop when interrupted | 24 to 103 ms across runs |
-| Understanding each sentence (Listener) | median 965 ms over 5 calls (was 9 to 12 s) |
-| Drawing appears after you speak | sketch card 0.31 s; first shapes 2 to 10 s depending on Crusoe load (2.09 s best warm; was 7 to 24 s) |
-| Reflex check per sentence | ~0.1 s warm |
-| Per-turn latency log | `server/learning/runs/latency.jsonl` (final, first token, first sentence, audio) |
-| Contract tests | every draw op has a golden JSON shared by server and web (`server/tests/golden_ops.json`, replayed at `web/golden-dev.html`) |
+```mermaid
+xychart-beta
+  title "Before vs after tuning (seconds, lower is better)"
+  x-axis ["Understand a sentence", "First sound", "Diagram on board"]
+  y-axis "seconds" 0 --> 24
+  bar [12, 2.7, 24]
+  bar [0.97, 0.016, 2.09]
+```
 
-Per-model benchmarks (accuracy, p50/p95 latency, tokens per task, raw JSON) live in **`BENCHMARKS.md`** and `server/bench/` (run: `cd server && .venv/bin/python bench/run_bench.py`).
+| Model | What we pushed | What we found and changed |
+|---|---|---|
+| Nemotron 3 Nano 30B (Listener, reflex fallback) | Every sentence of a live meeting | Reasoning-heavy replies hit 1,500 to 1,600 output tokens and took 9 to 12 s. A compact no-thinking extraction prompt brought the median to 965 ms (5 live calls) |
+| Nemotron 3 Super 120B (Diagrammer, router, code analyst) | One call that plans a WHOLE diagram as validated JSON ops, plus 3D part plans | Empty or partial plans were sometimes accepted as success: now every plan is validated before drawing, with one repair retry. A 3D robot arm came back as 7 connected named parts with exactly 3 joints, but took 24.6 s, so 3D runs off the critical path |
+| Nemotron 3.5 Lightning 30B (spoken reply) | Fastest first token | Returns "capacity unavailable" (503) under load; Twin falls back to Nano automatically |
+| Nemotron 3.5 Super VL (Coach, screen reading) | Judging Twin's own edits on held-out meetings | First Coach edit scored F1 0.40 vs 0.60 and was rejected automatically |
+| NVIDIA Magpie TTS | Sentence-by-sentence streaming voice | 1 to 2.5 s per call; free tier returns 429 after about 3 rapid calls. Added backoff, a phrase cache, and a pre-made 16 ms acknowledgement |
 
----
+Speed tricks that came out of this: one model call per drawing burst, rough draw on the fast model then refine on Super, newest sentence cancels stale work, reflex check (~0.1 s) gates everything.
+
+Full per-model numbers (accuracy, p50/p95 latency, tokens, startup times, raw JSON): **`BENCHMARKS.md`**.
+
+Tests exist too (436 server tests, a 12-step live spoken script, Playwright browser tests), but the point is the measurements above.
 
 ## You stay in control
 

@@ -1131,3 +1131,13 @@ JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN/JIRA_PROJECT_KEY are in server/.env on P
 /myself 200 (Parsh), project SCRUM = "CrusoeHacks" 200, issue types Epic/Subtask/Task/Story. No ticket was created.
 No server code calls Jira yet (PC-23 push_jira not built; past freeze). Names added to server/.env.example.
 ---
+
+[15:11] PREET -> PREET-CODEX PREET-CLAUDE | CHANGE | benchmarks = MODEL DEPTH + SYSTEM SPEED, not test counts
+Preet: test pass counts don't matter. Judges want: how deep did we push each model, and how fast is the system.
+@PREET-CODEX BENCHMARKS.md: per model, push to the limit with real runs (state N): JSON-plan validity rate over N calls, max diagram size
+  (nodes) from a long spec paragraph before quality breaks, tool-calling reliability, cold vs warm latency, 503/fallback rate, 3D plan
+  validity rate, tokens per task. Commit raw JSON + PNG charts (matplotlib) in docs/bench/ and embed them in BENCHMARKS.md.
+@PREET-CLAUDE STARTUP + SPEED: measure and post: server boot to /health ok (ms), page load to join screen, join to Twin ready, first model
+  warm call, sentence -> first shape, sentence -> first audio. Add a `scripts/time_startup.py` that prints them. Post numbers here; Preet's
+  README will use them. Keep it to real measured values.
+---

@@ -244,7 +244,10 @@ class Diagrammer:
         rough_refine = _rough_physical_request(moments, source_lines, required_visual)
         if rough_refine:
             required_visual = None  # A classifier hint must not force an unrequested 3D scene.
-        selected_model = config.MODEL_FAST if simple or rough_refine else config.MODEL_SMART
+        from agents.paragraph_diagram import paragraph_request
+        paragraph = paragraph_request(moments, source_lines)
+        selected_model = (config.MODEL_RESPONDER if paragraph is not None else
+                          config.MODEL_FAST if simple or rough_refine else config.MODEL_SMART)
         detail = f"draw {len(moments)} system fact(s)"
         if topic_id:
             detail += f" topic={topic_id}"
@@ -344,6 +347,16 @@ class Diagrammer:
         # Topic bookkeeping is deterministic and does not consume model tool budget.
         attempts = 0
         if not moments:
+            return draws
+        from agents.paragraph_diagram import paragraph_request, draw_paragraph
+        paragraph = paragraph_request(moments, source_lines)
+        if paragraph is not None:
+            planned = await draw_paragraph(session, board, paragraph, topic_id,
+                                           self._publish_draw, expected_revision)
+            draws.extend(planned)
+            update = session.push_update("I mapped the architecture and its labeled connections on the board.")
+            if inspect.isawaitable(update):
+                await update
             return draws
         if rough_refine:
             latest = (source_lines or moments)[-1]
