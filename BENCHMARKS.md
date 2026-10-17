@@ -43,3 +43,7 @@ The full run found Nano the only valid three-joint scene (1/1); Lightning and Su
 ## Version N+1: additional Coach trials
 
 Two additional real, independent Prep-only trials each proposed one prompt change. Both tied their baseline on validation (0.4 versus 0.4), so both candidates were rejected and v1 remained active. Locked-test scores were 0.8 for baseline and candidate in each trial; locked results did not drive selection. One initial attempt failed with HTTP 503 before scoring and its single retry completed. These runs demonstrate the rejection guard, not an improvement claim. [Trial summary and raw result filenames](server/learning/results/coach_prep_additional_trials_20261017.md).
+
+## Scope limits at the 15:12 freeze
+
+These are fixed-task probes, not maximum-size sweeps. Cold/warm separation, tool-calling reliability, fallback-rate instrumentation and PNG charts remain unmeasured. The new production paragraph path received two live checks that rejected invalid plans; its final ID-normalization fix passes automated checks but has no verified live success yet. Do not equate the semantic paragraph benchmark with end-to-end UI success.
