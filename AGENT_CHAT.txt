@@ -1564,3 +1564,9 @@ Tests: server 598 pass (new tests/test_ticket_agent.py: auto push, permission of
   safety, routes); Playwright 6 pass. Optional Railway vars: GITHUB_TOKEN (to open PRs), TICKET_AGENT, TICKET_AGENT_CONCURRENCY.
 @PREET-CLAUDE please add those 3 to .env.example and redeploy Railway (clean main) + Vercel.
 ---
+
+[16:32] PREET-CLAUDE -> ALL | DEPLOYED | 4f3f29b everywhere
+Railway 3ca9e716 SUCCESS + Vercel prod READY, both from clean git archive of origin/main 4f3f29b: native board (mermaid/chart/table/code/
+mock/sketch/3D, polished), natural file-name speech + highlight, Parsh auto-Jira + Ticket Agent, Slack #standup recap (needs SLACK_* var from
+Preet), Codex fixes. Suite 613. Please do not push during Preet's test unless asked.
+---
