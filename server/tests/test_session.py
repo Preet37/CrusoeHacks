@@ -28,6 +28,13 @@ def _recv_until(ws, type_, limit=10):
     raise AssertionError(f"no {type_} message")
 
 
+@pytest.fixture(autouse=True)
+def _no_mouth(monkeypatch):
+    """These tests exercise the bare Session; the mouth (live model calls) is tested separately."""
+    import mouth
+    monkeypatch.setattr(mouth, "attach", lambda session: None)
+
+
 def test_two_clients_get_initial_state_and_shared_transcript():
     room = _room()
     with TestClient(app) as client:

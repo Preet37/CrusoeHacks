@@ -269,14 +269,8 @@ class Session:
         self.speaking = False
         await self.set_status("listening")
 
-    async def reset(self) -> None:
-        self.cancel_all()
-        self.history.clear()
-        self._updates.clear()
-        self.board = BoardState()
-        self.current_say_id = None
-        self.speaking = False
-        self.push_to_talk_active = False
+    async def _run_reset_hooks(self) -> None:
+        """Mind cleanup runs BEFORE state is cleared, so late work cannot leak back in."""
         for cb in self._reset_hooks:
             try:
                 res = cb(self)
@@ -284,6 +278,21 @@ class Session:
                     await res
             except Exception:  # noqa: BLE001
                 log.exception("[%s] reset hook failed", self.room)
+
+    async def clear_board(self) -> None:
+        await self._run_reset_hooks()
+        self._updates.clear()
+        await self.apply_draw({"op": "clear"})
+
+    async def reset(self) -> None:
+        await self._run_reset_hooks()
+        self.cancel_all()
+        self.history.clear()
+        self._updates.clear()
+        self.board = BoardState()
+        self.current_say_id = None
+        self.speaking = False
+        self.push_to_talk_active = False
         await self.broadcast(StopAudio())
         await self.set_status("listening")
         await self.broadcast(self.snapshot_message())
@@ -317,7 +326,7 @@ class Session:
             elif msg.action == "unmute_twin":
                 self.muted = False
             elif msg.action == "clear_board":
-                await self.apply_draw({"op": "clear"})
+                await self.clear_board()
             elif msg.action == "reset_session":
                 await self.reset()
         else:

@@ -100,6 +100,30 @@ async def clean_stream(deltas: AsyncIterator[str]) -> AsyncIterator[str]:
             yield tail
 
 
+_PREFIX_RE = re.compile(r"^\s*(?:twin\s*[:.,\-]\s*)+", re.I)
+
+
+async def strip_prefix(deltas: AsyncIterator[str]) -> AsyncIterator[str]:
+    """Models like to start with a speaker label ("Twin: ..."); never speak it."""
+    head = ""
+    done = False
+    async for d in deltas:
+        if done:
+            yield d
+            continue
+        head += d
+        if len(head) < 8 and "twin"[: len(head.strip())].lower() == head.strip().lower():
+            continue  # could still be the start of a label
+        done = True
+        head = _PREFIX_RE.sub("", head)
+        if head:
+            yield head
+    if not done and head:
+        head = _PREFIX_RE.sub("", head)
+        if head:
+            yield head
+
+
 async def model_stream(messages: list[dict], stream: Callable[..., AsyncIterator[str]] | None = None
                        ) -> AsyncIterator[str]:
     """Responder model with thinking off; fall back to the plain call, then to MODEL_FAST.
@@ -182,7 +206,7 @@ async def respond(session, reason: str, *, trigger_ts: int | None = None,
 
     spoken = ""
     try:
-        spoken = await speak(clean_stream(model_stream(messages, stream)), say_id, emit, timings=timings)
+        spoken = await speak(strip_prefix(clean_stream(model_stream(messages, stream))), say_id, emit, timings=timings)
         spoken = (spoken or "").strip()
         if spoken and session.current_say_id == say_id:
             await session.add_line(config.TWIN_NAME, spoken)
@@ -199,9 +223,9 @@ async def respond(session, reason: str, *, trigger_ts: int | None = None,
             session.speaking = False
             await session.set_status("listening")
         row = {"ts": trigger_ts, "say_id": say_id, "reason": reason, "chars": len(spoken)}
-        ft = timings.get("first_token_ms")
-        fs = timings.get("first_sentence_ms")
-        fa = timings.get("first_audio_ms")
+        ft = timings.get("first_token")
+        fs = timings.get("first_sentence")
+        fa = timings.get("first_audio")
         if ft:
             row["final_to_first_token_ms"] = ft - trigger_ts
         if ft and fs:

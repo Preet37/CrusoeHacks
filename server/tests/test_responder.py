@@ -113,3 +113,14 @@ def test_build_messages_has_stable_prefix():
     m = responder.build_messages([{"speaker": "A", "text": "hi"}], "web -> auth", ["drew auth"], "addressed")
     assert m[0]["role"] == "system" and "Twin" in m[0]["content"]
     assert "drew auth" in m[1]["content"] and "web -> auth" in m[1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_strips_speaker_label():
+    async def labelled(model, messages, **kw):
+        for d in ["Tw", "in: I connected ", "auth to postgres."]:
+            yield d
+
+    s = FakeSession()
+    out = await responder.respond(s, "addressed", stream=labelled, speak=fake_speak)
+    assert out == "I connected auth to postgres."

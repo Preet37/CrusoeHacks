@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import protocol
 from protocol import Error, Status
+import mouth
 from session import SESSIONS, get_session
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -32,6 +33,7 @@ async def state(room: str = "demo"):
 async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
     await ws.accept()
     session = get_session(room)
+    mouth.attach(session)
     session.add_socket(ws, user)
     log.info("[%s] %s connected (%d sockets)", room, user, len(session.sockets))
     try:

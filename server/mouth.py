@@ -1,0 +1,141 @@
+"""Wires one Session to the mouth (turn-taking + Responder + TTS) and the mind (Listener).
+
+attach(session) is idempotent. It:
+  - sends every human final line to the Listener (mind path, background)
+  - runs turn_taking.on_final_text for the mouth path (respond / hold)
+  - runs an idle loop that delivers queued work updates at natural pauses
+  - recreates the Listener on clear_board / reset (before state is cleared)
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+
+import turn_taking
+from agents import responder
+
+log = logging.getLogger("twin.mouth")
+
+IDLE_TICK_S = 0.2
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def _make_listener(session):
+    try:
+        from agents.listener import Listener
+    except Exception:  # noqa: BLE001 - mind is optional; the mouth must still work
+        log.exception("Listener unavailable; drawing disabled")
+        return None
+    return Listener(session)
+
+
+class Mouth:
+    def __init__(self, session) -> None:
+        self.session = session
+        self.state = turn_taking.TurnState()
+        self.listener = _make_listener(session)
+        self._updates_since: int | None = None
+        self._idle_task: asyncio.Task | None = None
+
+    # ------------------------------------------------------------ wiring
+    def attach(self) -> None:
+        s = self.session
+        s.decide_and_respond = self.on_final
+        s.on_final_text(self.on_final_mind)
+        s.on_reset(self.on_reset)
+        self.ensure_idle_loop()
+
+    def ensure_idle_loop(self) -> None:
+        loop = asyncio.get_running_loop()
+        t = self._idle_task
+        if t is None or t.done() or t.get_loop() is not loop:
+            self._idle_task = loop.create_task(self._idle_loop())
+
+    def _sync(self) -> None:
+        s, st = self.session, self.state
+        st.last_human_speech_ms = max(st.last_human_speech_ms, s.last_human_speech_ts or 0)
+        st.twin_speaking = bool(s.speaking or s.current_say_id)
+        st.push_to_talk_active = bool(s.push_to_talk_active)
+        st.muted = bool(s.muted)
+
+    # ------------------------------------------------------------ mind path
+    async def on_final_mind(self, session, line: dict) -> None:
+        if self.listener is not None:
+            self.listener.submit(line.get("speaker", "?"), line.get("text", ""))
+
+    async def on_reset(self, session) -> None:
+        if self.listener is not None:
+            try:
+                await self.listener.close()
+            except Exception:  # noqa: BLE001
+                log.exception("listener close failed")
+        self.listener = _make_listener(session)
+        self._updates_since = None
+        self.state.hold_until_ms = 0
+
+    # ------------------------------------------------------------ mouth path
+    async def on_final(self, session, line: dict) -> None:
+        self._sync()
+        now = _now_ms()
+        d = turn_taking.on_final_text(self.state, line.get("text", ""), now, session.has_updates())
+        log.info("[%s] turn: %s (%s)", session.room, d.action, d.reason)
+        if d.action == "hold":
+            if self.state.twin_speaking:
+                await session.barge_in()
+            await session.set_status("hand_raised")
+        elif d.action == "respond":
+            self.speak(d.reason, trigger_ts=line.get("ts") or now, updates=session.pop_updates())
+
+    def speak(self, reason: str, *, trigger_ts: int, updates: list[str]) -> None:
+        self._updates_since = None
+        self.session.spawn("responder", responder.respond(
+            self.session, reason, trigger_ts=trigger_ts, updates=updates))
+
+    async def _idle_loop(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(IDLE_TICK_S)
+                await self._tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                log.exception("idle tick failed")
+
+    async def _tick(self) -> None:
+        s = self.session
+        self._sync()
+        now = _now_ms()
+        has = s.has_updates()
+        if has and self._updates_since is None:
+            self._updates_since = now
+        if not has:
+            self._updates_since = None
+        age = now - self._updates_since if self._updates_since else 0
+        d = turn_taking.check_idle(self.state, now, has, age)
+        if d.action == "deliver_update":
+            turn_taking.mark_interjection(self.state, now)
+            self.speak("work update", trigger_ts=now, updates=s.pop_updates())
+        elif d.action == "none" and d.reason == "stale":
+            dropped = s.pop_updates()
+            self._updates_since = None
+            log.info("[%s] dropped stale updates: %s", s.room, dropped)
+        elif d.action == "hold":
+            if s.status not in ("hand_raised", "speaking", "thinking"):
+                await s.set_status("hand_raised")
+        if s.status == "hand_raised" and now >= self.state.hold_until_ms and not self.state.twin_speaking:
+            await s.set_status("listening")
+
+
+def attach(session) -> Mouth:
+    mouth = getattr(session, "mouth", None)
+    if mouth is None:
+        mouth = Mouth(session)
+        session.mouth = mouth
+        mouth.attach()
+    else:
+        mouth.ensure_idle_loop()
+    return mouth
