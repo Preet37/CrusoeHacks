@@ -1,6 +1,7 @@
 """FastAPI app: /health, /state (debug), /calendar, /simulate/calendar_join, and the meeting WebSocket at /ws."""
 import json
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,37 @@ async def _prewarm_acks() -> None:
             log.exception("ack prewarm failed")
 
     asyncio.get_running_loop().create_task(run())
+
+
+METRICS_FILE = Path(__file__).resolve().parent / "learning" / "runs" / "latest_metrics.json"
+
+
+def load_metrics() -> list[dict]:
+    """Coach results (M3) written by PREET-CODEX: a JSON array of protocol `metric` messages."""
+    try:
+        data = json.loads(METRICS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for m in data if isinstance(data, list) else []:
+        try:
+            msg = protocol.parse({**m, "type": "metric"}) if isinstance(m, dict) else None
+        except ValueError:
+            continue
+        if msg is not None and msg.type == "metric":
+            out.append(msg)
+    return out
+
+
+@app.post("/metrics/refresh")
+async def metrics_refresh(room: str = "demo"):
+    """Re-send the latest Coach metrics to everyone in the room (Scoreboard updates live)."""
+    session = SESSIONS.get(room)
+    metrics = load_metrics()
+    if session is not None:
+        for m in metrics:
+            await session.broadcast(m)
+    return {"ok": True, "sent": len(metrics) if session else 0}
 
 
 @app.get("/health")
@@ -80,6 +112,8 @@ async def ws_endpoint(ws: WebSocket, room: str = "demo", user: str = "guest"):
     try:
         await session.send_to(ws, Status(state=session.status))
         await session.send_to(ws, session.snapshot_message())
+        for metric in load_metrics():  # M3 scoreboard: v1 vs coached version on the locked test
+            await session.send_to(ws, metric)
         await session.send_initial_state(ws)
         while True:
             frame = await ws.receive()

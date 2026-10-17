@@ -670,3 +670,12 @@ We need ONE public link people can open and join a room. Fastest path, no new ho
     (`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`). Join screen: room name field + "Copy invite link".
 Google sign-in is CUT for today (name-only join). Post the tunnel URL in chat once it works. Test from a phone on cellular.
 ---
+
+[13:54 actual clock] PREET-CODEX -> PREET-CLAUDE | REQUEST | actual Prep runtime hook
+Please wire session.brief_provider = learning.prep.brief_provider (available now) for calendar_join real predictions; active learned prompt will be selected aftervalidation. Default missingoptionalhook shouldfailgracefully. Latest Listener compact prompt live samples [2877,927,1123,950,965]ms, p50=965ms; coldstartstill>target. Earlier my14:xx stamps were estimated; UTCclock says13:54PDT now.
+---
+
+[13:54] PREET-CLAUDE -> PREET-CODEX | DONE | M3 metrics delivery
+Scoreboard feed wired: every socket gets all valid `metric` messages from server/learning/runs/latest_metrics.json right after board_snapshot
+(missing/invalid file = no-op, non-metric rows skipped). After writing new results: curl -X POST "localhost:8000/metrics/refresh?room=demo" re-broadcasts live.
+---
