@@ -26,6 +26,21 @@ _demo = None
 _demo_lock = threading.Lock()
 
 
+def _memory_for(room: str, workspace: str | None) -> MemoryStore:
+    # All rooms in a trusted workspace share sourced memory. Legacy rooms keep
+    # their existing per-room file path for backward compatibility.
+    identity = f"workspace:{workspace}" if workspace else room
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:24]
+    state_root = Path(os.getenv('TWIN_STATE_DIR', str(STATE_DIR)))
+    return MemoryStore(state_root / f'{digest}.json')
+
+
+def _unconnected_scope(workspace: str | None, room: str) -> str:
+    # An explicit empty code scope prevents fact checking from searching all
+    # meeting decisions while a saved repository is still restoring.
+    return f"workspace:{workspace}:unconnected-code" if workspace else f"{room}:unconnected-code"
+
+
 def _restore_saved_repo(session) -> None:
     """Schedule one nonblocking restore for a workspace with a saved URL."""
     key = workspace_key(session)
@@ -85,21 +100,40 @@ def attach(session) -> None:
     if getattr(session, "brief_provider", None) is None:
         from learning.prep import brief_provider
         session.brief_provider = brief_provider
+    room = str(getattr(session, 'room', 'demo'))
+    workspace = workspace_key(session)
     if getattr(session, '_mind_runtime_ready', False):
+        prior_workspace = getattr(session, '_mind_workspace', None)
+        if prior_workspace != workspace:
+            if prior_workspace is not None:
+                raise ValueError('session workspace cannot change after mind attachment')
+            # A room first entered without an invite can later be authorized
+            # for a workspace. Remove its legacy context before registration.
+            session.code_map = None
+            session.repo_url = None
+            session.code_fact_scope = _unconnected_scope(workspace, room)
+            session.memory = _memory_for(room, workspace)
+            session._mind_workspace = workspace
         REGISTRY.register(session)
         _restore_saved_repo(session)
         return
     try:
-        session.code_map = demo_map()
-        room = str(getattr(session, 'room', 'demo'))
-        room_key = hashlib.sha256(room.encode()).hexdigest()[:24]
-        state_root = Path(os.getenv('TWIN_STATE_DIR', str(STATE_DIR)))
-        session.memory = MemoryStore(state_root / f'{room_key}.json')
-        session.code_fact_scope = 'demo:code'
+        existing_repo = (workspace is None and bool(getattr(session, 'repo_url', None)
+                                                      and getattr(session, 'code_map', None)))
+        use_demo = workspace is None and room == 'demo' and not existing_repo
+        session.code_map = demo_map() if use_demo else (session.code_map if existing_repo else None)
+        session.memory = _memory_for(room, workspace)
+        if existing_repo:
+            session.code_fact_scope = (getattr(session, 'code_fact_scope', None)
+                                       or 'repo:' + hashlib.sha256(session.repo_url.encode()).hexdigest()[:16]
+                                       + ':code')
+        else:
+            session.code_fact_scope = ('demo:code' if use_demo and not os.getenv('TWIN_REPO_ROOT')
+                                       else _unconnected_scope(workspace, room))
         session.decision_scope = f'{room}:decisions'
         # Seed only verified demo implementation facts; meeting decisions live
         # in a separate scope and never imply that code has already changed.
-        if not os.getenv('TWIN_REPO_ROOT'):
+        if use_demo and not os.getenv('TWIN_REPO_ROOT'):
             seed = [
                 ('Current login validates credentials and returns a signed JWT token, not a Redis-backed server session.',
                  'demo_project/auth/login.py:18-24', 'Auth login'),
@@ -110,6 +144,7 @@ def attach(session) -> None:
                 if (claim, source) not in existing:
                     session.memory.add_fact(claim, source, scope=session.code_fact_scope, subject=subject)
         REGISTRY.register(session)
+        session._mind_workspace = workspace
         session._mind_runtime_ready = True
         _restore_saved_repo(session)
     except Exception:

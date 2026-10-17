@@ -65,11 +65,11 @@ async def test_lobby_connect_updates_existing_and_new_workspace_sessions(
     # string looks like the same workspace prefix.
     legacy = Session("acme-retro")
     runtime.attach(legacy)
-    assert legacy.code_map == "demo"
+    assert legacy.code_map is None  # An arbitrary room never inherits demo context.
     assert not hasattr(legacy, "repo_url")
     other_workspace = Session("acme-standup", "other")
     runtime.attach(other_workspace)
-    assert other_workspace.code_map == "demo"
+    assert other_workspace.code_map is None
     assert not hasattr(other_workspace, "repo_url")
 
 

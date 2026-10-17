@@ -66,6 +66,25 @@ async def test_connect_builds_map_without_executing_source(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_connected_repo_root_wins_over_nested_demo_project(monkeypatch):
+    async def clone(url, target):
+        target.mkdir()
+        (target / 'app.py').write_text('def serve(): pass\n')
+        nested = target / 'demo_project'
+        nested.mkdir()
+        (nested / 'auth.py').write_text('def demo_login(): pass\n')
+    monkeypatch.setattr(connector, '_clone', clone)
+    session = Session()
+    try:
+        await connector.connect_repo(session, 'https://github.com/demo/repo')
+        assert set(session.code_map.files) == {'app.py', 'demo_project/auth.py'}
+        assert session.code_map.root.name == 'checkout'
+    finally:
+        import shutil
+        shutil.rmtree(session._repo_directory, ignore_errors=True)
+
+
+@pytest.mark.asyncio
 async def test_cancelled_clone_cleans_directory(monkeypatch):
     entered = asyncio.Event()
     paths = []

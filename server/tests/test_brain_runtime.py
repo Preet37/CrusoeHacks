@@ -6,7 +6,7 @@ from brain import runtime
 def test_runtime_attaches_real_demo_owners_and_separates_code_facts(monkeypatch, tmp_path):
     monkeypatch.setenv('TWIN_STATE_DIR', str(tmp_path))
     monkeypatch.delenv('TWIN_REPO_ROOT', raising=False)
-    session = SimpleNamespace(room='runtime-test')
+    session = SimpleNamespace(room='demo')
     runtime.attach(session)
     assert session._mind_runtime_ready
     assert session.code_map.files['auth/login.py']['owner'] == 'Avery Chen'

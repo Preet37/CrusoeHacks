@@ -107,8 +107,9 @@ async def connect_repo(session, url: str, *, restore_generation: object | None =
         temporary = Path(tempfile.mkdtemp(prefix='twin-repo-'))
         checkout = temporary / 'checkout'
         await _clone(canonical, checkout)
-        root = checkout / 'demo_project' if (checkout / 'demo_project').is_dir() else checkout
-        code_map = await asyncio.to_thread(lambda: CodeMap(root).build())
+        # Index exactly the repository the workspace connected. A checked-in
+        # demo_project is ordinary source, never an implicit root override.
+        code_map = await asyncio.to_thread(lambda: CodeMap(checkout).build())
         scope = "repo:" + hashlib.sha256(canonical.encode()).hexdigest()[:16] + ":code"
         if workspace is not None:
             def persist() -> None:
