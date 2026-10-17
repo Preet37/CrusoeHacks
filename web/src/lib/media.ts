@@ -37,25 +37,31 @@ export function useLocalMedia(initial: { cam: boolean; mic: boolean }): LocalMed
       setStream(cur ? new MediaStream(cur.getTracks()) : null)
       return
     }
-    navigator.mediaDevices
-      ?.getUserMedia({
-        video: needVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
-        audio: needAudio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
-      })
-      .then((s) => {
-        if (cancelled) return s.getTracks().forEach((t) => t.stop())
-        const merged = streamRef.current ?? new MediaStream()
-        s.getTracks().forEach((t) => merged.addTrack(t))
-        streamRef.current = merged
-        setStream(new MediaStream(merged.getTracks()))
-        setError(null)
-      })
-      .catch((e: Error) => {
-        if (cancelled) return
-        setError(e.name === 'NotAllowedError' ? 'Camera or mic permission denied' : e.message)
-        if (needVideo) setCamOn(false)
-        if (needAudio) setMicOn(false)
-      })
+    // Ask for camera and mic SEPARATELY: a busy camera (Zoom, another tab) must never turn the mic off.
+    const md = navigator.mediaDevices
+    const want = (kind: 'video' | 'audio') =>
+      md?.getUserMedia(
+        kind === 'video'
+          ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false }
+          : { video: false, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } },
+      )
+    const add = (s: MediaStream) => {
+      if (cancelled) return s.getTracks().forEach((t) => t.stop())
+      const merged = streamRef.current ?? new MediaStream()
+      s.getTracks().forEach((t) => merged.addTrack(t))
+      streamRef.current = merged
+      setStream(new MediaStream(merged.getTracks()))
+      setError(null)
+    }
+    const fail = (kind: 'video' | 'audio') => (e: Error) => {
+      if (cancelled) return
+      const what = kind === 'video' ? 'Camera' : 'Microphone'
+      setError(e.name === 'NotAllowedError' ? `${what} permission denied` : `${what}: ${e.message}`)
+      if (kind === 'video') setCamOn(false)
+      else setMicOn(false)
+    }
+    if (needAudio) want('audio')?.then(add).catch(fail('audio'))
+    if (needVideo) want('video')?.then(add).catch(fail('video'))
     return () => {
       cancelled = true
     }
