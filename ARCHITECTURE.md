@@ -474,19 +474,17 @@ Draw tool schemas (also in `PROTOCOL.md` as draw ops):
 
 ## 9. Who does what (3 coding agents, 2 humans)
 
-**Update 13:08: there are only THREE coding agents. Parsh has no Codex. `PARSH-CODEX` does not exist; its work moved to `PREET-CLAUDE` (server M1 is done, so it now also owns the board side of the web app).** The `RX-*` task ids are unchanged; their owner is now PREET-CLAUDE.
+**Update 14:10: there are only THREE coding agents (Parsh has no Codex; `PARSH-CODEX` does not exist). The split below is the one the agents agreed in AGENT_CHAT.txt at 14:00; it overrides earlier versions of this section.**
 
-Agent ids (use them in commits, `TASKS.md`, and `AGENT_CHAT.txt`):
-
-| Agent id | Human | Tool | Owns folders | Focus |
+| Agent id | Human | Tool | Owns | Focus |
 |---|---|---|---|---|
-| `PREET-CLAUDE` | Preet | Claude Code | Server core: `server/app.py`, `server/session.py`, `server/mouth.py`, `server/protocol.py`, `server/turn_taking.py`, `server/voice/`, `server/agents/responder.py`, `server/agents/prompts/responder.md`, `server/scripts/`. **Plus the board side of the web app:** `web/src/components/Whiteboard.tsx`, `web/src/components/board/` (all rich shapes), `AgentTree.tsx`, `Scoreboard.tsx`, `TaskPanel.tsx`, `web/src/lib/protocol.ts`, `web/src/lib/mockServer.ts` | Server core, then whiteboard + rich drawing in the browser, protocol types, mock server, agent tree, scoreboard |
-| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `server/config.py`, `server/board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | The mind: Crusoe client, Listener, Conductor, Diagrammer (incl. rich drawing choices + topics + speed), Brain (M2), Learning (M3) |
-| `PARSH-CLAUDE` | Parsh | Claude Code | **The web app scaffold** (`web/package.json`, `vite.config.ts`, `index.html`, `main.tsx`) and the call experience: `web/src/App.tsx`, `JoinScreen.tsx`, `MeetingRoom.tsx`, `ParticipantTile.tsx`, `ControlBar.tsx`, `SidePanel.tsx`, `Captions.tsx`, `ConnectionsPanel.tsx`, `web/src/lib/speech.ts`, `player.ts`, `ws.ts`, `media.ts`, `echoGuard.ts`, `web/src/styles/` | Meet/Zoom-like meeting app, Mac-native look, camera, mic and speech recognition, audio playback, barge-in, echo guard, connections tab |
+| `PREET-CLAUDE` | Preet | Claude Code | Server core: `server/app.py`, `session.py`, `mouth.py`, `protocol.py`, `turn_taking.py`, `server/voice/`, `server/agents/responder.py` + its prompt, `server/scripts/`. Browser audio: `web/src/lib/player.ts`, `speech.ts`, `bargeIn.ts`, `echoGuard.ts`. Board extras: `web/src/components/board/` (rich shape renderers), `AgentTree.tsx`, `Scoreboard.tsx`, `TaskPanel.tsx`; v2 types in `web/src/lib/protocol.ts` | Server, audio in the browser (RC-4/5/6/13), rich shapes (RX-8), agent tree (RX-5), tasks (RX-6), scoreboard (RX-7) |
+| `PREET-CODEX` | Preet | Codex | `server/llm.py`, `config.py`, `board.py`, `server/agents/` (except responder), `server/brain/`, `server/learning/`, `demo_project/` | The mind: Listener, Conductor, Diagrammer (one call per burst, topics, rich drawing choices), Brain (M2), Learning (M3) |
+| `PARSH-CLAUDE` | Parsh | Claude Code | Web scaffold (`package.json`, `vite.config.ts`, `index.html`, `main.tsx`), `App.tsx`, `JoinScreen.tsx`, `MeetingRoom.tsx`, `ParticipantTile.tsx`, `ControlBar.tsx`, `SidePanel.tsx`, `Captions.tsx`, `ConnectionsPanel.tsx`, `Whiteboard.tsx` (tldraw, box/arrow ops, frames, focus), `web/src/lib/ws.ts`, `media.ts`, `mockServer.ts`, `web/src/styles/` | Meet/Zoom-like app, Mac-native look, camera tiles, ws client, mock server, whiteboard core (RX-1/2/3/4/9, RC-1/2/3/7/8/10/11/12/14/15) |
 
-Shared files: `PROTOCOL.md` (change only with agreement in chat from PREET-CLAUDE and PARSH-CLAUDE), `requirements.txt` (PREET-CLAUDE owns; others request additions in chat), `web/package.json` (PARSH-CLAUDE owns; PREET-CLAUDE may add `tldraw`, `mermaid` and a chart library itself and must post a CHANGE in the chat when it does).
+**How rich shapes plug in:** PREET-CLAUDE exports `renderRichOp(editor, op, ctx)` from `web/src/components/board/index.ts` (handles add_mermaid, add_chart, add_table, add_code, add_mock, add_sticky, add_text, sketch, update). PARSH-CLAUDE's `Whiteboard.tsx` handles box/arrow/frame/focus/remove/highlight/clear itself and calls `renderRichOp` for everything else.
 
-**Order matters:** PARSH-CLAUDE pushes the `web/` scaffold FIRST (RX-1, within 10 minutes). PREET-CLAUDE does not create `web/` itself; until the scaffold lands it works on server tasks (PC-13 onward). If the scaffold has not landed by 13:30, PREET-CLAUDE posts in the chat and creates it.
+Shared files: `PROTOCOL.md` (change only with agreement in chat from PREET-CLAUDE and PARSH-CLAUDE), `requirements.txt` (PREET-CLAUDE owns), `web/package.json` (PARSH-CLAUDE owns; PREET-CLAUDE may add `mermaid` and a chart library and posts a CHANGE when it does).
 
 ### Humans
 - **Parsh:** gets all API keys and credits working first (Crusoe org + API key, $50 credit form, NVIDIA build.nvidia.com key for Magpie), shares keys with Preet privately (NOT in the repo, NOT in chat files), asks Crusoe in Discord #crusoe about VoiceChat once. Then drives the web agents.

@@ -271,4 +271,10 @@ Integration contract from my side:
   - ws.ts: `createClient({room,user})` -> { send(msg: ClientMessage), on(type, cb) -> unsubscribe, onAny(cb), state }. With ?mock=1
     it uses `startMockServer(emit)` from lib/mockServer.ts if that file exports it (your RX-2): `startMockServer(emit:(m:ServerMessage)=>void, onClientMessage?) -> stop()`.
   - AgentTree/TaskPanel: I render `<AgentTree client={ws}/>` and `<TaskPanel client={ws}/>` in the side panel tabs.
+[14:10] PREET -> ALL | CHANGE | -
+Your 14:00 split wins over my 13:12 note. ARCHITECTURE.md section 9 + TASKS.md now match it:
+  PARSH-CLAUDE: scaffold, meeting UI, ws.ts, mockServer, Whiteboard core (boxes, arrows, frames, focus) = RX-1/2/3/4/9 + RC-1/2/3/7/8/10/11/12/14/15.
+  PREET-CLAUDE: server + browser audio (RC-4/5/6 and echo guard RC-13) + rich shapes RX-8 + AgentTree RX-5, tasks RX-6, scoreboard RX-7 + v2 types in protocol.ts.
+  Rich shapes plug-in: @PREET-CLAUDE exports renderRichOp(editor, op, ctx) from web/src/components/board/index.ts;
+  @PARSH-CLAUDE Whiteboard.tsx calls it for any op it does not handle itself. Please confirm in chat.
 ---

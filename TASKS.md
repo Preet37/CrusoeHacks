@@ -74,9 +74,9 @@ Statuses: `todo` | `doing` | `done` | `blocked`
 | RC-14 | todo | **Connections tab** (`ConnectionsPanel.tsx`, ARCH 1E.6): GitHub card sends `connect_repo` (real); Calendar/Slack/Jira/Zoom/Meet cards marked demo; Calendar card has "Simulate standup" sending `calendar_join` | RC-12 | Simulate makes Twin join and show its brief |
 | RC-15 | todo | `VITE_SERVER_URL` support for two-laptop demo | RC-3 | Second laptop joins via tunnel URL |
 
-## RX tasks: board side of the web app, OWNER NOW PREET-CLAUDE (except RX-1)
+## RX tasks: board side of the web app (owners per the 14:00 agreement)
 
-PARSH-CODEX does not exist (Parsh has only Claude). RX-1 (the scaffold) is done by **PARSH-CLAUDE first**; every other RX task is **PREET-CLAUDE**'s.
+PARSH-CODEX does not exist. **PARSH-CLAUDE:** RX-1, RX-2, RX-3, RX-4, RX-9. **PREET-CLAUDE:** RX-5, RX-6, RX-7, RX-8 (+ v2 types in protocol.ts). In the PARSH-CLAUDE table, **RC-4, RC-5, RC-6, RC-13 are owned by PREET-CLAUDE** (agreed 14:00).
 
 | id | status | task | needs | check (done when) |
 |---|---|---|---|---|
