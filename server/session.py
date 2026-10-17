@@ -34,6 +34,7 @@ log = logging.getLogger("twin.session")
 SPEAKING_WINDOW_MS = 1500          # human counts as speaking this long after a user_text
 ECHO_KEEP = 6                      # last ~3 Twin sentences + whole turns, for the echo guard
 ECHO_RATIO = 0.75
+CAPTION_MIN_INTERVAL_MS = 125     # live caption relay: <= 8 interim captions / second / speaker
 SCREEN_MAX_B64 = 300_000           # v2.2: cap on one screen_frame's base64 JPEG
 DEMO_CALENDAR = Path(__file__).resolve().parent / "demo_calendar.json"
 GENERIC_PREDICTIONS = [
@@ -174,6 +175,7 @@ class Session:
         self.board = BoardState()
 
         self._updates: list[str] = []
+        self._update_meta: dict[str, tuple[int, str | None]] = {}  # text -> (queued ts, topic_id)
         self._tasks: dict[str, asyncio.Task] = {}
         self._anon = itertools.count(1)
 
@@ -209,6 +211,9 @@ class Session:
         self.brief: dict | None = None
         # v2.2: latest shared-screen frame (wire dict) for late joiners and Twin's vision
         self.screen: dict | None = None
+        # live captions: speaker -> last relayed interim ts (ms); task id/title -> who assigned it
+        self._caption_sent: dict[str, int] = {}
+        self._assigned_by: dict[str, str] = {}
 
     # ------------------------------------------------------------ say ids / updates
 
@@ -229,6 +234,8 @@ class Session:
         if self._updates and self._updates[-1] == text:
             return
         self._updates.append(text)
+        topic = self.active_topic.get("topic_id") if isinstance(self.active_topic, dict) else None
+        self._update_meta[text] = (now_ms(), topic)
 
     def pop_updates(self) -> list[str]:
         self.urgent_updates = False
@@ -237,6 +244,25 @@ class Session:
 
     def has_updates(self) -> bool:
         return bool(self._updates)
+
+    def drop_stale_updates(self, topic_id: str | None, max_age_ms: int = 30_000,
+                           before_ts: int | None = None) -> list[str]:
+        """Drop queued updates about another topic, older than max_age_ms, or queued before before_ts."""
+        now = now_ms()
+        keep, dropped = [], []
+        for u in self._updates:
+            ts, tid = self._update_meta.get(u, (now, None))
+            stale = (now - ts > max_age_ms or (before_ts is not None and ts <= before_ts)
+                     or bool(topic_id and tid and tid != topic_id))
+            (dropped if stale else keep).append(u)
+        self._updates = keep
+        for u in dropped:
+            self._update_meta.pop(u, None)
+        if not keep:
+            self.urgent_updates = False
+        if len(self._update_meta) > 200:
+            self._update_meta = {u: self._update_meta[u] for u in keep if u in self._update_meta}
+        return dropped
 
     # ------------------------------------------------------------ background tasks
 
@@ -303,6 +329,8 @@ class Session:
     async def broadcast(self, msg) -> None:
         """Send to every socket in the room (model or plain dict)."""
         data = protocol.dump(msg)
+        if isinstance(data, dict) and data.get("type") in ("task", "ticket") and not data.get("assigned_by"):
+            data = {**data, "assigned_by": self._assigner(data)}
         if isinstance(data, dict) and data.get("type") == "topic" and data.get("topic_id"):
             self._last_topic_sent = data["topic_id"]  # dedupes set_topic vs direct broadcasts
         for cb in list(getattr(self, "_broadcast_observers", ())):
@@ -313,6 +341,36 @@ class Session:
         if not self.sockets:
             return
         await asyncio.gather(*(self.send_to(ws, data) for ws in list(self.sockets)))
+
+    def _assigner(self, data: dict) -> str | None:
+        """Who said the line a task/ticket came from: the source line's speaker, else the latest human."""
+        keys = [str(k).casefold() for k in (data.get("id"), data.get("title")) if k]
+        for k in keys:
+            if k in self._assigned_by:
+                return self._assigned_by[k]
+        who = None
+        m = re.search(r"@\s*(\d+)\s*$", str(data.get("source") or ""))
+        if m:
+            ts = int(m.group(1))
+            who = next((ln["speaker"] for ln in reversed(self.history)
+                        if ln.get("ts") == ts and ln.get("speaker") != TWIN_SPEAKER), None)
+        if who is None:
+            who = next((ln["speaker"] for ln in reversed(self.history)
+                        if ln.get("speaker") != TWIN_SPEAKER), None)
+        if who:
+            for k in keys:
+                self._assigned_by[k] = who
+        return who
+
+    async def relay_caption(self, ws, speaker: str, text: str, ts: int | None = None) -> bool:
+        """Live CC: send one human interim to everyone else, throttled per speaker."""
+        now = now_ms()
+        if now - self._caption_sent.get(speaker, 0) < CAPTION_MIN_INTERVAL_MS:
+            return False
+        self._caption_sent[speaker] = now
+        await self.broadcast_except(ws, {"type": "caption", "speaker": speaker, "text": text,
+                                         "final": False, "ts": ts if ts is not None else now})
+        return True
 
     async def broadcast_except(self, sender, msg) -> None:
         """v2.2: send to every socket in the room except `sender`."""
@@ -609,9 +667,14 @@ class Session:
                 return
             self.last_human_speech_ts = now_ms()
             self.last_heard[msg.speaker or user] = now_ms()
+            if not msg.final:
+                if text and msg.source != "typed":
+                    await self.relay_caption(ws, msg.speaker or user, text, msg.ts)
+                return
             if msg.final:
                 if not text:
                     return
+                self._caption_sent.pop(msg.speaker or user, None)
                 line = await self.add_line(msg.speaker or user, text, msg.ts)
                 if msg.source:
                     line["source"] = msg.source

@@ -8,6 +8,11 @@ and the rejection count survives eviction so a topic that keeps failing is visib
 
 Storage: GLB files + index.json under server/learning/runs/cad/library (gitignored;
 override with CAD_LIBRARY_DIR). If the filesystem is unavailable it degrades to memory.
+
+Seed library (Twin addition): server/cad/seed_library/ ships Loomin's .model-library
+(photoreal + OpenSCAD GLBs, same index.json format) plus Loomin's public/models/wind_turbine.glb,
+read-only. lookup_model falls back to it with a fuzzy topic match ("draw a 3D windmill" ->
+photoreal wind turbine), preferring photoreal entries. CAD_SEED_LIBRARY=0 disables it.
 """
 from __future__ import annotations
 
@@ -98,14 +103,21 @@ def _read_blob(entry: dict[str, Any]) -> bytes | None:
     return data if len(data) >= MIN_GLB_BYTES else None
 
 
-def lookup_model(topic: str) -> tuple[dict[str, Any], bytes] | None:
-    """A previously accepted model for this topic, or None."""
+def lookup_model(topic: str, *, use_seed: bool = True) -> tuple[dict[str, Any], bytes] | None:
+    """A previously accepted model for this topic (exact), else a fuzzy seed-library match, or None."""
     key = topic_key(topic)
     with _lock:
         index = _read_index()
         entry = index["entries"].get(key)
         if not entry:
-            return None
+            if not use_seed:
+                return None
+            rejected = set(index["rejections"])
+            seed = match_seed(topic)
+            if seed is None or seed["key"] in rejected:
+                return None
+            blob = _read_seed_blob(seed)
+            return (dict(seed), blob) if blob is not None else None
         blob = _read_blob(entry)
         if blob is None:  # index and files drifted apart
             index["entries"].pop(key, None)
@@ -156,13 +168,18 @@ def verify_model(topic: str) -> dict[str, Any] | None:
 
 
 def reject_model(topic: str) -> dict[str, Any]:
-    """Thumbs down: evict so the next request re-renders; keep the rejection count."""
+    """Thumbs down: evict so the next request re-renders; keep the rejection count.
+
+    A rejected seed match is remembered (by seed key) so that topic stops replaying the seed."""
     key = topic_key(topic)
     with _lock:
         index = _read_index()
         rejections = index["rejections"].get(key, 0) + 1
         index["rejections"][key] = rejections
         entry = index["entries"].pop(key, None)
+        seed = match_seed(topic) if entry is None else None
+        if seed is not None:
+            index["rejections"][seed["key"]] = index["rejections"].get(seed["key"], 0) + 1
         if entry:
             _memory_blobs.pop(key, None)
             try:
@@ -198,3 +215,154 @@ def clear_library() -> None:
             (library_dir() / "index.json").unlink(missing_ok=True)
         except OSError:
             pass
+
+
+# ── Seed library (read-only, shipped in the repo) ────────────────────────────
+
+SEED_DIR = Path(__file__).resolve().parent / "seed_library"
+_seed_cache: dict[str, Any] | None = None
+_seed_blobs: dict[str, bytes] = {}
+
+# Whole-phrase rewrites applied to the normalized request before tokenizing.
+_PHRASES = [
+    (r"\bformula (?:1|one)\b|\bf ?1\b", "formula one"),
+    (r"\bwind ?mills?\b|\bwind ?generators?\b|\bwind ?power turbines?\b", "wind turbine"),
+    (r"\bhour ?glass(?:es)?\b|\bsand ?timers?\b|\begg ?timers?\b", "hour glass"),
+    (r"\b(?:aero ?planes?|air ?planes?|planes?|jets?|jetliners?|airliners?|aircraft|boeing)\b", "airplane"),
+    (r"\b(?:smart ?phones?|cell ?phones?|mobile phones?|phones?|i ?phones?)\b", "iphone"),
+    (r"\b(?:race ?cars?|racecars?)\b", "race car"),
+    (r"\b(?:cars?|automobiles?|sports cars?|miata)\b", "car"),
+    (r"\b(?:pulleys?|block and tackle)\b", "pulley"),
+    (r"\b(?:benches|bench)\b", "bench"),
+    (r"\bcatapults?\b", "trebuchet"),
+    (r"\b(?:the )?moon (?:and|around|orbiting|circling) (?:the )?earth\b|\bearth (?:and|with) (?:the )?moon\b", "moon orbiting earth"),
+]
+_NOISE = {"photoreal", "photorealistic", "realistic"}
+# Present in some entry topics but not needed for a match ("pulley" -> "pulley system").
+_OPTIONAL = {"system", "race", "orbiting", "garden", "bicycle"}
+
+
+def _singular(tok: str) -> str:
+    if len(tok) > 3 and tok.endswith("ies"):
+        return tok[:-3] + "y"
+    if len(tok) > 3 and tok.endswith("s") and not tok.endswith(("ss", "us", "is")):
+        return tok[:-1]
+    return tok
+
+
+def seed_tokens(text: str) -> list[str]:
+    """Normalized, synonym-folded, singular tokens of a request or an entry topic."""
+    norm = normalize_topic(text)
+    for pattern, repl in _PHRASES:
+        norm = re.sub(pattern, repl, norm)
+    return [_singular(t) for t in norm.split() if t not in _NOISE]
+
+
+def seed_enabled() -> bool:
+    return os.getenv("CAD_SEED_LIBRARY", "1").strip().lower() not in ("0", "false", "off", "no")
+
+
+def _seed_index() -> dict[str, Any]:
+    global _seed_cache
+    if _seed_cache is None:
+        try:
+            parsed = json.loads((SEED_DIR / "index.json").read_text("utf-8"))
+            entries = parsed.get("entries") if isinstance(parsed, dict) else None
+            _seed_cache = {k: dict(v, seed=True) for k, v in (entries or {}).items()
+                           if isinstance(v, dict) and v.get("glbFile") and (SEED_DIR / v["glbFile"]).is_file()}
+        except (OSError, ValueError):
+            log.warning("model library: seed library unavailable at %s", SEED_DIR)
+            _seed_cache = {}
+    return _seed_cache
+
+
+def seed_models() -> list[dict[str, Any]]:
+    return [dict(e) for e in _seed_index().values()] if seed_enabled() else []
+
+
+def seed_topics() -> list[str]:
+    """Distinct human topics available instantly from the seed library (for prompts)."""
+    out: list[str] = []
+    for entry in seed_models():
+        topic = " ".join(seed_tokens(entry.get("topic", "")))
+        if topic and topic not in out:
+            out.append(topic)
+    return sorted(out)
+
+
+def match_seed(topic: str) -> dict[str, Any] | None:
+    """Best seed entry for a free-text request, or None. Every core word of the entry's topic
+    must appear in the request (2/3 of them for 3+ word topics); photoreal wins ties."""
+    if not topic or not seed_enabled():
+        return None
+    query = set(seed_tokens(topic))
+    if not query:
+        return None
+    best: tuple | None = None
+    best_entry = None
+    for key, entry in sorted(_seed_index().items()):
+        toks = seed_tokens(entry.get("topic", ""))
+        core = [t for t in toks if t not in _OPTIONAL] or toks
+        if not core:
+            continue
+        hit = sum(1 for t in core if t in query)
+        need = len(core) if len(core) <= 2 else -(-2 * len(core) // 3)
+        if hit < need:
+            continue
+        extra = sum(1 for t in toks if t in _OPTIONAL and t in query)
+        score = (hit + extra, hit / len(core), entry.get("generator") == "photoreal",
+                 bool(entry.get("verified")))
+        if best is None or score > best:
+            best, best_entry = score, entry
+    return dict(best_entry) if best_entry else None
+
+
+def _read_seed_blob(entry: dict[str, Any]) -> bytes | None:
+    key = entry["key"]
+    if key not in _seed_blobs:
+        try:
+            data = (SEED_DIR / entry["glbFile"]).read_bytes()
+        except OSError:
+            return None
+        if len(data) < MIN_GLB_BYTES:
+            return None
+        _seed_blobs[key] = data
+    return _seed_blobs[key]
+
+
+_STRONG_3D = re.compile(r"\b3d\b|three[- ]dimensional|\bmodel of\b|\bphoto ?real|\brender\b|\bcad\b", re.I)
+_REQUEST = re.compile(
+    r"\b(?:draw|show|build|create|make|render|display|visuali[sz]e|model|sketch|pull up|bring up|put up)\s+"
+    r"(?:me\s+|us\s+)?(?:a\s+|an\s+|the\s+|our\s+|this\s+|that\s+|some\s+)?(.{1,60})", re.I)
+_WINDOW_STOP = {"with", "and", "for", "that", "which", "so", "please", "on", "in", "to", "showing", "where",
+                "while", "from", "here", "now", "next", "there", "it", "its", "spinning", "rotating", "turning"}
+
+
+def seed_for_request(text: str) -> dict[str, Any] | None:
+    """The seed entry a spoken/typed request is asking to see, or None.
+
+    With an explicit 3D cue ("3D", "model of", "render") any seed topic in the sentence counts.
+    Otherwise the topic must directly follow a show/draw verb, so "make car rentals talk to
+    Postgres" is not a request for a car model."""
+    if not text or not seed_enabled():
+        return None
+    if re.search(r"\b(?:remove|delete|clear|hide|don't|do not|no longer)\b", text, re.I):
+        return None
+    if _STRONG_3D.search(text):
+        hit = match_seed(text)
+        if hit is not None:
+            return hit
+    for m in _REQUEST.finditer(text):
+        window: list[str] = []
+        for tok in normalize_topic(m.group(1)).split():
+            if tok in _WINDOW_STOP:
+                break
+            window.append(tok)
+        phrase = " ".join(window)
+        hit = match_seed(phrase) if phrase else None
+        if hit is None:
+            continue
+        toks = [t for t in seed_tokens(phrase) if t not in {"3d", "model", "of", "photo", "real"}]
+        if len(toks) <= len(seed_tokens(hit.get("topic", ""))) + 1:
+            return hit
+    return None

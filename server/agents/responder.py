@@ -84,10 +84,52 @@ def repo_brief(session, max_files: int = 8) -> list[str]:
             continue
         owner = r.get("owner") or (r.get("owners") or [None])[0]
         out.append(f"{r.get('path')}: {r.get('summary', '')[:120]}" + (f" (owner {owner})" if owner else ""))
-    c = getattr(session, "latest_contribution", None)
-    if isinstance(c, dict) and c.get("current"):
-        out.append(f"Latest grounded take: {c.get('current')}")
+    take = fresh_contribution(session)
+    if take:
+        out.append(f"Latest grounded take: {take}")
     return out[:12]
+
+
+CONTRIB_MAX_AGE_MS = 90_000
+TOPIC_CHANGED_MIN = 0.7
+
+
+def _topic_changed(decision) -> float:
+    v = decision.get("topic_changed") if isinstance(decision, dict) else None
+    if isinstance(v, dict):
+        v = v.get("noul", v.get("confidence"))
+    try:
+        return float(v) if v is not None and not isinstance(v, bool) else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def latest_human_line(history) -> dict | None:
+    for h in reversed(list(history or [])):
+        if isinstance(h, dict) and h.get("speaker") != config.TWIN_NAME and str(h.get("text", "")).strip():
+            return h
+    return None
+
+
+def fresh_contribution(session) -> str:
+    """The latest contribution's take, only while it is about the CURRENT topic and recent.
+
+    Never after the newest human line switched topic (reflex topic_changed >= 0.7).
+    """
+    c = getattr(session, "latest_contribution", None)
+    if not isinstance(c, dict) or not c.get("current"):
+        return ""
+    topic = getattr(session, "active_topic", None)
+    active_id = topic.get("topic_id") if isinstance(topic, dict) else None
+    if c.get("topic_id") != active_id:
+        return ""
+    ts = c.get("ts")
+    if not isinstance(ts, (int, float)) or _now_ms() - ts > CONTRIB_MAX_AGE_MS:
+        return ""
+    last = latest_human_line(getattr(session, "history", None))
+    if last is not None and _topic_changed(last.get("decision")) >= TOPIC_CHANGED_MIN:
+        return ""
+    return str(c.get("current"))
 
 
 def build_messages(history: list[dict], board_summary: str, updates: list[str],
@@ -105,6 +147,9 @@ def build_messages(history: list[dict], board_summary: str, updates: list[str],
     if memory:
         context += ["", "Cited memory:"] + [f"- {m}" for m in memory]
     context += ["", f"Why you are speaking now: {reason}. Reply as Twin, out loud, now."]
+    latest = latest_human_line(history)
+    if latest is not None:
+        context += ["", f"Answer THIS, not earlier topics: {latest.get('speaker', '?')}: {latest.get('text', '')}"]
     return [
         {"role": "system", "content": load_prompt()},
         {"role": "user", "content": "\n".join(context)},

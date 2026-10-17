@@ -5,7 +5,8 @@
     # {"id", "url", "parts", "ms", "generator", "category", "referenceProduct", ...}
 
 Flow (Loomin's geometry-render route, on Nemotron):
-  1. model library hit for this topic -> instant replay;
+  1. model library hit for this topic -> instant replay (Twin: incl. the shipped seed
+     library from Loomin's .model-library, fuzzy-matched; see cad.library.match_seed);
   2. spec sheet research (cad.spec) -> validated real dimensions;
   3. researched part plan (cad.plan) grounded on the spec, validated, audited
      (cad.audit), one repair retry with the complaints fed back;
@@ -20,6 +21,7 @@ JSON; all OpenSCAD is compiled here or fixed template source.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
@@ -190,7 +192,39 @@ async def _render(scad: str) -> bytes:
     return await asyncio.to_thread(R.render_glb, scad)
 
 
-async def generate_model(description: str, *, use_library: bool = True, use_spec: bool | None = None) -> dict:
+def seed_model_id(seed_key: str) -> str:
+    """Stable /cad/<id>.glb id for a seed entry, so browsers (useGLTF) cache it across requests."""
+    return hashlib.sha1(f"seed:{seed_key}".encode()).hexdigest()[:12]
+
+
+def library_hit(description: str, title: str | None = None) -> dict | None:
+    """Instant model from the library (exact runtime topic, then fuzzy seed match), stored for
+    GET /cad/<id>.glb, or None. Tries the short title first so a long utterance can't mis-match."""
+    hit = None
+    for text in [t for t in (title, description) if t]:
+        hit = L.lookup_model(text)
+        if hit is not None:
+            break
+    if hit is None:
+        return None
+    entry, glb = hit
+    if entry.get("seed"):
+        model_id = seed_model_id(entry["key"])
+        with _store_lock:
+            cached = model_id in _store
+        if not cached:
+            put_glb(model_id, glb)
+    else:
+        model_id = uuid.uuid4().hex[:12]
+        put_glb(model_id, glb)
+    return {"id": model_id, "url": model_url(model_id), "parts": entry.get("parts"), "ms": {},
+            "generator": "library", "cached": True, "category": entry.get("category"),
+            "seed": bool(entry.get("seed")), "libraryKey": entry.get("key"), "topic": entry.get("topic"),
+            "referenceProduct": entry.get("referenceProduct"), "names": entry.get("names", [])}
+
+
+async def generate_model(description: str, *, use_library: bool = True, use_spec: bool | None = None,
+                         title: str | None = None) -> dict:
     description = " ".join((description or "").split())[:400]
     if not description:
         raise CadError("empty description")
@@ -204,15 +238,12 @@ async def generate_model(description: str, *, use_library: bool = True, use_spec
         return now
 
     if use_library:
-        hit = L.lookup_model(description)
+        # cad.hook builds "<title>. <last utterance>": try the title part on its own first
+        hit = library_hit(description, title if title is not None else description.split(". ")[0])
         if hit is not None:
-            entry, glb = hit
-            model_id = uuid.uuid4().hex[:12]
-            put_glb(model_id, glb)
             lap("total", t0)
-            return {"id": model_id, "url": model_url(model_id), "parts": entry.get("parts"), "ms": ms,
-                    "generator": "library", "cached": True, "category": entry.get("category"),
-                    "referenceProduct": entry.get("referenceProduct"), "names": entry.get("names", [])}
+            hit["ms"] = ms
+            return hit
 
     category = T.classify_topic(description)
     spec: S.SpecSheet | None = None

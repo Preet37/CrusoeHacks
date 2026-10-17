@@ -296,6 +296,7 @@ def test_fast_templates_compile_with_openscad(tmp_path):
 
 def test_model_library_save_lookup_reject(monkeypatch, tmp_path):
     monkeypatch.setenv("CAD_LIBRARY_DIR", str(tmp_path))
+    monkeypatch.setenv("CAD_SEED_LIBRARY", "0")  # the shipped seed has a tennis racket; test_cad_seed_library covers it
     L.clear_library()
     glb = b"glTF" + b"\0" * 100
     assert L.lookup_model("Tennis Racket") is None

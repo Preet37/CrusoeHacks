@@ -137,6 +137,13 @@ def _three_vector(value: Any, name: str, *, limit: float, positive: bool = False
     return checked
 
 
+def _own_cad_url(url: str) -> bool:
+    """True for this server's own GET /cad/<12 hex>.glb URL (PUBLIC_SERVER_URL, default localhost:8000)."""
+    import os
+    base = os.getenv("PUBLIC_SERVER_URL", "http://localhost:8000").rstrip("/")
+    return re.fullmatch(re.escape(base) + r"/cad/[a-f0-9]{12}\.glb", url) is not None
+
+
 def _three_scene(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or not set(value) <= {"autoRotate", "objects", "gltf"}:
         raise ValueError("scene must contain only autoRotate, objects, or gltf")
@@ -183,7 +190,9 @@ def _three_scene(value: Any) -> dict[str, Any]:
         if not isinstance(url, str) or not 1 <= len(url) <= 2048 or any(ord(char) < 33 for char in url):
             raise ValueError("gltf must be an HTTPS URL")
         parsed = urlsplit(url)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        if parsed.scheme == "http" and _own_cad_url(url):
+            pass  # Twin's own /cad/<id>.glb (model library / CAD pipeline) on a local http server
+        elif parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("gltf must be an HTTPS URL without credentials")
         _ = parsed.port  # Reject malformed ports before sending the URL to a browser.
         scene["gltf"] = url

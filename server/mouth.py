@@ -57,8 +57,22 @@ BACKCHANNEL_GAP_MS = 600          # speak at the first human pause this long
 BACKCHANNEL_MAX_WAIT_MS = 4000    # the room never paused: drop it
 BACKCHANNEL_RATE_MS = 10000       # at most one per room per 10 s
 BACKCHANNEL_FOLLOW_MS = 15000     # a contribution may chain onto a backchannel this recent
+# Vision turn: someone is sharing their screen and asks about what is on it.
+VISION_ACK = "Let me look at your screen."
+VISION_FAIL = "I couldn't read the screen just now."
+VISION_FRESH_MS = 20_000          # a frame older than this means nobody is sharing
+VISION_TIMEOUT_S = 12.0
+VISION_HISTORY_LINES = 12
+VISION_TTL_S = 20
+_VISION_STRONG = re.compile(
+    r"\b(screen|look|looks|looking|see|seeing|showing|ticket|this page|what is this|what's this|"
+    r"on my screen|what does it look like)\b", re.I)
+_VISION_WEAK = re.compile(r"\b(this|here|where|point|pointing)\b", re.I)
+STALE_CONTRIB_MS = 30_000         # a pending contribution older than this is dropped on a new line
+TOPIC_SHIFT_MIN = 0.7
+
 PREWARM_PHRASES = list(dict.fromkeys([*VISUAL_PHRASES.values(), FACT_PHRASE, SKETCH_ACK,
-                                      *BACKCHANNEL_PHRASES.values()]))
+                                      *BACKCHANNEL_PHRASES.values(), VISION_ACK, VISION_FAIL]))
 
 # Contribution speech (Codex 15:23 contract: broadcast {"type": "contribution", show, current,
 # impact[], risks[], question, sources[]}, also session.latest_contribution).
@@ -202,6 +216,55 @@ def highlight_refs(session, refs: list[str], hold_s: float = 8.0) -> None:
         pass
 
 
+def fresh_screen(session, now_ms: int | None = None) -> dict | None:
+    """The latest shared-screen frame when it is recent enough that someone is sharing."""
+    frame = getattr(session, "screen", None)
+    if not isinstance(frame, dict) or not frame.get("jpeg"):
+        return None
+    now = _now_ms() if now_ms is None else now_ms
+    try:
+        ts = int(frame.get("ts") or 0)
+    except (TypeError, ValueError):
+        return None
+    return frame if 0 <= now - ts <= VISION_FRESH_MS else None
+
+
+def _looks_like_question(text: str) -> bool:
+    t = (text or "").strip().lower()
+    return t.endswith("?") or "?" in t or t.startswith(_QUESTION_START)
+
+
+def wants_vision_turn(session, text: str, decision=None, now_ms: int | None = None) -> bool:
+    """A fresh frame exists and the line is about what is on screen; honors twin_mode."""
+    mode = getattr(session, "twin_mode", "proactive")
+    if mode == "off" or getattr(session, "muted", False) or fresh_screen(session, now_ms) is None:
+        return False
+    text = str(text or "")
+    if not text.strip():
+        return False
+    strong = bool(_VISION_STRONG.search(text))
+    weak = bool(_VISION_WEAK.search(text))
+    kind, conf = _choice(decision, "kind") if isinstance(decision, dict) else (None, 0.0)
+    kind_q = kind == "question" and conf >= 0.6
+    if not (strong or weak or kind_q):
+        return False
+    addressed = bool(turn_taking.mentions_name(text) or getattr(session, "push_to_talk_active", False))
+    question = _looks_like_question(text) or kind_q
+    if mode == "on_request":
+        return addressed or question
+    return addressed or question or strong
+
+
+def topic_shift(decision) -> float:
+    v = decision.get("topic_changed") if isinstance(decision, dict) else None
+    if isinstance(v, dict):
+        v = v.get("noul", v.get("confidence"))
+    try:
+        return float(v) if v is not None and not isinstance(v, bool) else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def addressed_without_name(decision: dict, text: str) -> bool:
     """JEV says the line is directed at Twin AND it really is a question. A score alone
     never triggers speech (Nano has scored small talk as addressed)."""
@@ -293,6 +356,8 @@ class Mouth:
         self._spoken_contribs: set[str] = set()
         self._last_backchannel_ms = 0
         self._backchannel: dict | None = None  # {"line_ts", "started_ms", "until_ms"} of the last one spoken
+        self._vision_ids = itertools.count(1)
+        self._pending_contrib: dict | None = None  # {"id", "topic_id", "arrived"} waiting to be spoken
 
     # ------------------------------------------------------------ wiring
     def attach(self) -> None:
@@ -348,7 +413,15 @@ class Mouth:
             decision = await self._decide(session, line)
             if decision is not None:
                 line["decision"] = decision
-                if wants_ghost(decision):
+                if topic_shift(decision) >= TOPIC_SHIFT_MIN:
+                    self._drop_stale_work(line, topic_changed=True)
+                if (not line.get("vision_turn") and self._is_latest_human(line)
+                        and not self._turn_running()
+                        and wants_vision_turn(session, line.get("text", ""), decision)):
+                    self.start_vision_turn(line)
+                if line.get("vision_turn"):
+                    pass  # the vision turn answers this line; no visual phrase or backchannel
+                elif wants_ghost(decision):
                     self._mark_visual_turn(session, line, decision)
                     try:
                         await self._show_ghost(session, line)
@@ -365,7 +438,8 @@ class Mouth:
                         session.spawn("backchannel", self._backchannel_at_gap(session, line, phrase))
             if self.listener is listener:  # a reset may have swapped it while we waited
                 listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
-        if decision is not None and addressed_without_name(decision, line.get("text", "")):
+        if (decision is not None and not line.get("vision_turn")
+                and addressed_without_name(decision, line.get("text", ""))):
             session.spawn("addressed_wait", self._answer_unnamed(session, line))
 
     async def on_floor_handoff(self, name: str) -> None:
@@ -449,8 +523,9 @@ class Mouth:
         """Speak a short pre-synthesized line right now, unless Twin is busy, muted or holding."""
         if session.muted or _now_ms() < self.state.hold_until_ms or self._turn_running():
             return
-        if _now_ms() - (session.last_human_speech_ts or 0) < 300 and session.last_human_speech_ts:
-            pass  # the line just ended; fine to acknowledge
+        await self._play_cached(session, text)
+
+    async def _play_cached(self, session, text: str) -> None:
         import base64
         from voice import tts
         wav = tts.cached(text)
@@ -518,6 +593,11 @@ class Mouth:
         if not isinstance(data, dict):
             return
         if data.get("type") == "contribution":
+            now = _now_ms()
+            data.setdefault("ts", now)
+            latest = getattr(self.session, "latest_contribution", None)
+            if isinstance(latest, dict) and latest is not data and latest.get("id") == data.get("id"):
+                latest.setdefault("ts", data["ts"])
             self._on_contribution(data)
             return
         if data.get("type") != "draw":
@@ -576,6 +656,7 @@ class Mouth:
         cid = str(msg.get("id") or "")
         if not cid or cid in self._spoken_contribs:
             return
+        self._pending_contrib = {"id": cid, "topic_id": msg.get("topic_id"), "arrived": _now_ms()}
         try:
             self.session.spawn("contribution", self._deliver_contribution(msg))
         except RuntimeError:  # no running loop
@@ -621,6 +702,9 @@ class Mouth:
             return
         if not addressed and _now_ms() < self.state.hold_until_ms:
             return  # a "not now" arrived while we waited
+        if self._contribution_stale(msg, arrived):
+            log.info("[%s] dropped stale contribution %s", s.room, cid)
+            return
         labels = self.narration_labels() if not board_is_empty(s) else []
         text = compose_contribution(msg, labels)
         sentences = drop_false_draw_claims(s, _SENT_SPLIT.split(text)) if text else []
@@ -650,7 +734,7 @@ class Mouth:
 
         spoken = ""
         try:
-            spoken = (await tts.speak_text(text, say_id, emit, on_refs=lambda refs: highlight_refs(session, refs)) or "").strip()
+            spoken = (await tts.speak_text(text, say_id, emit, on_refs=lambda refs: highlight_refs(s, refs)) or "").strip()
             if spoken and s.current_say_id == say_id:
                 await s.add_line(config.TWIN_NAME, spoken)
         finally:
@@ -660,8 +744,92 @@ class Mouth:
                 await s.set_status("listening")
         return spoken
 
+    def _contribution_stale(self, msg: dict, arrived: int) -> bool:
+        """A newer human line arrived and the contribution is about another topic or too old."""
+        s = self.session
+        last = next((h for h in reversed(list(s.history)) if h.get("speaker") != config.TWIN_NAME), None)
+        if last is None or int(last.get("ts") or 0) <= arrived:
+            return False
+        if topic_shift(last.get("decision")) >= TOPIC_SHIFT_MIN:
+            return True
+        topic = getattr(s, "active_topic", None)
+        active_id = topic.get("topic_id") if isinstance(topic, dict) else None
+        tid = msg.get("topic_id")
+        return bool(tid and active_id and tid != active_id) or _now_ms() - arrived > STALE_CONTRIB_MS
+
+    def _drop_stale_work(self, line: dict, *, topic_changed: bool = False) -> None:
+        """A new human line: drop queued contribution speech and work updates about other topics."""
+        s = self.session
+        now = _now_ms()
+        topic = getattr(s, "active_topic", None)
+        active_id = topic.get("topic_id") if isinstance(topic, dict) else None
+        p = self._pending_contrib
+        t = s._tasks.get("contribution") if hasattr(s, "_tasks") else None
+        if p is not None and t is not None and not t.done():
+            other = bool(p.get("topic_id") and active_id and p["topic_id"] != active_id)
+            if topic_changed or other or now - p["arrived"] > STALE_CONTRIB_MS:
+                s.cancel("contribution")
+                self._pending_contrib = None
+                log.info("[%s] dropped pending contribution %s (new line)", s.room, p.get("id"))
+        drop = getattr(s, "drop_stale_updates", None)
+        if callable(drop):
+            before = int(line.get("ts") or now) if topic_changed else None
+            dropped = drop(active_id, STALE_CONTRIB_MS, before_ts=before)
+            if dropped:
+                log.info("[%s] dropped %d stale update(s) on a new line", s.room, len(dropped))
+
+    def _is_latest_human(self, line: dict) -> bool:
+        hist = [h for h in list(self.session.history) if h.get("speaker") != config.TWIN_NAME]
+        return not hist or hist[-1] is line or hist[-1].get("text") == line.get("text")
+
+    # ------------------------------------------------------------ vision turn (screen share)
+    def start_vision_turn(self, line: dict) -> None:
+        s = self.session
+        frame = fresh_screen(s)
+        if frame is None:
+            return
+        line["vision_turn"] = True
+        self._take_unstarted_turn()
+        self._turn = None
+        self._updates_since = None
+        s.spawn("responder", self._vision_turn(line, dict(frame)))  # barge-in cancels "responder"
+
+    async def _vision_turn(self, line: dict, frame: dict) -> str:
+        from agents import screen_vision
+        s = self.session
+        started = time.monotonic()
+        await self._play_cached(s, VISION_ACK)
+        await s.set_status("thinking")
+        question = str(line.get("text", "")).strip()[:1000]
+        transcript = [f"{h.get('speaker', '?')}: {h.get('text', '')}" for h in list(s.history)[-VISION_HISTORY_LINES:]]
+        result = None
+        try:
+            result = await asyncio.wait_for(screen_vision.analyze(frame["jpeg"], question, transcript), VISION_TIMEOUT_S)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - includes timeout
+            log.warning("[%s] vision turn failed: %s", s.room, type(exc).__name__)
+        answer = ""
+        items: list = []
+        if isinstance(result, dict):
+            answer = str(result.get("say") or result.get("answer") or "").strip()
+            items = [i for i in (result.get("items") or []) if isinstance(i, dict)]
+        if items:
+            await s.broadcast({"type": "annotate", "target": "screen", "user": frame.get("user") or "guest",
+                               "id": f"twin_{next(self._vision_ids)}", "ttl_s": VISION_TTL_S,
+                               "by": "Twin", "items": items})
+        log.info("[%s] vision turn %dms ok=%s items=%d", s.room, (time.monotonic() - started) * 1000,
+                 bool(answer), len(items))
+        if not answer:
+            answer = VISION_FAIL
+        deadline = _now_ms() + 3000
+        while _now_ms() < min(self._phrase_until_ms, deadline):
+            await asyncio.sleep(0.05)  # let the ack finish
+        return await self._speak_contribution(answer)
+
     async def on_reset(self, session) -> None:
         self._visual_turn = None
+        self._pending_contrib = None
         self._shape_labels = []
         self._backchannel = None
         try:
@@ -685,8 +853,13 @@ class Mouth:
     async def on_final(self, session, line: dict) -> None:
         self._sync()
         now = _now_ms()
+        self._drop_stale_work(line)
         d = turn_taking.on_final_text(self.state, line.get("text", ""), now, session.has_updates())
         log.info("[%s] turn: %s (%s)", session.room, d.action, d.reason)
+        if d.action != "hold" and wants_vision_turn(session, line.get("text", ""), now_ms=now):
+            log.info("[%s] vision turn for %r", session.room, line.get("text", "")[:80])
+            self.start_vision_turn(line)
+            return
         if d.action == "hold":
             if self.state.twin_speaking:
                 await session.barge_in()

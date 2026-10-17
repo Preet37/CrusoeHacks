@@ -151,6 +151,44 @@ def _rough_physical_request(moments, source_lines, required_visual):
     return _PHYSICAL_SKETCH.search(text) is not None
 
 
+def _library_3d_op(moments, source_lines, required_visual, rough_refine):
+    """A ready model from the CAD library (Loomin's seed models included) for a 3D/physical
+    request, as an add_3d op with its GLB URL, or None. Skips the primitive LLM build entirely."""
+    if rough_refine or required_visual not in {None, "add_3d"} or not moments:
+        return None
+    text = str((source_lines or moments)[-1].get("text", ""))
+    if not text:
+        return None
+    try:
+        from cad import pipeline as cad_pipeline
+        from cad.library import seed_for_request, seed_tokens
+        seed = seed_for_request(text)
+        hit = cad_pipeline.library_hit(seed["topic"]) if seed else None
+    except Exception:  # noqa: BLE001 - the library is an optimisation, never a failure
+        log.warning("diagrammer_library lookup failed", exc_info=True)
+        return None
+    if hit is None:
+        return None
+    topic_name = " ".join(seed_tokens(hit.get("topic") or "")) or "model"
+    op = {"op": "add_3d", "id": f"lib_{uuid4().hex[:10]}", "title": topic_name[:1].upper() + topic_name[1:],
+          "x": 500, "y": 100, "w": 460, "h": 400, "scene": {"gltf": hit["url"], "autoRotate": True}}
+    return op, topic_name
+
+
+def _library_prompt_note() -> str:
+    """Tell the planner which 3D topics have ready-made models (Loomin's seed library)."""
+    try:
+        from cad.library import seed_topics
+        topics = seed_topics()
+    except Exception:  # noqa: BLE001
+        return ""
+    if not topics:
+        return ""
+    return ("\n\nReady-made 3D models (photoreal where available) exist for: " + ", ".join(topics) +
+            ". For one of these, use add_3d with that topic as the title and a small placeholder scene; "
+            "the server swaps in the real model in place. Prefer suggesting these when a physical example helps.")
+
+
 def _sketch_strokes(raw):
     cleaned = raw.strip()
     if cleaned.startswith("```"):
@@ -382,6 +420,15 @@ class Diagrammer:
             if inspect.isawaitable(update):
                 await update
             return draws
+        library_draw = _library_3d_op(moments, source_lines, required_visual, rough_refine)
+        if library_draw is not None:
+            op, topic_name = library_draw
+            await apply(op)
+            log.info("diagrammer_library hit id=%s topic=%r", op["id"], topic_name)
+            update = session.push_update(f"I put a 3D {topic_name} model on the board.")
+            if inspect.isawaitable(update):
+                await update
+            return draws
         if rough_refine:
             latest = (source_lines or moments)[-1]
             request = str(latest.get("text", ""))
@@ -518,7 +565,7 @@ class Diagrammer:
                     raise ValueError(f"The latest fact states {relations_needed} connection(s); include each connect operation.")
 
         messages = [
-            {"role": "system", "content": PROMPT.read_text()},
+            {"role": "system", "content": PROMPT.read_text() + _library_prompt_note()},
             {"role": "user", "content": json.dumps({"board": board.snapshot(),
                                                       "facts": moments, "topic_id": topic_id,
                                                       "source_lines": (source_lines or [])[-8:],

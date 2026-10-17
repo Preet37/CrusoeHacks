@@ -72,7 +72,18 @@ def _wants_visual(moments: list[dict], source_lines: list[dict]) -> bool:
     texts.extend(str(moment.get("text") or "") for moment in moments)
     return any((_VISUAL_NOUN.search(text) and _VISUAL_REQUEST.search(text))
                or _CHART_VERB.search(text) or _measured_comparison(text)
-               or _SCREEN_QUESTION.search(text) for text in texts)
+               or _SCREEN_QUESTION.search(text) or _library_model_request(text) for text in texts)
+
+
+def _library_model_request(text: str) -> bool:
+    """'show me a wind turbine': a ready-made model exists (cad seed library), so draw it."""
+    if not text or not _VISUAL_REQUEST.search(text):
+        return False
+    try:
+        from cad.library import seed_for_request
+        return seed_for_request(text) is not None
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _specialist_moments(moments: list[dict], source_lines: list[dict]) -> list[dict]:
