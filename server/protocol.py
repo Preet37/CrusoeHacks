@@ -61,7 +61,7 @@ class PushToTalk(Msg):
     ts: Optional[int] = None
 
 
-ControlAction = Literal["mute_twin", "unmute_twin", "clear_board", "reset_session", "set_mode"]
+ControlAction = Literal["mute_twin", "unmute_twin", "clear_board", "reset_session", "set_mode", "mic_off", "mic_on"]
 
 
 class Control(Msg):

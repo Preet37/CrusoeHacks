@@ -78,6 +78,17 @@ export function useCallAudio(opts: {
     if (twinMuted) playerRef.current?.stopAll()
   }, [twinMuted])
 
+  // Tell the server our mic state (on every change and every (re)connect) so a muted person is
+  // never heard, never shown as speaking, and shows as muted to everyone else.
+  useEffect(() => {
+    if (!client) return
+    const sendMic = () => client.send({ type: 'control', action: micOn ? 'mic_on' : 'mic_off' })
+    sendMic()
+    return client.onState((st) => {
+      if (st === 'open') sendMic()
+    })
+  }, [client, micOn])
+
   // Mic -> speech recognition -> user_text + barge-in.
   useEffect(() => {
     if (!client || !micOn || !speechSupported) return

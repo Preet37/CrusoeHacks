@@ -42,7 +42,22 @@ VISUAL_PHRASES = {
     "3d": "Let me show it in 3D.",
 }
 FACT_PHRASE = "Let me pull up what the repo says."
-PREWARM_PHRASES = list(dict.fromkeys([*VISUAL_PHRASES.values(), FACT_PHRASE, SKETCH_ACK]))
+# Proactive backchannel: one short reaction at the first gap after a substantive (non-visual) line.
+BACKCHANNEL_PHRASES = {
+    "decision": "Good call, let me check what that touches.",
+    "claim": "Let me check that against the repo.",
+    "question": "Good question, one sec.",
+    "task": "Got it, I'll note that.",
+    "system_fact": "Got it, adding that.",
+}
+BACKCHANNEL_MIN_CONF = 0.6
+BACKCHANNEL_MIN_WORDS = 4
+BACKCHANNEL_GAP_MS = 600          # speak at the first human pause this long
+BACKCHANNEL_MAX_WAIT_MS = 4000    # the room never paused: drop it
+BACKCHANNEL_RATE_MS = 10000       # at most one per room per 10 s
+BACKCHANNEL_FOLLOW_MS = 15000     # a contribution may chain onto a backchannel this recent
+PREWARM_PHRASES = list(dict.fromkeys([*VISUAL_PHRASES.values(), FACT_PHRASE, SKETCH_ACK,
+                                      *BACKCHANNEL_PHRASES.values()]))
 
 # Contribution speech (Codex 15:23 contract: broadcast {"type": "contribution", show, current,
 # impact[], risks[], question, sources[]}, also session.latest_contribution).
@@ -50,8 +65,8 @@ CONTRIB_MAX_SENTENCES = 4
 CONTRIB_MAX_WORDS = 30
 CONTRIB_PHRASE_WAIT_MS = 3000     # addressed: let the step-1 phrase finish first (max)
 CONTRIB_BUSY_WAIT_MS = 8000       # addressed: let an already-speaking reply finish (max)
-CONTRIB_GAP_MS = 1200             # proactive: speak at the next gap this long
-CONTRIB_GAP_WAIT_MS = 10000       # proactive: give up if the room never pauses
+CONTRIB_GAP_MS = 700              # proactive: speak at the next gap this long
+CONTRIB_GAP_WAIT_MS = 12000       # proactive: give up if the room never pauses
 CONTRIB_TRIGGER_TTL_MS = 30000    # a visual trigger older than this no longer counts
 NARRATE_MAX_LABELS = 4
 _SHAPE_OPS = {"add_box", "add_sticky", "add_text", "add_mermaid", "add_chart", "add_table",
@@ -69,6 +84,16 @@ def visual_phrase(decision) -> str:
         return VISUAL_PHRASES[visual]
     kind, _ = _choice(decision, "kind") if isinstance(decision, dict) else (None, 0.0)
     return FACT_PHRASE if kind == "system_fact" else SKETCH_ACK
+
+
+def backchannel_phrase(decision, text: str) -> str:
+    """The proactive one-liner for a substantive line; "" when none applies."""
+    if not isinstance(decision, dict) or len(str(text or "").split()) < BACKCHANNEL_MIN_WORDS:
+        return ""
+    kind, conf = _choice(decision, "kind")
+    if kind not in BACKCHANNEL_PHRASES or conf < BACKCHANNEL_MIN_CONF:
+        return ""
+    return BACKCHANNEL_PHRASES[kind]
 
 
 def _sentence(text) -> str:
@@ -227,6 +252,8 @@ class Mouth:
         self._visual_turn: dict | None = None  # {"ts", "addressed"} of the latest visual line
         self._shape_labels: list[tuple[float, int, str]] = []  # (x, order, label) drawn since then
         self._spoken_contribs: set[str] = set()
+        self._last_backchannel_ms = 0
+        self._backchannel: dict | None = None  # {"line_ts", "started_ms", "until_ms"} of the last one spoken
 
     # ------------------------------------------------------------ wiring
     def attach(self) -> None:
@@ -292,6 +319,10 @@ class Mouth:
                         await self._say_cached(session, visual_phrase(decision))  # step 1: what's coming
                     except Exception:  # noqa: BLE001
                         log.exception("visual phrase failed")
+                else:
+                    phrase = backchannel_phrase(decision, line.get("text", ""))
+                    if phrase and getattr(session, "twin_mode", "proactive") == "proactive":
+                        session.spawn("backchannel", self._backchannel_at_gap(session, line, phrase))
             if self.listener is listener:  # a reset may have swapped it while we waited
                 listener.submit(line.get("speaker", "?"), line.get("text", ""), decision=decision)
         if decision is not None and addressed_without_name(decision, line.get("text", "")):
@@ -319,6 +350,37 @@ class Mouth:
             return
         log.info("[%s] answering unnamed question: %r", session.room, line.get("text", "")[:80])
         self.speak("asked a question without saying your name", trigger_ts=_now_ms(), updates=session.pop_updates())
+
+    async def _backchannel_at_gap(self, session, line: dict, phrase: str) -> None:
+        """Proactive only: say one short reaction at the first >= 0.6 s human pause (max 4 s)."""
+        import turn_taking as tt
+        if tt.mentions_name(line.get("text", "")) or getattr(session, "push_to_talk_active", False):
+            return  # addressed: the responder answers properly
+        line_ts = int(line.get("ts") or _now_ms())
+        start = _now_ms()
+        while True:
+            last = max(session.last_human_speech_ts or 0, line_ts)
+            if _now_ms() - last >= BACKCHANNEL_GAP_MS:
+                break
+            if _now_ms() - start > BACKCHANNEL_MAX_WAIT_MS:
+                return
+            await asyncio.sleep(0.05)
+        now = _now_ms()
+        if (getattr(session, "twin_mode", "proactive") != "proactive" or session.muted
+                or now < self.state.hold_until_ms or self._turn_running() or now < self._phrase_until_ms
+                or (self._last_backchannel_ms and now - self._last_backchannel_ms < BACKCHANNEL_RATE_MS)):
+            return
+        self._last_backchannel_ms = now
+        await self._say_cached(session, phrase)
+        self._backchannel = {"line_ts": line_ts, "started_ms": now, "until_ms": max(self._phrase_until_ms, now)}
+        log.info("[%s] backchannel: %r", session.room, phrase)
+
+    def _follows_backchannel(self) -> bool:
+        """A backchannel just played and no human has spoken since it started."""
+        b, s = self._backchannel, self.session
+        if b is None or _now_ms() - b["started_ms"] > BACKCHANNEL_FOLLOW_MS:
+            return False
+        return (s.last_human_speech_ts or 0) <= b["started_ms"] and _now_ms() >= b["until_ms"]
 
     async def _say_cached(self, session, text: str) -> None:
         """Speak a short pre-synthesized line right now, unless Twin is busy, muted or holding."""
@@ -486,14 +548,16 @@ class Mouth:
         else:
             while True:
                 quiet = _now_ms() - (s.last_human_speech_ts or 0)
-                if quiet >= CONTRIB_GAP_MS and not s.speaking and not s.current_say_id \
-                        and _now_ms() >= self._phrase_until_ms:
+                free = not s.speaking and not s.current_say_id and _now_ms() >= self._phrase_until_ms
+                if free and (quiet >= CONTRIB_GAP_MS or self._follows_backchannel()):
                     break
                 if _now_ms() - arrived > CONTRIB_GAP_WAIT_MS:
                     return
                 await asyncio.sleep(0.1)
         if getattr(s, "twin_mode", "proactive") == "off" or s.muted or cid in self._spoken_contribs:
             return
+        if not addressed and _now_ms() < self.state.hold_until_ms:
+            return  # a "not now" arrived while we waited
         labels = self.narration_labels() if not board_is_empty(s) else []
         text = compose_contribution(msg, labels)
         sentences = drop_false_draw_claims(s, _SENT_SPLIT.split(text)) if text else []
@@ -536,6 +600,7 @@ class Mouth:
     async def on_reset(self, session) -> None:
         self._visual_turn = None
         self._shape_labels = []
+        self._backchannel = None
         try:
             await self._clear_ghost()
         except Exception:  # noqa: BLE001

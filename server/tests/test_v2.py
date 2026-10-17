@@ -122,7 +122,7 @@ def test_two_clients_see_each_other(_no_mouth):
     with TestClient(app) as client:
         with client.websocket_connect(f"/ws?room={room}&user=Preet") as a:
             p = _recv_type(a, "participants")
-            assert p["people"] == [{"name": "Preet", "kind": "human", "speaking": False},
+            assert p["people"] == [{"name": "Preet", "kind": "human", "speaking": False, "muted": False},
                                    {"name": TWIN_SPEAKER, "kind": "ai", "speaking": False}]
             with client.websocket_connect(f"/ws?room={room}&user=Parsh") as b:
                 names = [x["name"] for x in _recv_type(b, "participants")["people"]]
@@ -360,3 +360,31 @@ def test_echo_guard_never_drops_addressed_or_short_lines():
     assert not is_echo("Twin, does that look right?", twin)
     assert not is_echo("does that look right", twin)
     assert is_echo("I put the postgres connection next to auth", twin)
+
+
+def test_muted_user_is_ignored_and_shown_muted():
+    import asyncio as _a
+    from session import Session
+    from protocol import parse
+    s = Session("mute")
+
+    class WS:
+        sent = []
+
+        async def send_text(self, t):
+            WS.sent.append(t)
+
+    ws = WS()
+    s.add_socket(ws, "Preet")
+
+    async def run():
+        await s.handle_message(ws, "Preet", parse({"type": "control", "action": "mic_off"}))
+        await s.handle_message(ws, "Preet", parse({"type": "user_text", "speaker": "Preet", "text": "secret talk here", "final": True}))
+        assert s.history == []
+        p = [x for x in s.participants() if x["name"] == "Preet"][0]
+        assert p["muted"] is True and p["speaking"] is False
+        await s.handle_message(ws, "Preet", parse({"type": "control", "action": "mic_on"}))
+        await s.handle_message(ws, "Preet", parse({"type": "user_text", "speaker": "Preet", "text": "now you can hear me", "final": True}))
+        assert len(s.history) == 1
+
+    _a.run(run())

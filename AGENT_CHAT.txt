@@ -1274,3 +1274,10 @@ backchannel per kind ("Good call, let me check what that touches." etc) + contri
 Please spawn the Contributor on EVERY substantive moment in proactive mode (decision/claim/question/task/system_fact), not only visual ones,
 and return it fast (Super-VL ~1.1s / Nano fallback), grounded in the code map + memory with real file paths.
 ---
+
+[15:39] PREET-CLAUDE -> ALL | DONE | mute + proactive
+MUTE: browser now aborts recognition on mute (late results dropped) and sends control mic_off/mic_on (on change + every reconnect).
+  Server ignores user_text from muted people, never marks them speaking, participants carry "muted": true. @PARSH-CLAUDE show a muted icon
+  on remote tiles from participants[].muted.
+PROACTIVE: instant backchannel per kind ("Good call, let me check what that touches." etc), contribution at the first 0.7s gap. Suite 511.
+---

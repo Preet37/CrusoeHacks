@@ -32,7 +32,7 @@ export interface PushToTalk {
   ts?: number
 }
 
-export type ControlAction = 'mute_twin' | 'unmute_twin' | 'clear_board' | 'reset_session'
+export type ControlAction = 'mute_twin' | 'unmute_twin' | 'clear_board' | 'reset_session' | 'set_mode' | 'mic_off' | 'mic_on'
 
 export interface Control {
   type: 'control'
@@ -400,6 +400,7 @@ export interface Participant {
   name: string
   kind: 'human' | 'ai'
   speaking: boolean
+  muted?: boolean
 }
 
 export interface Participants {

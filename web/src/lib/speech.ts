@@ -104,7 +104,7 @@ export class Speech {
   }
 
   isRunning(): boolean {
-    return this.wanted;
+    return this.wanted && this.running;
   }
 
   start(handlers: SpeechHandlers): void {
@@ -129,13 +129,15 @@ export class Speech {
       this.restartTimer = undefined;
     }
     const rec = this.rec;
-    if (rec && this.running) {
+    if (rec) {
+      // abort() (not stop()) so buffered results are discarded, even if onstart has not fired yet.
       try {
-        rec.stop();
+        rec.abort();
       } catch {
         /* ignore */
       }
     }
+    this.running = false;
     this.utteranceStarted = false;
   }
 
@@ -200,6 +202,7 @@ export class Speech {
   }
 
   private handleResult(ev: SREvent): void {
+    if (!this.wanted) return; // muted: never deliver late results
     this.lastErrorCode = ""; // healthy again; allow future errors to be reported
     let interim = "";
     for (let i = ev.resultIndex; i < ev.results.length; i++) {

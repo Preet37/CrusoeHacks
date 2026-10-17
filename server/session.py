@@ -182,6 +182,7 @@ class Session:
         self._reset_hooks: list[ResetHook] = []
         self.urgent_updates = False
         self.twin_mode = "on_request"
+        self.mic_muted: set[str] = set()
         # async decide_and_respond(session, line) -> None. Runs turn-taking and, if it
         # decides to talk, should spawn the responder via session.spawn("responder", ...).
         self.decide_and_respond: Callable[["Session", dict], Awaitable[Any]] | None = None
@@ -448,8 +449,9 @@ class Session:
             if not name or name in seen or name == TWIN_SPEAKER:
                 continue
             seen.add(name)
-            speaking = now - self.last_heard.get(name, 0) <= SPEAKING_WINDOW_MS
-            people.append({"name": name, "kind": "human", "speaking": speaking})
+            muted = name in self.mic_muted
+            speaking = (not muted) and now - self.last_heard.get(name, 0) <= SPEAKING_WINDOW_MS
+            people.append({"name": name, "kind": "human", "speaking": speaking, "muted": muted})
         people.append({"name": TWIN_SPEAKER, "kind": "ai",
                        "speaking": bool(self.speaking)})
         return people
@@ -594,6 +596,8 @@ class Session:
                 self.sockets[ws] = msg.user
                 await self.broadcast_participants()
         elif t == "user_text":
+            if (msg.speaker or user) in self.mic_muted or user in self.mic_muted:
+                return  # muted mic: Twin must not hear, show or act on anything from this person
             text = msg.text.strip()
             if self.is_echo(text, bool(msg.final)):
                 # PC-14: the mic heard Twin. No history, hooks, transcript or speaking state.
@@ -622,6 +626,14 @@ class Session:
                     await self.barge_in()
             elif msg.action == "unmute_twin":
                 self.muted = False
+            elif msg.action in ("mic_off", "mic_on"):
+                name = self.sockets.get(ws, user)
+                if msg.action == "mic_off":
+                    self.mic_muted.add(name)
+                    self.last_heard.pop(name, None)
+                else:
+                    self.mic_muted.discard(name)
+                await self.broadcast_participants(force=True)
             elif msg.action == "set_mode" and msg.mode:
                 self.twin_mode = msg.mode  # off | on_request | proactive (honored by mouth turn-taking)
                 self.muted = msg.mode == "off"
