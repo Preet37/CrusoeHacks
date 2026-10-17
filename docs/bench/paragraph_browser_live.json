@@ -1,0 +1,400 @@
+{
+  "kind": "live browser paste -> WebSocket -> real Nemotron -> tldraw",
+  "N": 1,
+  "elapsed_to_graph_and_viewport_assertions_ms": 14401,
+  "expected_nodes": 11,
+  "expected_labeled_edges": 10,
+  "model_plan_calls": 1,
+  "observations": [
+    {
+      "type": "draw",
+      "op": "add_sticky",
+      "id": "ghost_1",
+      "text": "Twin is sketching\u2026",
+      "color": "blue",
+      "x": 820,
+      "y": 80,
+      "by": "Twin"
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_5c289f9effc1",
+      "parent_id": null,
+      "agent": "Listener",
+      "model": "NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "state": "started",
+      "detail": "1 transcript line(s)",
+      "ts": 1792276168610
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_b81565540b82",
+      "parent_id": "ev_5c289f9effc1",
+      "agent": "Conductor",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "started",
+      "detail": "route 1 moment(s) topic=t_arch_spec lines=ln_1d28848621e2",
+      "ts": 1792276172459
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_44572a55b674",
+      "parent_id": "ev_b81565540b82",
+      "agent": "Diagrammer",
+      "model": "Nemotron-3.5-Lightning-30B-A3B",
+      "state": "started",
+      "detail": "draw 1 system fact(s) topic=t_arch_spec lines=ln_1d28848621e2",
+      "ts": 1792276172459
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_2d370823079c",
+      "parent_id": "ev_b81565540b82",
+      "agent": "Contributor",
+      "model": "NVIDIA-Nemotron-3.5-Super-VL",
+      "state": "started",
+      "detail": "sourced visual contribution",
+      "ts": 1792276172459
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "t_arch_spec",
+      "x": 0,
+      "y": 0,
+      "w": 1000,
+      "h": 1000,
+      "title": "Architecture spec"
+    },
+    {
+      "type": "draw",
+      "op": "focus",
+      "id": "t_arch_spec"
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_2d370823079c",
+      "parent_id": "ev_b81565540b82",
+      "agent": "Contributor",
+      "model": "NVIDIA-Nemotron-3.5-Super-VL",
+      "state": "done",
+      "detail": "1 verified source(s)",
+      "ts": 1792276174803
+    },
+    {
+      "type": "contribution",
+      "id": "contrib_72662c395a44",
+      "topic_id": "t_arch_spec",
+      "show": "Web App calls API Gateway; gateway sends identity requests to Auth and orders to Checkout; Auth reads User DB; Checkout calls Inventory and Payments; Inventory ",
+      "current": "web/routes.py:7-12 provides login validation and returns a signed JWT token.",
+      "impact": [
+        "New diagram documentation",
+        "No code change"
+      ],
+      "risks": [
+        "Diagram may drift from implementation",
+        "Manual layout errors"
+      ],
+      "question": "Should the diagram be stored in the repository as generated markdown, SVG, or ASCII?",
+      "sources": [
+        "web/routes.py:7-12"
+      ]
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "arch_9c8df176_l1",
+      "frame": "t_arch_spec",
+      "x": 25,
+      "y": 50,
+      "w": 950,
+      "h": 170,
+      "title": "client"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n1",
+      "label": "Web App",
+      "x": 500,
+      "y": 250,
+      "kind": "client",
+      "frame": "arch_9c8df176_l1"
+    },
+    {
+      "type": "draw",
+      "op": "remove",
+      "id": "ghost_1"
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "arch_9c8df176_l2",
+      "frame": "t_arch_spec",
+      "x": 25,
+      "y": 230,
+      "w": 950,
+      "h": 170,
+      "title": "gateway"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n2",
+      "label": "API Gateway",
+      "x": 500,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l2"
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "arch_9c8df176_l3",
+      "frame": "t_arch_spec",
+      "x": 25,
+      "y": 410,
+      "w": 950,
+      "h": 170,
+      "title": "services"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n3",
+      "label": "Auth",
+      "x": 164,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l3"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n4",
+      "label": "Checkout",
+      "x": 332,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l3"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n5",
+      "label": "Payments",
+      "x": 500,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l3"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n6",
+      "label": "Inventory",
+      "x": 668,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l3"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n7",
+      "label": "Fraud Service",
+      "x": 836,
+      "y": 250,
+      "kind": "service",
+      "frame": "arch_9c8df176_l3"
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "arch_9c8df176_l4",
+      "frame": "t_arch_spec",
+      "x": 25,
+      "y": 590,
+      "w": 950,
+      "h": 170,
+      "title": "data"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n8",
+      "label": "User DB",
+      "x": 290,
+      "y": 250,
+      "kind": "datastore",
+      "frame": "arch_9c8df176_l4"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n9",
+      "label": "Catalog DB",
+      "x": 710,
+      "y": 250,
+      "kind": "datastore",
+      "frame": "arch_9c8df176_l4"
+    },
+    {
+      "type": "draw",
+      "op": "frame",
+      "id": "arch_9c8df176_l5",
+      "frame": "t_arch_spec",
+      "x": 25,
+      "y": 770,
+      "w": 950,
+      "h": 170,
+      "title": "messaging"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n10",
+      "label": "Event Bus",
+      "x": 290,
+      "y": 250,
+      "kind": "external",
+      "frame": "arch_9c8df176_l5"
+    },
+    {
+      "type": "draw",
+      "op": "add_box",
+      "id": "arch_9c8df176_n11",
+      "label": "Notifications",
+      "x": 710,
+      "y": 250,
+      "kind": "client",
+      "frame": "arch_9c8df176_l5"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e1",
+      "from_id": "arch_9c8df176_n1",
+      "to_id": "arch_9c8df176_n2",
+      "label": "HTTP",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e2",
+      "from_id": "arch_9c8df176_n2",
+      "to_id": "arch_9c8df176_n3",
+      "label": "HTTPS",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e3",
+      "from_id": "arch_9c8df176_n2",
+      "to_id": "arch_9c8df176_n4",
+      "label": "HTTPS",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e4",
+      "from_id": "arch_9c8df176_n3",
+      "to_id": "arch_9c8df176_n8",
+      "label": "SQL",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e5",
+      "from_id": "arch_9c8df176_n4",
+      "to_id": "arch_9c8df176_n6",
+      "label": "REST",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e6",
+      "from_id": "arch_9c8df176_n4",
+      "to_id": "arch_9c8df176_n5",
+      "label": "REST",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e7",
+      "from_id": "arch_9c8df176_n6",
+      "to_id": "arch_9c8df176_n9",
+      "label": "SQL",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e8",
+      "from_id": "arch_9c8df176_n5",
+      "to_id": "arch_9c8df176_n7",
+      "label": "REST",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e9",
+      "from_id": "arch_9c8df176_n4",
+      "to_id": "arch_9c8df176_n10",
+      "label": "Order events",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "connect",
+      "id": "arch_9c8df176_e10",
+      "from_id": "arch_9c8df176_n10",
+      "to_id": "arch_9c8df176_n11",
+      "label": "Order events",
+      "frame": "t_arch_spec"
+    },
+    {
+      "type": "draw",
+      "op": "focus",
+      "id": "t_arch_spec"
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_44572a55b674",
+      "parent_id": "ev_b81565540b82",
+      "agent": "Diagrammer",
+      "model": "Nemotron-3.5-Lightning-30B-A3B",
+      "state": "done",
+      "detail": "29 draw operation(s)",
+      "ts": 1792276176016
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_b81565540b82",
+      "parent_id": "ev_5c289f9effc1",
+      "agent": "Conductor",
+      "model": "NVIDIA-Nemotron-3-Super-120B-A12B",
+      "state": "done",
+      "detail": "routed 0 system fact(s) and visual request",
+      "ts": 1792276176016
+    },
+    {
+      "type": "agent_event",
+      "event_id": "ev_5c289f9effc1",
+      "parent_id": null,
+      "agent": "Listener",
+      "model": "NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "state": "done",
+      "detail": "1 moment(s)",
+      "ts": 1792276176017
+    }
+  ],
+  "limitations": "Single successful explicit-component spec. Earlier runs hit provider503/timeouts, invalid graph references and extra message nodes; not a reliability estimate. Contributor card can overlay diagram; it is closable."
+}

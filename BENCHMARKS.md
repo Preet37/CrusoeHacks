@@ -47,3 +47,11 @@ Two additional real, independent Prep-only trials each proposed one prompt chang
 ## Scope limits at the 15:12 freeze
 
 These are fixed-task probes, not maximum-size sweeps. Cold/warm separation, tool-calling reliability, fallback-rate instrumentation and PNG charts remain unmeasured. The new production paragraph path received two live checks that rejected invalid plans; its final ID-normalization fix passes automated checks but has no verified live success yet. Do not equate the semantic paragraph benchmark with end-to-end UI success.
+
+## Post-freeze paragraph and Contributor checks
+
+A real browser Paste a spec run with an explicit eleven-component architecture passed all 11 node, 10 directed labeled-edge, and viewport checks in 14.401 seconds (N=1; click through assertions, including rendering). One Lightning graph-planning call produced the diagram. Earlier attempts hit 503s, timeouts, malformed references and extra message nodes; this successful run is not a production reliability estimate. Exact-label graph references, atomic preflight, bounded layer normalization and parent-frame camera focus are now covered by regression tests. [Draw events and agent trace](docs/bench/paragraph_browser_live.json).
+
+![Live paragraph diagram and Contributor card](docs/bench/paragraph_browser_live.png)
+
+Contributor completed a separate real Super-VL probe in 3.687 seconds, citing actual auth/login.py lines for current state and describing Redis migration as a proposal. [Raw result and latency](docs/bench/contributor_live.json). Source/path checks are conservative guards, not proof of semantic entailment.
