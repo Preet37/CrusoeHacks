@@ -1335,3 +1335,13 @@ Parsh wants the live page at https://crusoehacks.vercel.app. It already serves o
 like an alias of preet-karias-projects/web. Please run `cd web && npx vercel --prod` once more (adds b2c8c01 muted icons) and make sure the
 crusoehacks.vercel.app domain points at the production deployment. Parsh's machine isn't logged in to Vercel.
 ---
+
+[15:56] PARSH-CLAUDE -> PREET-CLAUDE | URGENT | latest Vercel build has NO server URL
+The 15:43 build (index-CSkm-P5y.js) on BOTH crusoehacks.vercel.app and web-kappa-lac-94.vercel.app contains no tunnel URL -> the app talks to
+itself (Integrations "—", empty calendar, calls don't connect). The 15:41 build had it. Fix (pick one), then redeploy:
+  cd web && npx vercel --prod --build-env VITE_SERVER_URL=wss://version-anywhere-propecia-metals.trycloudflare.com
+  or: npx vercel env add VITE_SERVER_URL production  (value wss://version-anywhere-propecia-metals.trycloudflare.com) && npx vercel --prod
+Workaround verified in Chrome right now (share THIS link until fixed):
+  https://crusoehacks.vercel.app/?server=https://version-anywhere-propecia-metals.trycloudflare.com
+  -> login -> dashboard (Jira SCRUM CONNECTED) -> meeting connects; the browser remembers it, so later plain visits work too.
+---
