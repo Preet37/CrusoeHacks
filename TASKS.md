@@ -93,6 +93,20 @@ RX-1 was done by PARSH-CLAUDE. RX-2 to RX-9 are PREET-CLAUDE's. ALL RC tasks (in
 
 ---
 
+## Polish, 3D and tests (added 13:30; ARCH 1G)
+
+| id | owner | status | task | check |
+|---|---|---|---|---|
+| RC-16 | PARSH-CLAUDE | todo | **Twin 3D orb avatar** in Twin's tile (`@react-three/fiber` + `drei`): breathes when listening, swirls when thinking, pulses with real voice amplitude (Web Audio analyser on playback), glow ring when hand raised. Lazy-loaded | Judges notice it immediately; 60 fps on a MacBook |
+| RC-17 | PARSH-CLAUDE | todo | **UI polish pass per ARCH 1G**: frosted panels over subtle animated background, spring transitions, side panel slide-ins, captions styling, empty states, loading states. "Looks complex, feels simple" | Screen at rest shows only call + board + Twin |
+| RX-10 | PREET-CLAUDE | todo | **`add_3d` renderer** (PROTOCOL v2.1) in `web/src/components/board/`: primitives scene with labels, orbit, auto-rotate, optional glTF; `draw_error` on failure; lazy-load Three.js. Add to mock server sequence | Mock shows a rotating 3D robot arm on the board |
+| RX-11 | PREET-CLAUDE | todo | Stretch: **3D view toggle** of the architecture board (layered stack, particles along edges) | Toggle switches 2D board to 3D and back |
+| RX-12 | PREET-CLAUDE | todo | Stretch: **Twin brain view** (3D force graph of memory facts) in the side panel | Nodes light up when used |
+| PX-18 | PREET-CODEX | todo | Diagrammer + BoardState support `add_3d` (validate scene spec); choosing rule: physical objects, devices, robots, rack/room layouts, "show it in 3D" -> add_3d; JEV `wants_visual` gets a `3d` option | "Show me a three-joint robot arm" places a 3D scene |
+| T-1 | PREET-CLAUDE | todo | `server/scripts/e2e_text.py`: connects to the running server over WebSocket, sends the RUNNING.md section 3 script as `user_text` finals with pauses, asserts draws (boxes, edges, mermaid, chart, mock), Twin transcript, audio messages, topic switch; prints PASS/FAIL per step + latencies | Passes against the live server |
+| T-2 | PARSH-CLAUDE | todo | Playwright smoke test in mock mode (`web/tests/smoke.spec.ts`, `npm run test:e2e`): join screen -> room -> board receives shapes -> side panel opens -> no console errors | `npm run test:e2e` passes |
+| T-3 | PREET-CODEX | todo | Contract tests for every v2/v2.1 draw op (server validates; one golden JSON per op shared with web via `server/tests/golden_ops.json`) | Server tests pass; web renders every golden op in board-dev |
+
 ## Humans
 | id | owner | task |
 |---|---|---|

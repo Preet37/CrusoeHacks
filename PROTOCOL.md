@@ -5,7 +5,7 @@ Every message is one JSON object with a `type` field. Times are milliseconds sin
 Server mirror: `server/protocol.py` (pydantic). Web mirror: `web/src/lib/protocol.ts` (TypeScript).
 **Changing this file requires agreement from both PREET-CLAUDE and PARSH-CLAUDE in `AGENT_CHAT.txt`.** Bump `PROTOCOL_VERSION` when you change it.
 
-PROTOCOL_VERSION = 2  (v2 = v1 plus the additions at the bottom of this file; nothing in v1 changed)
+PROTOCOL_VERSION = 2.1  (v2 = v1 plus additions at the bottom; v2.1 adds add_3d; nothing earlier changed)
 
 ---
 
@@ -176,3 +176,17 @@ All v1 messages are unchanged. Every new draw op below may carry an optional `"f
 - `board_snapshot` may carry optional `shapes` (list of canonical rich draw-op objects, same shape as `draw` messages) and optional `active_frame` (frame id currently focused). Browsers replay `shapes` after boxes/edges, then focus `active_frame`.
 - `add_box`, `connect` and the `Box`/`Edge` records in a snapshot may carry optional `frame`.
 - `agent_event.parent_id` may be `null` (root jobs).
+
+## v2.1 addition (13:30): 3D scenes on the board
+
+```json
+{"type":"draw","op":"add_3d","id":"r1","title":"Robot arm, 3 joints","x":550,"y":100,"w":400,"h":350,"frame":"t_robot",
+ "scene":{"autoRotate":true,"objects":[
+   {"id":"base","shape":"cylinder","pos":[0,0,0],"rot":[0,0,0],"scale":[1,0.3,1],"color":"#8a8f98","label":"Base"},
+   {"id":"link1","shape":"box","pos":[0,1,0],"rot":[0,0,0.3],"scale":[0.3,1.6,0.3],"color":"#4f8cff","label":"Link 1"},
+   {"id":"joint","shape":"sphere","pos":[0.45,1.8,0],"scale":[0.25,0.25,0.25],"color":"#ffb020"}]}}
+{"type":"draw","op":"add_3d","id":"r2","title":"Uploaded model","x":100,"y":100,"w":400,"h":350,"scene":{"gltf":"https://example.com/model.glb"}}
+```
+- `shape`: `box | cylinder | sphere | cone | torus | plane`. `pos`/`rot`(radians)/`scale` are `[x,y,z]`. `color` hex. `label` optional (shown as a floating tag). Max 60 objects.
+- `update` with the same id replaces the scene. `remove`, `highlight`, `focus` work as for other shapes.
+- Browser renders with Three.js (`@react-three/fiber` + `@react-three/drei`), orbit by drag, auto-rotate if set. On render failure send `draw_error`.

@@ -146,6 +146,18 @@ Also: **first-pass relevance** over code-map summaries and memory facts (1D step
 - One interface, two backends: `server/agents/fast_decide.py` exposes `decide(state, questions) -> answers`. Backend = JEV when `TYPESAFE_API_KEY` is set and a health check passes; otherwise Nemotron Nano with a strict JSON prompt. The rest of the code never knows which one ran.
 - Log JEV latency next to the Nemotron latency in `latency.jsonl`. Demo line: "the reflex layer answers in about X ms" (real measured number only).
 
+### 1G. Look and feel: "looks complex, feels simple" + 3D (added 13:30)
+
+The UI is a big part of the demo score. Target: an app that looks like a premium, intricate product at a glance but is dead simple to use. Rules:
+- **Simple surface, rich depth.** At rest the screen shows only: the call, the board, Twin. Detail (agent tree, scores, memory) slides in on demand from the side panel. Never more than one primary action visible.
+- **Motion carries meaning.** Shapes draw themselves in (stroke animation), arrows grow from source to target, frames glide when topics switch, Twin's avatar reacts to its own voice level. Spring easing everywhere, 200 to 450 ms. Respect `prefers-reduced-motion`.
+- **Depth and light.** Frosted glass panels over a subtle animated gradient or soft noise field; layered shadows; thin 1px light borders; Mac-native type (SF / system font, tight sizes, 500/600 weights).
+- **Twin is a living 3D presence.** Twin's tile is a 3D orb or abstract shape (Three.js via `@react-three/fiber` + `@react-three/drei`) that breathes while listening, swirls while thinking, and pulses with its voice amplitude while speaking (amplitude from the Web Audio analyser on the playback node). Hand raised = a gentle glow ring. This is the single most memorable visual; build it first in the polish phase.
+- **3D on the board** (new draw op `add_3d`, PROTOCOL v2.1): when the conversation is about something physical or spatial (a robot arm, a data center rack layout, a device, a 3D architecture "stack"), the Diagrammer can place a small interactive 3D scene on the board: primitives (box, cylinder, sphere, cone, torus, plane) with position/rotation/scale/color/label, auto-rotating, drag to orbit. Optionally a glTF model by URL.
+- **"3D view" toggle of the architecture:** the current boxes-and-arrows diagram rendered as a 3D layered stack (clients on top, services in the middle, data stores at the bottom), with animated particles flowing along edges. Stretch, but a great wow moment.
+- **Twin's brain view (stretch):** a 3D force graph of Twin's memory (facts as nodes, sources as links) that lights up nodes when Twin uses them.
+- Keep it fast: lazy-load Three.js only when a 3D shape or the orb is on screen; cap device pixel ratio at 2; pause rendering when off screen.
+
 ---
 
 ## 1E. Product decisions added at 13:07 (all agents read this)

@@ -473,4 +473,11 @@ Fixed both UI bugs from @PREET-CODEX (b5cd109): SidePanel is now always mounted 
 TaskPanel/Scoreboard collect events from the start; transcript-speaker fallback is only used until the server's participants list arrives.
 @PREET-CLAUDE yes please add hideUi to Whiteboard's <Tldraw> for a clean "Twin is presenting" stage (the stage already has Clear board + close buttons).
 Local check on a fresh clone: server 249 tests pass; v2 WS flow returns participants/brief/calendar greet; connect_repo -> "not available yet" until PX-16.
+[14:30] PREET -> ALL | CHANGE | -
+Great progress everyone. New: ARCHITECTURE.md 1G (look and feel + 3D), PROTOCOL v2.1 (add_3d), RUNNING.md (how to run + test in Chrome).
+New tasks: @PARSH-CLAUDE RC-16 (Twin 3D orb), RC-17 (polish), T-2 (Playwright mock smoke).
+@PREET-CLAUDE RX-10 (add_3d renderer), T-1 (e2e_text.py live script), RX-11/RX-12 stretch.
+@PREET-CODEX PX-18 (add_3d in Diagrammer/BoardState), T-3 (golden op contract tests).
+Priority order still: M1 working end to end in Chrome first, then M2 (code), M3 (learning), then polish/3D.
+If RUNNING.md has a wrong command for your area, fix it (humans own it, but small corrections are welcome) and post CHANGE.
 ---
