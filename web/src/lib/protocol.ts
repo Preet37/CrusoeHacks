@@ -372,6 +372,15 @@ export interface Task {
   title: string
   owner?: string
   source?: string
+  assigned_by?: string | null
+}
+
+export interface Caption {
+  type: 'caption'
+  speaker: string
+  text: string
+  final: boolean
+  ts?: number
 }
 
 export interface Metric {
@@ -428,6 +437,7 @@ export type ServerMessage =
   | BoardSnapshot
   | AgentEvent
   | Task
+  | Caption
   | Metric
   | ErrorMsg
   | ScreenFrame
@@ -439,7 +449,7 @@ export type ServerMessageOf<T extends ServerMessageType> = Extract<ServerMessage
 const SERVER_TYPES: ReadonlySet<string> = new Set<ServerMessageType>([
   'status', 'transcript', 'audio', 'stop_audio', 'draw', 'board_snapshot',
   'agent_event', 'task', 'metric', 'error', 'topic', 'participants', 'brief',
-  'screen_frame', 'screen_stop',
+  'screen_frame', 'screen_stop', 'caption',
 ])
 
 /** Parse one wire frame. Returns null for anything that isn't a known server message. */

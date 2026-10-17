@@ -13,8 +13,9 @@ export default function Captions({ lines, interim }: { lines: Line[]; interim: R
 
   const now = Date.now()
   // Lines are stamped with the local receive time (meetingState), so this is clock-skew safe.
-  const fresh = lines.slice(-2).filter((l) => now - l.ts < SHOW_MS)
-  const live = Object.entries(interim).filter(([, t]) => t.trim())
+  const live = Object.entries(interim).filter(([, t]) => t.trim()).slice(-3)
+  const fresh = lines.slice(-3).filter((l) => now - l.ts < SHOW_MS).slice(-(3 - live.length) || 0)
+  if (live.length >= 3) fresh.length = 0
   if (!fresh.length && !live.length) return null
 
   return (

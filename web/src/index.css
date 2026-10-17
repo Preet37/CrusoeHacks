@@ -1,1 +1,3 @@
 html, body, #root { height: 100%; margin: 0; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

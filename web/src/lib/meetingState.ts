@@ -22,6 +22,16 @@ export interface Line {
   interim?: boolean
 }
 
+export interface MeetingTask {
+  id: string
+  title: string
+  owner?: string | null
+  assignedBy?: string | null
+  jiraUrl?: string | null
+  jiraKey?: string | null
+  ts: number
+}
+
 export interface Topic {
   topic_id: string
   title: string
@@ -56,6 +66,8 @@ export interface MeetingState {
   annotations: Annotation[]
   /** Latest Twin contribution ("Twin's take") for the active topic. */
   contribution: Contribution | null
+  /** Tasks/tickets created during this meeting (deduped by title). */
+  tasks: MeetingTask[]
 }
 
 const MAX_LINES = 200
@@ -81,6 +93,7 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
     remoteScreen: null,
     annotations: [],
     contribution: null,
+    tasks: [],
   }))
 
   useEffect(() => {
@@ -121,6 +134,37 @@ export function useMeeting(client: TwinClient | null): MeetingState & {
               interim,
               lastSpoke: { ...p.lastSpoke, [speaker]: Date.now() },
             }
+          })
+          break
+        }
+        case 'caption': {
+          const speaker = String(msg.speaker ?? '')
+          if (!speaker || speaker === client.user) break
+          const text = String(msg.text ?? '')
+          set((p) => ({ ...p, interim: { ...p.interim, [speaker]: text }, lastSpoke: { ...p.lastSpoke, [speaker]: Date.now() } }))
+          break
+        }
+        case 'task':
+        case 'ticket': {
+          if (msg.status === 'dismissed') break
+          const title = String(msg.title ?? '').trim()
+          if (!title) break
+          const links = (msg.links as Record<string, string | null> | undefined) ?? {}
+          const jiraUrl = links.jira ?? null
+          const jiraKey = (msg.jira_key as string | undefined) ?? (jiraUrl ? (jiraUrl.match(/([A-Z][A-Z0-9]+-\d+)/)?.[1] ?? null) : null)
+          set((p) => {
+            const k = title.toLowerCase()
+            const old = p.tasks.find((t) => t.title.toLowerCase() === k || t.id === msg.id)
+            const merged: MeetingTask = {
+              id: old?.id ?? String(msg.id ?? Date.now()),
+              title: old?.title ?? title,
+              owner: (msg.owner as string | null) || old?.owner || null,
+              assignedBy: (msg.assigned_by as string | null) || old?.assignedBy || null,
+              jiraUrl: jiraUrl || old?.jiraUrl || null,
+              jiraKey: jiraKey || old?.jiraKey || null,
+              ts: old?.ts ?? Date.now(),
+            }
+            return { ...p, tasks: old ? p.tasks.map((t) => (t === old ? merged : t)) : [...p.tasks, merged] }
           })
           break
         }

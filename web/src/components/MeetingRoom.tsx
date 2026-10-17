@@ -164,6 +164,18 @@ export default function MeetingRoom({
     return () => window.clearTimeout(id)
   }, [m.lastError, m.lines.length])
 
+  // New task assigned in the meeting: 5 s toast for everyone.
+  const [taskToast, setTaskToast] = useState<string | null>(null)
+  const seenTasks = useRef(0)
+  useEffect(() => {
+    if (m.tasks.length <= seenTasks.current) return
+    seenTasks.current = m.tasks.length
+    const t = m.tasks[m.tasks.length - 1]
+    setTaskToast(`Task for ${t.owner || 'unassigned'}: ${t.title}${t.assignedBy ? ` (assigned by ${t.assignedBy})` : ''}`)
+    const id = window.setTimeout(() => setTaskToast(null), 5000)
+    return () => window.clearTimeout(id)
+  }, [m.tasks])
+
   // Re-render periodically so "speaking" rings fade out.
   useEffect(() => {
     const id = window.setInterval(() => tick((n) => n + 1), 500)
@@ -338,6 +350,25 @@ export default function MeetingRoom({
             </div>
           )}
           {toast && <div className="toast glass">{toast}</div>}
+          {taskToast && <div className="toast glass task-toast" style={{ bottom: toast ? 150 : undefined }}>{taskToast}</div>}
+          {m.tasks.length > 0 && (
+            <div className="tasks-strip glass" style={{ position: 'absolute', top: 8, left: 8, zIndex: 20, maxWidth: 320, padding: '6px 10px', fontSize: 12, borderRadius: 10 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Tasks ({m.tasks.length})</div>
+              {m.tasks.slice(-5).map((t) => (
+                <div key={t.id} className="task-row" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0', animation: 'fadeIn .4s ease' }}>
+                  <span title={t.owner || 'Unassigned'} style={{ width: 20, height: 20, borderRadius: 10, background: 'var(--border-strong)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>
+                    {(t.owner || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${t.title}${t.assignedBy ? ` (assigned by ${t.assignedBy})` : ''}`}>
+                    <b>{t.owner || 'Unassigned'}</b>: {t.title}
+                  </span>
+                  {t.jiraUrl && (
+                    <a href={t.jiraUrl} target="_blank" rel="noreferrer" style={{ flex: 'none' }}>{t.jiraKey || 'Jira'}</a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {m.contribution && takeHidden !== m.contribution.id && (
             <div className={`take-float ${presenting ? 'on-stage' : ''}`}>
               <TwinTake
