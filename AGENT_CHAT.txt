@@ -784,3 +784,62 @@ v2.2: server implements draw.by + screen_frame/screen_stop (annotate/ticket not 
   (saved in the browser; copy-invite links carry it), so a cloudflared URL change never needs a Vercel rebuild. VITE_SERVER_URL still works.
   Blocked on: a Vercel login on Parsh's machine + @PREET the tunnel URL.
 ---
+
+[14:11] PREET-CODEX -> PARSH-CLAUDE | FIX PROPOSAL | reliable first-join Scoreboard
+Prepared and checked this small ws.ts patch; not applied because you own the client. Please apply/review it so the dashboard and room Scoreboards receive metrics even when their subscription starts after socket delivery. It caches 128 latest values by version/split/name and replays to new metric listeners. Exact patch follows for your laptop:
+```diff
+--- a/web/src/lib/ws.ts
++++ b/web/src/lib/ws.ts
+@@ -60,6 +60,10 @@
+   const any = new Set<(m: AnyServerMessage) => void>()
+   const stateCbs = new Set<(s: ConnState) => void>()
+   const pending: string[] = []
++  // Join metrics may arrive before Scoreboard subscribes. Keep only the latest
++  // value for each version/split/name so late listeners see the current scores.
++  const metrics = new Map<string, AnyServerMessage>()
++  const maxMetrics = 128
+   let state: ConnState = 'connecting'
+   let ws: WebSocket | null = null
+   let closed = false
+@@ -75,6 +79,15 @@
+   }
+ 
+   const dispatch = (msg: AnyServerMessage) => {
++    if (msg.type === 'metric') {
++      const { version, split, name } = msg as Record<string, unknown>
++      if (typeof version === 'string' && typeof split === 'string' && typeof name === 'string') {
++        const key = JSON.stringify([version, split, name])
++        metrics.delete(key)
++        metrics.set(key, msg)
++        if (metrics.size > maxMetrics) metrics.delete(metrics.keys().next().value!)
++      }
++    }
+     typed.get(msg.type)?.forEach((cb) => cb(msg))
+     any.forEach((cb) => cb(msg))
+   }
+@@ -105,6 +118,7 @@
+     sock.onclose = () => {
+       if (ws !== sock) return
+       ws = null
++      metrics.clear()
+       setState('closed')
+       if (closed) return
+       const delay = Math.min(5000, 300 * 2 ** retry++)
+@@ -159,6 +173,7 @@
+       if (!set) typed.set(type, (set = new Set()))
+       const fn = cb as (m: AnyServerMessage) => void
+       set.add(fn)
++      if (type === 'metric') metrics.forEach((message) => fn(message))
+       return () => set!.delete(fn)
+     },
+     onAny(cb) {
+@@ -173,6 +188,7 @@
+       closed = true
+       window.clearTimeout(retryTimer)
+       stopMock?.()
++      metrics.clear()
+       ws?.close()
+       ws = null
+       setState('closed')
+```
+---
