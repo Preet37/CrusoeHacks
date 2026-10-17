@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 log = logging.getLogger("twin.integrations")
 
@@ -121,6 +122,176 @@ def wire(ticket: dict) -> dict:
     return {"type": "ticket", **{k: ticket.get(k) for k in keep if k in ticket}}
 
 
+# ------------------------------------------------------------ Jira description
+
+_WORD = re.compile(r"[a-z0-9]+")
+_PATH_LINES = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w.-]+\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?")
+_SOURCE_TS = re.compile(r"@\s*(\d+)\s*$")
+_FILES_LINE = re.compile(r"^Relevant indexed files:\s*(.+)$", re.M)
+_STOPWORDS = {"the", "and", "for", "that", "this", "with", "will", "should", "we", "to",
+              "a", "an", "of", "in", "on", "is", "it", "be", "let", "lets", "decision"}
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in _WORD.findall(str(text or "").casefold())
+            if len(w) > 2 and w not in _STOPWORDS}
+
+
+def _decision_text(ticket: dict) -> str:
+    body = str(ticket.get("body") or "")
+    first = body.splitlines()[0] if body else ""
+    return first.removeprefix("Decision: ") if first.startswith("Decision: ") else \
+        str(ticket.get("title") or "")
+
+
+def _context_lines(ticket: dict, lines: list[dict]) -> tuple[list[dict], str | None]:
+    """3-6 transcript lines around the decision, plus the human who said it."""
+    lines = [l for l in lines if isinstance(l, dict) and str(l.get("text") or "").strip()]
+    if not lines:
+        return [], None
+    idx = None
+    match = _SOURCE_TS.search(str(ticket.get("source") or ""))
+    if match:
+        ts = int(match.group(1))
+        idx = next((i for i in range(len(lines) - 1, -1, -1)
+                    if str(lines[i].get("ts")) == str(ts)), None)
+    if idx is None:
+        target = _words(_decision_text(ticket)) | _words(ticket.get("title"))
+        best = 0
+        for i, line in enumerate(lines):
+            score = len(target & _words(line.get("text")))
+            if score > best or (score == best and score and i > (idx or 0)):
+                best, idx = score, i
+        if not best:
+            return [], None
+    start = max(0, min(idx - 3, len(lines) - 3))
+    window = lines[start:min(len(lines), max(idx + 3, start + 3))]
+    speaker = str(lines[idx].get("speaker") or "").strip()
+    if speaker.casefold() in ("twin", "participant", ""):
+        speaker = None
+    return window, speaker
+
+
+def _github_base(repo_url: str | None) -> str | None:
+    url = str(repo_url or "").strip().rstrip("/")
+    if not re.match(r"^https?://(www\.)?github\.com/[\w.-]+/[\w.-]+$", url):
+        return None
+    return url.removesuffix(".git")
+
+
+def _file_refs(ticket: dict, contribution: dict | None) -> list[tuple[str, int | None, int | None]]:
+    refs: list[tuple[str, int | None, int | None]] = []
+    texts = [str(s) for s in (contribution or {}).get("sources") or [] if s]
+    texts.append(str(ticket.get("body") or ""))
+    for text in texts:
+        for path, a, b in _PATH_LINES.findall(text):
+            refs.append((path, int(a), int(b or a)))
+    files = _FILES_LINE.search(str(ticket.get("body") or ""))
+    if files:
+        for path in files.group(1).split(","):
+            path = path.strip()
+            if path and not any(r[0] == path for r in refs):
+                refs.append((path, None, None))
+    return list(dict.fromkeys(refs))[:12]
+
+
+def _mermaid_codes(ticket: dict, session) -> list[str]:
+    board = getattr(session, "board", None) if session is not None else None
+    if board is None:
+        return []
+    try:
+        snap = board.snapshot()
+    except Exception:  # noqa: BLE001 - description is best effort
+        return []
+    shapes = [s for s in snap.get("shapes") or [] if isinstance(s, dict)
+              and s.get("op") == "add_mermaid" and isinstance(s.get("code"), str)]
+    frame = ticket.get("topic") or snap.get("active_frame")
+    scoped = [s for s in shapes if frame and s.get("frame") == frame]
+    return [s["code"] for s in (scoped or ([] if frame else shapes))][:3]
+
+
+def _contribution(ticket: dict, session) -> dict | None:
+    contrib = getattr(session, "latest_contribution", None) if session is not None else None
+    if not isinstance(contrib, dict):
+        return None
+    topic, ctopic = ticket.get("topic"), contrib.get("topic_id")
+    return contrib if not topic or not ctopic or topic == ctopic else None
+
+
+def _repo_url(session, meeting, workspace) -> str | None:
+    url = getattr(session, "repo_url", None) if session is not None else None
+    if url:
+        return url
+    key = getattr(session, "workspace", None) or (meeting or {}).get("workspace") or workspace
+    if not key:
+        return None
+    try:
+        from brain.workspace_store import get_workspace
+        return get_workspace(key).get("repo_url")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def build_jira_description(ticket: dict, session=None, meeting: dict | None = None,
+                           workspace: str | None = None) -> tuple[dict, str | None]:
+    """(ADF doc without footer, decision speaker) from everything Twin knows about the ticket."""
+    from integrations import jira
+    content: list[dict] = []
+    decision = _decision_text(ticket)
+    if decision:
+        content += [jira.heading("Decision"), jira.paragraph(jira._text(decision))]
+    history = getattr(session, "history", None) if session is not None else None
+    if not isinstance(history, list):
+        history = (meeting or {}).get("notes") or ticket.get("context") or []
+    window, speaker = _context_lines(ticket, list(history))
+    if window:
+        content.append(jira.heading("Context"))
+        content.append(jira.bullet_list([[jira._text(
+            f"{str(l.get('speaker') or 'Participant')}: {str(l.get('text')).strip()}"[:600])]
+            for l in window]))
+    contrib = _contribution(ticket, session)
+    if contrib:
+        items = []
+        if contrib.get("current"):
+            items.append([jira._text(f"Current: {contrib['current']}")])
+        for label, key in (("Impact", "impact"), ("Risk", "risks")):
+            for value in contrib.get(key) or []:
+                items.append([jira._text(f"{label}: {value}")])
+        if contrib.get("question"):
+            items.append([jira._text(f"Question: {contrib['question']}")])
+        if items:
+            content += [jira.heading("Twin's take"), jira.bullet_list(items)]
+    refs = _file_refs(ticket, contrib)
+    if refs:
+        base = _github_base(_repo_url(session, meeting, workspace))
+        items = []
+        for path, a, b in refs:
+            label = f"{path}:{a}-{b}" if a else path
+            link = None
+            if base:
+                link = f"{base}/blob/HEAD/{path.lstrip('/')}" + (f"#L{a}-L{b}" if a else "")
+            items.append([jira._text(label, link)])
+        content += [jira.heading("Relevant files"), jira.bullet_list(items)]
+    codes = _mermaid_codes(ticket, session)
+    if codes:
+        content.append(jira.heading("Diagram (Mermaid)"))
+        content += [jira.code_block(code, "mermaid") for code in codes]
+    if ticket.get("agent_prompt"):
+        content += [jira.heading("Agent prompt"), jira.code_block(str(ticket["agent_prompt"]))]
+    acceptance = ticket.get("acceptance")
+    checks = acceptance if isinstance(acceptance, list) else \
+        [p for p in re.split(r"\n+|(?<=[.!?])\s+(?=[A-Z])", str(acceptance or "")) if p.strip()]
+    if checks:
+        content += [jira.heading("Acceptance"),
+                    jira.bullet_list([[jira._text(str(c).strip())] for c in checks])]
+    source = ticket.get("source")
+    if source:
+        content.append(jira.paragraph(jira._text(f"Source: {source}")))
+    if not content:
+        content.append(jira.paragraph(jira._text(str(ticket.get("body") or ticket.get("title") or ""))))
+    return jira.doc(content), speaker
+
+
 async def apply_action(ticket_id: str, action: str, *, workspace: str | None,
                        room: str | None = None) -> tuple[dict, object | None]:
     """Run one ticket action; returns (updated ticket, live session or None)."""
@@ -147,8 +318,17 @@ async def apply_action(ticket_id: str, action: str, *, workspace: str | None,
         if ticket.get("acceptance"):
             body += f"\nAcceptance: {ticket['acceptance']}"
         try:
+            description, speaker = build_jira_description(ticket, session, meeting, workspace)
+        except Exception:  # noqa: BLE001 - fall back to the plain body
+            log.exception("rich Jira description failed; using plain body")
+            description, speaker = None, None
+        owner = ticket.get("owner")
+        fallback = speaker if speaker and speaker != owner else None
+        try:
             issue = await jira.create_issue(str(ticket.get("title") or ""), body,
-                                            owner=ticket.get("owner"), meeting=name)
+                                            owner=owner, meeting=name,
+                                            description=description,
+                                            fallback_assignee=fallback)
         except jira.JiraError as e:
             raise TicketError(str(e), 502) from None
         ticket["links"] = {"jira": None, "slack": None, "agent": None, **links,

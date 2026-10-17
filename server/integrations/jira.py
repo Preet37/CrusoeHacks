@@ -97,11 +97,40 @@ async def status() -> dict:
     return out
 
 
+def _text(text: str, link: str | None = None) -> dict:
+    node: dict = {"type": "text", "text": str(text)[:2000] or " "}
+    if link:
+        node["marks"] = [{"type": "link", "attrs": {"href": link}}]
+    return node
+
+
+def paragraph(*parts: dict) -> dict:
+    return {"type": "paragraph", "content": [p for p in parts if p]}
+
+
+def heading(text: str) -> dict:
+    return {"type": "heading", "attrs": {"level": 3}, "content": [_text(text)]}
+
+
+def bullet_list(items: list[list[dict]]) -> dict:
+    return {"type": "bulletList", "content": [
+        {"type": "listItem", "content": [paragraph(*parts)]} for parts in items if parts]}
+
+
+def code_block(code: str, language: str | None = None) -> dict:
+    node: dict = {"type": "codeBlock", "content": [_text(str(code)[:30000])]}
+    if language:
+        node["attrs"] = {"language": language}
+    return node
+
+
+def doc(content: list[dict]) -> dict:
+    return {"type": "doc", "version": 1, "content": content}
+
+
 def _adf(body: str, footer: str) -> dict:
     paragraphs = [line for line in (body or "").splitlines() if line.strip()] + [footer]
-    return {"type": "doc", "version": 1, "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": text[:2000]}]}
-        for text in paragraphs]}
+    return doc([paragraph(_text(text)) for text in paragraphs])
 
 
 async def _find_account(client: httpx.AsyncClient, owner: str) -> str | None:
@@ -120,21 +149,32 @@ async def _find_account(client: httpx.AsyncClient, owner: str) -> str | None:
 
 
 async def create_issue(title: str, body: str, owner: str | None = None,
-                       labels: list[str] | None = None, meeting: str | None = None) -> dict:
-    """Create a Task in JIRA_PROJECT_KEY; returns {"key", "url"}. Raises JiraError."""
+                       labels: list[str] | None = None, meeting: str | None = None,
+                       description: dict | None = None,
+                       fallback_assignee: str | None = None) -> dict:
+    """Create a Task in JIRA_PROJECT_KEY; returns {"key", "url"}. Raises JiraError.
+
+    `description` is a prebuilt ADF doc (the footer is appended); without it the
+    plain `body` lines become paragraphs. `fallback_assignee` (the speaker of the
+    decision line) is searched only when `owner` finds no Jira user.
+    """
     if not configured():
         raise JiraError("connect Jira")
     base, _email, _token, project = _env()
     title = " ".join((title or "").split())[:250] or "Untitled ticket from Twin"
     footer = f"Created by Twin from meeting {meeting or 'session'}"
     fields: dict = {"project": {"key": project}, "summary": title,
-                    "issuetype": {"name": "Task"}, "description": _adf(body, footer),
+                    "issuetype": {"name": "Task"},
+                    "description": (doc([*description.get("content", []), paragraph(_text(footer))])
+                                    if isinstance(description, dict) else _adf(body, footer)),
                     "labels": [str(l).replace(" ", "-") for l in (labels or ["twin"])]}
     async with _client() as client:
-        if owner and owner.strip():
-            account = await _find_account(client, owner.strip())
-            if account:
-                fields["assignee"] = {"id": account}
+        account = None
+        for name in (owner, fallback_assignee):
+            if account is None and isinstance(name, str) and name.strip():
+                account = await _find_account(client, name.strip())
+        if account:
+            fields["assignee"] = {"id": account}
         resp = await _request(client, "POST", "/rest/api/3/issue", json={"fields": fields})
     try:
         key = resp.json()["key"]

@@ -178,3 +178,129 @@ def test_ws_ticket_actions_and_permission_off(jira_env):
     assert "Unknown ticket" in out[-1][1].message
     asyncio.run(session.ticket_action(None, {"id": "T-2", "action": "dismiss"}))
     assert out[-1][1]["status"] == "dismissed"
+
+
+# ------------------------------------------------------------ rich ADF description
+
+def _walk(node):
+    yield node
+    for child in node.get("content") or []:
+        yield from _walk(child)
+
+
+def _texts(adf):
+    return [n["text"] for n in _walk(adf) if n.get("type") == "text"]
+
+
+def _rich_session(room="acme-rich"):
+    session = SESSIONS[room] = Session(room)
+    session.workspace = "acme"
+    session.repo_url = "https://github.com/acme/twin.git"
+    session.history = [
+        {"speaker": "Bea", "text": "Morning all", "ts": 1},
+        {"speaker": "Avery", "text": "The client keeps dropping uploads", "ts": 2},
+        {"speaker": "Twin", "text": "Uploads go through upload.py", "ts": 3},
+        {"speaker": "Casey", "text": "We will add retries to the uploader", "ts": 4},
+        {"speaker": "Bea", "text": "Sounds good", "ts": 5},
+        {"speaker": "Avery", "text": "Next topic", "ts": 6},
+        {"speaker": "Bea", "text": "Lunch?", "ts": 7},
+    ]
+    session.latest_contribution = {
+        "type": "contribution", "topic_id": "uploads", "current": "Uploads fail once.",
+        "impact": ["fewer lost files"], "risks": ["duplicate writes"],
+        "question": "Should retries be idempotent?", "sources": ["server/upload.py:10-24"]}
+    session.board.apply({"op": "frame", "id": "uploads", "title": "Uploads",
+                         "x": 0, "y": 0, "w": 800, "h": 600})
+    session.board.apply({"op": "add_mermaid", "id": "m1", "x": 10, "y": 10,
+                         "frame": "uploads", "code": "graph TD; A-->B"})
+    ticket = {"type": "ticket", "id": "T-R", "title": "Add retries to the uploader",
+              "body": "Decision: We will add retries to the uploader\nSource: meeting acme-rich @ 4\n"
+                      "Relevant indexed files: server/upload.py, server/client.py",
+              "owner": None, "acceptance": "Retries happen. Tests pass.",
+              "agent_prompt": "Implement retries", "topic": "uploads",
+              "source": "meeting acme-rich @ 4", "status": "draft",
+              "links": {"jira": None, "slack": None, "agent": None}}
+    session.ticket_drafts = OrderedDict(r=ticket)
+    return session, ticket
+
+
+def _posted_fields(calls):
+    return json.loads([c for c in calls if c.method == "POST"][0].content)["fields"]
+
+
+def test_rich_description_sections_links_mermaid_and_speaker_fallback(jira_env):
+    session, ticket = _rich_session()
+    orig = jira_env  # calls list
+
+    resp = TestClient(app.app).post("/tickets/T-R/push_jira",
+                                    params={"workspace": "acme", "code": "invite"})
+    assert resp.status_code == 200, resp.text
+    fields = _posted_fields(orig)
+    adf = fields["description"]
+    headings = [n["content"][0]["text"] for n in adf["content"] if n["type"] == "heading"]
+    assert headings == ["Decision", "Context", "Twin's take", "Relevant files",
+                        "Diagram (Mermaid)", "Agent prompt", "Acceptance"]
+    assert all(n["attrs"]["level"] == 3 for n in adf["content"] if n["type"] == "heading")
+    texts = _texts(adf)
+    assert "Casey: We will add retries to the uploader" in texts
+    assert "Avery: The client keeps dropping uploads" in texts and "Bea: Lunch?" not in texts
+    assert "Current: Uploads fail once." in texts and "Risk: duplicate writes" in texts
+    assert "Question: Should retries be idempotent?" in texts
+    links = {n["text"]: n["marks"][0]["attrs"]["href"] for n in _walk(adf)
+             if n.get("type") == "text" and n.get("marks")}
+    assert links["server/upload.py:10-24"] == \
+        "https://github.com/acme/twin/blob/HEAD/server/upload.py#L10-L24"
+    assert links["server/client.py"] == "https://github.com/acme/twin/blob/HEAD/server/client.py"
+    blocks = [n for n in adf["content"] if n["type"] == "codeBlock"]
+    assert blocks[0]["attrs"] == {"language": "mermaid"}
+    assert blocks[0]["content"][0]["text"] == "graph TD; A-->B"
+    assert blocks[1]["content"][0]["text"] == "Implement retries"
+    accept = [n for n in adf["content"] if n["type"] == "bulletList"][-1]
+    assert [li["content"][0]["content"][0]["text"] for li in accept["content"]] == \
+        ["Retries happen.", "Tests pass."]
+    assert adf["content"][-1]["content"][0]["text"].startswith("Created by Twin from meeting")
+    # No owner: Casey (who said the decision) is searched; no Jira match -> unassigned.
+    searches = [c.url.params["query"] for c in orig if c.url.path == "/rest/api/3/user/search"]
+    assert searches == ["Casey"] and "assignee" not in fields
+    assert TOKEN not in json.dumps(fields)
+
+
+def test_speaker_fallback_assigns_when_jira_user_found(jira_env):
+    session, ticket = _rich_session("acme-rich2")
+    session.history[3]["speaker"] = "Avery"  # Avery is a Jira user in the mock
+    resp = TestClient(app.app).post("/tickets/T-R/push_jira",
+                                    params={"workspace": "acme", "code": "invite"})
+    assert resp.status_code == 200
+    assert _posted_fields(jira_env)["assignee"] == {"id": "acc-1"}
+
+
+def test_plain_text_files_without_github_repo(jira_env):
+    session, ticket = _rich_session("acme-rich3")
+    session.repo_url = "https://gitlab.com/acme/twin"
+    adf, speaker = integrations.build_jira_description(ticket, session)
+    assert speaker == "Casey"
+    assert "server/upload.py:10-24" in _texts(adf)
+    assert not any(n.get("marks") for n in _walk(adf))
+
+
+def test_saved_ticket_without_session_uses_meeting_notes(jira_env):
+    from brain.meeting_store import save_meeting
+    _, ticket = _rich_session("acme-tmp")
+    history = SESSIONS.pop("acme-tmp").history
+    ticket["id"] = "T-S"
+    save_meeting(SimpleNamespace(workspace="acme", room="acme-gone", history=history,
+                                 ticket_drafts={"r": ticket}))
+    resp = TestClient(app.app).post("/tickets/T-S/push_jira",
+                                    params={"workspace": "acme", "code": "invite"})
+    assert resp.status_code == 200, resp.text
+    adf = _posted_fields(jira_env)["description"]
+    texts = _texts(adf)
+    assert "Casey: We will add retries to the uploader" in texts
+    assert "Diagram (Mermaid)" not in texts and "Twin's take" not in texts
+    assert "Agent prompt" in texts and "Acceptance" in texts
+    assert "server/client.py" in texts  # no repo_url saved for acme -> plain text
+
+
+def test_build_description_minimal_ticket_no_session():
+    adf, speaker = integrations.build_jira_description({"id": "T", "title": "Do it"})
+    assert adf["type"] == "doc" and speaker is None and adf["content"]
