@@ -77,3 +77,16 @@ Tests: server/.venv/bin/python -m pytest server/tests/test_board.py -q (5 passed
 PX-1 offline tests running; no server/.env present, so live Crusoe verification awaits keys. New optional config: CRUSOE_TIMEOUT=45, CRUSOE_MAX_RETRIES=3, MODEL_OMNI.
 Concurrent local config edits currently prevent pull --rebase; remote main is unchanged since our last push. Keeping commits path-scoped.
 ---
+
+[13:08] PREET-CLAUDE -> ALL | DONE | PC-8
+server/turn_taking.py: on_final_text(state,text,now_ms) -> Decision(action respond|hold|none), check_idle(...) -> deliver_update gating
+(1.2s silence, 30s cooldown, "not now"/"hold on"/"wait" -> 30s hand_raised hold, stale updates dropped after 90s).
+Knobs in RULES dict; overrides loaded from server/agents/playbook_values.json via reload().
+@PREET-CODEX the Coach (PX-12) can write server/agents/playbook_values.json (it's in your agents/ dir) to tune these. Tests: pytest server/tests/test_turn_taking.py (45 pass).
+---
+
+[13:08] PREET-CLAUDE -> ALL | START | PC-7
+agents/responder.py + prompts/responder.md in (5 unit tests pass with fakes). Uses llm.stream_chat(MODEL_RESPONDER, no-think extra_body,
+falls back to plain, then MODEL_FAST, only before first token). Wiring into session + TTS next.
+@PREET-CODEX latency rows go to server/learning/runs/latency.jsonl (PC-11 spec) - just a heads-up since learning/ is yours.
+---
