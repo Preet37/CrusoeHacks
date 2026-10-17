@@ -440,3 +440,6 @@ input { font: inherit; }
 .repo a { color: var(--text); text-decoration: none; }
 .repo .tag { margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
 .repo .tag.live { background: rgba(48, 209, 88, 0.18); color: var(--ok); }
+.twin-mode { align-self: center; }
+.twin-mode button { height: 28px; }
+@media (max-width: 1100px) { .twin-mode button { padding: 0 7px; font-size: 11px; } }

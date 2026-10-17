@@ -5,6 +5,13 @@ import {
   PeopleIcon, ShareIcon, SparkIcon, SpeakerIcon, SpeakerOffIcon, TalkIcon,
 } from './Icons'
 
+export type TwinMode = 'off' | 'on_request' | 'proactive'
+const MODES: { id: TwinMode; label: string; title: string }[] = [
+  { id: 'off', label: 'Off', title: 'Twin stays silent and does not draw' },
+  { id: 'on_request', label: 'On request', title: 'Twin speaks and draws only when you name it or hold to talk' },
+  { id: 'proactive', label: 'Proactive', title: 'Twin may speak up and sketch on its own at natural pauses' },
+]
+
 export interface ControlBarProps {
   room: string
   micOn: boolean
@@ -13,6 +20,8 @@ export interface ControlBarProps {
   boardOn: boolean
   boardHasContent: boolean
   sharing: boolean
+  twinMode: TwinMode
+  onTwinMode(m: TwinMode): void
   onShare(): void
   handUp: boolean
   pttActive: boolean
@@ -108,6 +117,13 @@ export default function ControlBar(p: ControlBarProps) {
         </button>
       </div>
       <div className="right">
+        <span className="seg twin-mode" title="When Twin may speak or draw">
+          {MODES.map((m) => (
+            <button key={m.id} className={p.twinMode === m.id ? 'on' : ''} title={m.title} onClick={() => p.onTwinMode(m.id)}>
+              {m.label}
+            </button>
+          ))}
+        </span>
         <button className={`pill icon ${p.side === 'people' ? 'on' : ''}`} title="People" onClick={() => p.onSide('people')}>
           <PeopleIcon />
         </button>

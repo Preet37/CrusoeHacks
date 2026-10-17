@@ -5,7 +5,7 @@ import { useLocalMedia } from '../lib/media'
 import { useMeeting, type Person } from '../lib/meetingState'
 import type { TwinClient } from '../lib/ws'
 import Captions from './Captions'
-import ControlBar from './ControlBar'
+import ControlBar, { type TwinMode } from './ControlBar'
 import { CloseIcon } from './Icons'
 import { Whiteboard } from './optional'
 import { HumanTile, TwinTile } from './ParticipantTile'
@@ -37,6 +37,30 @@ export default function MeetingRoom({
   const [ptt, setPtt] = useState(false)
   const [side, setSide] = useState<SideTab | null>(null)
   const [briefOpen, setBriefOpen] = useState(true)
+  // Twin mode (judge feedback: users control when Twin speaks/draws). Default: only when asked.
+  const [twinMode, setTwinModeState] = useState<TwinMode>(() => {
+    try {
+      return (localStorage.getItem('twin.mode') as TwinMode) || 'on_request'
+    } catch {
+      return 'on_request'
+    }
+  })
+  const setTwinMode = (mode: TwinMode) => {
+    setTwinModeState(mode)
+    try {
+      localStorage.setItem('twin.mode', mode)
+    } catch {
+      /* ignore */
+    }
+    client.send({ type: 'control', action: 'set_mode', mode })
+  }
+  // Tell the server on join (and after reconnects).
+  useEffect(() => {
+    const send = () => client.send({ type: 'control', action: 'set_mode', mode: twinMode })
+    if (client.state === 'open') send()
+    return client.onState((st) => st === 'open' && send())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client])
   const [myScreen, setMyScreen] = useState<MediaStream | null>(null)
   const [stageTab, setStageTab] = useState<'board' | 'screen'>('board')
   const [screenErr, setScreenErr] = useState<string | null>(null)
@@ -48,7 +72,7 @@ export default function MeetingRoom({
     client,
     user,
     micOn: media.micOn,
-    twinMuted: m.twinMuted,
+    twinMuted: m.twinMuted || twinMode === 'off',
     onInterim: (t) => m.addLocalInterim(user, t),
     onFinal: () => m.addLocalInterim(user, ''),
   })
@@ -298,6 +322,8 @@ export default function MeetingRoom({
         captionsOn={captionsOn}
         boardOn={boardPresenting && (!screenActive || tab === 'board')}
         sharing={!!myScreen}
+        twinMode={twinMode}
+        onTwinMode={setTwinMode}
         onShare={() => (myScreen ? stopShare() : void startShare())}
         boardHasContent={boardHasContent}
         handUp={handUp}
