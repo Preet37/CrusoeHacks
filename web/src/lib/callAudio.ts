@@ -98,6 +98,8 @@ export function useCallAudio(opts: {
     const speech = new Speech({ earlyTrigger: mode === 'headphones' ? 'speech' : 'interim' })
     let bargedThisUtterance = false
     let lastBargeAt = 0
+    // In a noisy room Chrome may never finalize an utterance; remember the live interim so muting can flush it.
+    let pendingInterim = ''
 
     const bargeIn = () => {
       if (!player.isPlaying()) return
@@ -117,11 +119,13 @@ export function useCallAudio(opts: {
         if (mode === 'speakers' && player.isPlaying() && guard.isEcho(text)) return
         if (mode === 'speakers' && player.isPlaying() && guard.novelWords(text).length < 1) return
         bargeIn()
+        pendingInterim = text
         client.send({ type: 'user_text', speaker: user, text, final: false, ts: Date.now() })
         cbRef.current.onInterim(text)
       },
       onFinal: (text) => {
         bargedThisUtterance = false
+        pendingInterim = ''
         if (!text.trim()) return
         // Only while Twin's audio is actually playing can the mic be hearing Twin.
         if (mode === 'speakers' && player.isPlaying() && guard.isEcho(text)) {
@@ -145,6 +149,13 @@ export function useCallAudio(opts: {
     return () => {
       disposed = true
       stopVad()
+      // Muting (or leaving) mid-sentence: send what was said as a final BEFORE mic_off goes out.
+      const flush = pendingInterim.trim()
+      pendingInterim = ''
+      if (flush && flush.split(/\s+/).length >= 2) {
+        client.send({ type: 'user_text', speaker: user, text: flush, final: true, ts: Date.now() })
+        cbRef.current.onFinal(flush)
+      }
       speech.stop()
     }
   }, [client, user, micOn, mode, speechSupported])
