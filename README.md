@@ -132,10 +132,23 @@ xychart-beta
 | Nemotron 3 Nano 30B (Listener, reflex fallback) | Every sentence of a live meeting | Reasoning-heavy replies hit 1,500 to 1,600 output tokens and took 9 to 12 s. A compact no-thinking extraction prompt brought the median to 965 ms (5 live calls) |
 | Nemotron 3 Super 120B (Diagrammer, router, code analyst) | One call that plans a WHOLE diagram as validated JSON ops, plus 3D part plans | Empty or partial plans were sometimes accepted as success: now every plan is validated before drawing, with one repair retry. A 3D robot arm came back as 7 connected named parts with exactly 3 joints, but took 24.6 s, so 3D runs off the critical path |
 | Nemotron 3.5 Lightning 30B (spoken reply) | Fastest first token | Returns "capacity unavailable" (503) under load; Twin falls back to Nano automatically |
-| Nemotron 3.5 Super VL (Coach, screen reading) | Judging Twin's own edits on held-out meetings | First Coach edit scored F1 0.40 vs 0.60 and was rejected automatically |
+| Nemotron 3.5 Super VL (Coach, screen reading) | Judging Twin's own edits on held-out meetings | Three real Coach trials so far: one scored worse (0.40 vs 0.60), two tied; all three were rejected and v1 stayed active |
 | NVIDIA Magpie TTS | Sentence-by-sentence streaming voice | 1 to 2.5 s per call; free tier returns 429 after about 3 rapid calls. Added backoff, a phrase cache, and a pre-made 16 ms acknowledgement |
 
 Speed tricks that came out of this: one model call per drawing burst, rough draw on the fast model then refine on Super, newest sentence cancels stale work, reflex check (~0.1 s) gates everything.
+
+**Head-to-head, 76 real calls on Crusoe** (from `BENCHMARKS.md`, failures and timeouts kept in the denominator):
+
+| Model | Extraction F1 (12 meetings) | Fact check caught | 3D plan valid | Extraction p50 |
+|---|---|---|---|---|
+| Lightning | 0.43 | 2/2 | 0/1 | 662 ms |
+| Nano | 0.49 | 2/2 | 1/1 | 1028 ms |
+| Super | 0.53 (8/12 answered in time) | 1/2 | no answer in time | 1486 ms |
+| Super-VL | **0.77** | 2/2 | 0/1 | 1090 ms |
+
+Small samples (N shown in `BENCHMARKS.md`), but they already changed our routing: Super is too slow for the live path under an 8 s bound, Nano is the only model that produced a valid 3-joint 3D scene, and Super-VL extracts best.
+
+**System speed (Chrome, N=5, live server):** page load to join screen 231 ms median, Join to connected 669 ms, Join to Twin's 3D orb on screen 868 ms. Reproduce: `cd web && npx playwright test tests/timing.spec.ts`.
 
 Full per-model numbers (accuracy, p50/p95 latency, tokens, startup times, raw JSON): **`BENCHMARKS.md`**.
 
