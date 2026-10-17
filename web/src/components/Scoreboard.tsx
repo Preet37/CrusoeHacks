@@ -50,7 +50,7 @@ export default function Scoreboard({ client }: { client: TwinClient }) {
         extra,
         seq: seq++,
       }
-      const key = isRejected(row) ? `rej|${row.seq}` : `${row.split}|${row.name}|${row.version}`
+      const key = `${isRejected(row) ? "rej|" : ""}${row.split}|${row.name}|${row.version}`
       setRows((prev) => {
         const next = new Map(prev)
         const old = next.get(key)
