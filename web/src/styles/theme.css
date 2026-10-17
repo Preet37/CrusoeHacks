@@ -248,6 +248,7 @@ input { font: inherit; }
 .controls .left .clock { color: var(--text); font-weight: 600; }
 .controls .mid { display: flex; gap: 8px; padding: 6px; border-radius: 999px; }
 .controls .right { display: flex; gap: 8px; justify-content: flex-end; }
+.narrow-only { display: none !important; }
 .ptt.on { background: var(--twin-a); color: #fff; }
 .sep { width: 1px; height: 24px; background: var(--border-strong); align-self: center; margin: 0 2px; }
 
@@ -318,6 +319,7 @@ input { font: inherit; }
   .strip { display: none; }
   .controls { grid-template-columns: 1fr; }
   .controls .left, .controls .right { display: none; }
+  .narrow-only { display: inline-flex !important; }
   .controls .mid { justify-self: center; flex-wrap: wrap; justify-content: center; }
 }
 .side[hidden] { display: none; }

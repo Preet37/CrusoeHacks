@@ -85,6 +85,14 @@ export default function ControlBar(p: ControlBarProps) {
         <button className={`pill icon ${p.twinMuted ? 'off' : ''}`} title={p.twinMuted ? 'Unmute Twin' : 'Mute Twin'} onClick={p.onTwinMute}>
           {p.twinMuted ? <SpeakerOffIcon /> : <SpeakerIcon />}
         </button>
+        {/* Narrow windows hide the right-hand group, so keep one panel toggle here. */}
+        <button
+          className={`pill icon narrow-only ${p.side ? 'on' : ''}`}
+          title="People, Twin activity, tasks, connections"
+          onClick={() => p.onSide(p.side ?? 'activity')}
+        >
+          <PeopleIcon />
+        </button>
         <span className="sep" />
         <button className="pill danger" title="Leave call" onClick={p.onLeave} style={{ width: 56, height: 44 }}>
           <LeaveIcon />
