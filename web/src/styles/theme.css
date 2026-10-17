@@ -375,3 +375,8 @@ input { font: inherit; }
 .twin-orb { position: absolute; inset: 0; display: grid; place-items: center; }
 .twin-orb > div { width: min(70%, 260px) !important; height: min(85%, 260px) !important; }
 .twin-orb .twin-avatar { position: relative; }
+
+/* Stage controls sit top-right so they never cover the board's topic title. */
+.stage-label { left: auto; right: 10px; }
+/* While presenting, the brief sits over the board's bottom-left instead of covering the tile strip. */
+.center:has(.stage-wrap:not(.hidden)) .brief { top: auto; right: auto; left: 14px; bottom: 90px; }

@@ -112,7 +112,11 @@ export default function MeetingRoom({
 
   // Re-open the brief whenever a new one arrives.
   useEffect(() => {
-    if (m.brief) setBriefOpen(true)
+    if (!m.brief) return
+    setBriefOpen(true)
+    // The brief is a glance, not a panel: it tucks itself away after 15 s.
+    const id = window.setTimeout(() => setBriefOpen(false), 15_000)
+    return () => window.clearTimeout(id)
   }, [m.brief])
 
   // Hold Space = push-to-talk (ignored while typing in a field).
