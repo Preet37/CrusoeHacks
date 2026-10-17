@@ -25,7 +25,8 @@ export default function App() {
 
   useEffect(() => {
     if (!joined) return
-    const c = createClient({ room, user: joined.name })
+    if (joined.room !== room) history.replaceState(null, '', `/room/${encodeURIComponent(joined.room)}${location.search}`)
+    const c = createClient({ room: joined.room, user: joined.name })
     setClient(c)
     return () => {
       c.close()

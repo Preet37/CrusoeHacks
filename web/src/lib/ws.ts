@@ -34,6 +34,10 @@ export function serverWsBase(): string {
   const env = (import.meta.env.VITE_SERVER_URL as string | undefined)?.trim()
   if (env) return env.replace(/^http/, 'ws').replace(/\/+$/, '')
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  // Vite dev ports talk to a separate server on :8000. Anywhere else (server serving web/dist,
+  // or a public tunnel) the web app and /ws share one origin.
+  const devPorts = new Set(['5173', '5174', '5180'])
+  if (!devPorts.has(location.port)) return `${proto}://${location.host}`
   return `${proto}://${location.hostname || 'localhost'}:8000`
 }
 
