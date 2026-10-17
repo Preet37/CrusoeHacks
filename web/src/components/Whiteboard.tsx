@@ -17,6 +17,7 @@ import 'tldraw/tldraw.css'
 import type { BoxKind } from '../lib/protocol'
 import type { AnyServerMessage, TwinClient } from '../lib/ws'
 import Board3D from './Board3D'
+import NativeWhiteboard from './NativeWhiteboard'
 
 // Same shape as RichCtx in ./board/types.ts (kept local so a missing board/ never breaks the build).
 export interface RichCtx {
@@ -809,7 +810,15 @@ function AnnotateToolbar({ editor }: { editor: Editor }) {
   )
 }
 
-export default function Whiteboard({ client, onHasContent }: { client: TwinClient; onHasContent?: (has: boolean) => void }) {
+type WhiteboardProps = { client: TwinClient; onHasContent?: (has: boolean) => void }
+
+export default function Whiteboard(props: WhiteboardProps) {
+  const native = new URLSearchParams(location.search).get('nativeBoard') === '1'
+    || (import.meta.env.PROD && !import.meta.env.VITE_TLDRAW_LICENSE_KEY)
+  return native ? <NativeWhiteboard {...props} /> : <LicensedWhiteboard {...props} />
+}
+
+function LicensedWhiteboard({ client, onHasContent }: WhiteboardProps) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [view3d, setView3d] = useState(() => new URLSearchParams(location.search).get('view') === '3d')
   const onContentRef = useRef(onHasContent)
@@ -853,7 +862,7 @@ export default function Whiteboard({ client, onHasContent }: { client: TwinClien
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div style={{ position: 'absolute', inset: 0, visibility: view3d ? 'hidden' : 'visible' }}>
-        <Tldraw hideUi shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
+        <Tldraw licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} hideUi shapeUtils={richShapeUtils} onMount={(ed) => setEditor(ed)} />
       </div>
       {!view3d && editor && <AnnotateToolbar editor={editor} />}
       {view3d && <Board3D client={client} onClose={() => setView3d(false)} />}

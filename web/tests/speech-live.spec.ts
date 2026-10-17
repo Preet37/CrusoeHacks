@@ -60,7 +60,7 @@ test('deployed repo diagram speaks a grounded contribution', async ({ page }, in
     await page.getByRole('button', { name: 'Draw it (⌘↵)' }).click()
     await expect.poll(() => sent.some(m => m.type === 'user_text' && m.source === 'typed'), { timeout: 10_000 }).toBeTruthy()
     await expect.poll(() => received.filter(m => m.at >= start && m.op === 'add_box').length, { timeout: 90_000 }).toBeGreaterThanOrEqual(3)
-    await expect(page.locator('.tl-shape[data-shape-type="geo"]').first()).toBeVisible({ timeout: 45_000 })
+    await expect(page.locator('.tl-shape[data-shape-type="geo"], [data-testid="native-box"]').first()).toBeVisible({ timeout: 45_000 })
     await expect.poll(() => received.some(m => m.at >= start && m.type === 'contribution' && m.sources?.length), { timeout: 60_000 }).toBeTruthy()
     const contribution = received.find(m => m.at >= start && m.type === 'contribution' && m.sources?.length)
     expect(contribution.current).not.toMatch(/no verified repo|auth\/login\.py/i)
@@ -78,8 +78,9 @@ test('deployed repo diagram speaks a grounded contribution', async ({ page }, in
         ), { phrase, bytes })
       }, { timeout: 90_000 }).toBeTruthy()
     }
+    await expect.poll(() => page.locator('[data-testid="native-box"], .tl-shape[data-shape-type="geo"]').count()).toBeGreaterThanOrEqual(20)
     expect(sockets.every(url => !/localhost|127\.0\.0\.1/.test(url))).toBeTruthy()
-    await expect(page.locator('.tl-shape[data-shape-type="geo"]').first()).toBeVisible()
+    await expect(page.locator('.tl-shape[data-shape-type="geo"], [data-testid="native-box"]').first()).toBeVisible()
     console.log('LIVE_SPEECH', JSON.stringify({ elapsed_ms: Date.now() - start, contribution, audio_chunks: received.filter(m => m.at >= start && m.type === 'audio').length, sockets: sockets.map(u => u.split('?')[0]) }))
   } finally {
     const playback = await page.evaluate(() => (window as any).__playback || []).catch(() => [])
@@ -87,7 +88,9 @@ test('deployed repo diagram speaks a grounded contribution', async ({ page }, in
       const board = (window as any).twinBoard
       return board ? { boxes: board.boxes.size, frames: board.frames.size, camera: board.editor.getCamera(),
         pageBounds: board.editor.getCurrentPageBounds(), focusTarget: board.focusTarget,
-        renderedBoxes: document.querySelectorAll('.tl-shape[data-shape-type="geo"]').length } : null
+        renderedBoxes: document.querySelectorAll('.tl-shape[data-shape-type="geo"], [data-testid="native-box"]').length } : { renderer: 'native',
+        renderedBoxes: document.querySelectorAll('[data-testid="native-box"]').length,
+        renderedEdges: document.querySelectorAll('[data-testid="native-edge"]').length }
     }).catch(() => null)
     const safeEvents = received.filter(m => m.at >= start && ['draw', 'agent_event', 'contribution', 'audio', 'stop_audio', 'status'].includes(m.type)).map(({ data, ...m }) => ({ ...m, ...(data ? { audio_base64_bytes: data.length } : {}) }))
     await writeFile(info.outputPath('speech-events.json'), JSON.stringify({ base, workspace, start, errors, board, sockets: sockets.map(u => u.split('?')[0]), playback, events: safeEvents }, null, 2))
