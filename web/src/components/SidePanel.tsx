@@ -67,7 +67,7 @@ export default function SidePanel({
                     {p.name} {p.kind === 'ai' && <span className="tile"><span className="badge">AI</span></span>}
                   </div>
                   <div className="sub">
-                    {p.kind === 'ai' ? twinStatus.replace('_', ' ') : p.speaking ? 'speaking' : 'in call'}
+                    {p.kind === 'ai' ? twinStatus.replace('_', ' ') : p.muted ? 'muted' : p.speaking ? 'speaking' : 'in call'}
                   </div>
                 </div>
               </div>

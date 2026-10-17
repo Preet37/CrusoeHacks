@@ -10,6 +10,8 @@ export interface Person {
   name: string
   kind: 'human' | 'ai'
   speaking: boolean
+  /** Server says this person's mic is off (control mic_off). */
+  muted?: boolean
 }
 
 export interface Line {

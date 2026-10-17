@@ -111,7 +111,7 @@ export function HumanTile({
         </div>
       )}
       <div className="name glass">
-        {me && micOn === false && (
+        {micOn === false && (
           <span className="muted-ic"><MicOffIcon /></span>
         )}
         {name}
