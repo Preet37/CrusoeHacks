@@ -22,6 +22,23 @@ _RICH_SHAPES = {"add_mermaid", "add_chart", "add_mock", "add_table", "add_code",
 _RICH_CUES = re.compile(
     r"\b(?:sequence|step|then|first|chart|graph|plot|table|screen|mockup|wireframe|"
     r"3d|robot|timeline|latency|milliseconds?|measurements?|metrics?|percent|flow|p\d+)\b", re.I)
+_PHYSICAL_SKETCH = re.compile(
+    r"\b(?:build|draw|sketch|design|make|create)\b.{0,45}\b"
+    r"(?:airplane|plane|aircraft|rocket|car|boat|bicycle|house|robot)\b", re.I)
+_ROUGH_AIRPLANE = [
+    [[100, 500], [430, 475], [475, 360], [500, 260], [525, 360],
+     [570, 475], [900, 500], [570, 525], [525, 640], [500, 740],
+     [475, 640], [430, 525], [100, 500]],
+    [[240, 485], [275, 430], [300, 482]],
+    [[240, 515], [275, 570], [300, 518]],
+]
+_REFINED_AIRPLANE = _ROUGH_AIRPLANE + [
+    [[380, 480], [500, 465], [620, 480]],  # wings and fuselage
+    [[380, 520], [500, 535], [620, 520]],
+    [[470, 390], [500, 365], [530, 390]],  # cockpit
+    [[775, 490], [825, 500], [775, 510]],  # nose
+    [[170, 495], [225, 500], [170, 505]],  # tail
+]
 _SIMPLE_PROMPT = ("Maintain a component architecture diagram. Return ONLY one JSON object "
                   "{\"ops\":[...]}, at most 8 ops. Use add_box for each new component and "
                   "connect for EACH stated relationship, including follow-up facts. "
@@ -123,6 +140,23 @@ def _required_visual(moments, source_lines):
     return None
 
 
+def _rough_physical_request(moments, source_lines, required_visual):
+    if required_visual or not moments:
+        return False
+    latest = (source_lines or moments)[-1]
+    return _PHYSICAL_SKETCH.search(str(latest.get("text", ""))) is not None
+
+
+def _sketch_strokes(raw):
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.I)
+    value = json.loads(cleaned)
+    if not isinstance(value, dict) or set(value) != {"strokes"}:
+        raise ValueError("sketch response needs only strokes")
+    return value["strokes"]
+
+
 class StaleBoardError(RuntimeError):
     """The user cleared or reset the board while a model job was in flight."""
 
@@ -204,7 +238,8 @@ class Diagrammer:
         required_visual = _required_visual(moments, source_lines)
         simple = _fast_component_burst(session.board, moments, source_lines, topic_id,
                                        required_visual)
-        selected_model = config.MODEL_FAST if simple else config.MODEL_SMART
+        rough_refine = _rough_physical_request(moments, source_lines, required_visual)
+        selected_model = config.MODEL_FAST if simple or rough_refine else config.MODEL_SMART
         detail = f"draw {len(moments)} system fact(s)"
         if topic_id:
             detail += f" topic={topic_id}"
@@ -221,7 +256,8 @@ class Diagrammer:
             async with lock:
                 draws = await self._draw(session, moments, topic_id=topic_id, title=title,
                                          topic_changed=topic_changed, source_lines=source_lines,
-                                         simple=simple, required_visual=required_visual)
+                                         simple=simple, required_visual=required_visual,
+                                         rough_refine=rough_refine)
             await emit_event(session, "Diagrammer", selected_model, "done",
                              f"{len(draws)} draw operation(s)", event_id=event_id,
                              parent_id=parent_id)
@@ -247,7 +283,7 @@ class Diagrammer:
 
     async def _draw(self, session, moments: list[dict], *, topic_id=None, title=None,
                     topic_changed=False, source_lines=None, simple=False,
-                    required_visual=None) -> list[dict]:
+                    required_visual=None, rough_refine=False) -> list[dict]:
         board = session.board
         expected_revision = board.revision
         draws: list[dict] = []
@@ -303,6 +339,67 @@ class Diagrammer:
         # Topic bookkeeping is deterministic and does not consume model tool budget.
         attempts = 0
         if not moments:
+            return draws
+        if rough_refine:
+            latest = (source_lines or moments)[-1]
+            request = str(latest.get("text", ""))
+            sketch_id = f"rough_{uuid4().hex[:10]}"
+            fast_messages = [
+                {"role": "system", "content": "Sketch a recognizable ROUGH silhouette of the requested physical object. "
+                 "Return ONLY JSON {\"strokes\":[[[x,y],...],...]}; 2-6 paths, each 2-16 points, "
+                 "coordinates 0..1000. No text, no board operations."},
+                {"role": "user", "content": request},
+            ]
+            try:
+                raw = await asyncio.wait_for(llm.chat(
+                    config.MODEL_FAST, fast_messages, max_tokens=500,
+                    response_format={"type": "json_object"},
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}}), timeout=5)
+                rough_strokes = _sketch_strokes(raw)
+                preview = {"op": "sketch", "id": sketch_id, "strokes": rough_strokes, "color": "blue"}
+                if topic_id:
+                    preview["frame"] = topic_id
+                copy.deepcopy(board).apply(preview)
+            except Exception as exc:
+                if not re.search(r"\b(?:airplane|plane|aircraft)\b", request, re.I):
+                    raise
+                log.info("diagrammer_rough fallback airplane error=%s", type(exc).__name__)
+                rough_strokes = _ROUGH_AIRPLANE
+            if session.board is not board or board.revision != expected_revision:
+                raise StaleBoardError("board changed before rough sketch")
+            await apply({"op": "sketch", "id": sketch_id, "strokes": rough_strokes, "color": "blue"})
+            log.info("diagrammer_rough visible id=%s", sketch_id)
+            try:
+                raw = await asyncio.wait_for(llm.chat(
+                    config.MODEL_SMART, [
+                        {"role": "system", "content": "Refine the existing rough sketch in place. Return ONLY "
+                         "JSON {\"strokes\":[[[x,y],...],...]}; up to 20 paths with 2-30 points each. "
+                         "Use the same 0..1000 canvas. Add at least two recognizable details; "
+                         "do not repeat the rough strokes unchanged. Do not create a new shape or change its ID."},
+                        {"role": "user", "content": json.dumps({"request": request,
+                                                               "rough_strokes": rough_strokes})},
+                    ], max_tokens=1100, response_format={"type": "json_object"},
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}}), timeout=20)
+                if session.board is not board or board.revision != expected_revision:
+                    raise StaleBoardError("board changed before sketch refinement")
+                refined = _sketch_strokes(raw)
+                if refined == rough_strokes and re.search(
+                    r"\b(?:airplane|plane|aircraft)\b", request, re.I
+                ):
+                    refined = _REFINED_AIRPLANE
+                copy.deepcopy(board).apply({"op": "update", "id": sketch_id, "strokes": refined})
+                await apply({"op": "update", "id": sketch_id, "strokes": refined})
+                log.info("diagrammer_refine updated id=%s", sketch_id)
+            except StaleBoardError:
+                raise
+            except Exception as exc:
+                log.info("diagrammer_refine kept_rough id=%s error=%s", sketch_id,
+                         type(exc).__name__)
+            if session.board is not board or board.revision != expected_revision:
+                raise StaleBoardError("board changed before sketch update")
+            update = session.push_update("I sketched the object on the board.")
+            if inspect.isawaitable(update):
+                await update
             return draws
         handlers = {}
         for tool in DRAW_TOOLS:
