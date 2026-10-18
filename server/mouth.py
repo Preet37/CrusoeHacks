@@ -711,6 +711,9 @@ class Mouth:
         text = " ".join(sentences).strip()
         if not text:
             return
+        if self._vision_running():
+            log.info("[%s] contribution %s held: vision turn in flight", s.room, cid)
+            return  # never cancel a screen answer with a background take
         self._spoken_contribs.add(cid)
         self._turn = None
         self._updates_since = None
@@ -792,7 +795,9 @@ class Mouth:
         self._take_unstarted_turn()
         self._turn = None
         self._updates_since = None
-        s.spawn("responder", self._vision_turn(line, dict(frame)))  # barge-in cancels "responder"
+        if self._vision_running():
+            return  # one look at a time
+        self._vision_task = s.spawn("responder", self._vision_turn(line, dict(frame)))  # barge-in cancels "responder"
 
     async def _vision_turn(self, line: dict, frame: dict) -> str:
         from agents import screen_vision
@@ -898,7 +903,14 @@ class Mouth:
         self._turn = None
         return updates
 
+    def _vision_running(self) -> bool:
+        t = self.session._tasks.get("responder") if hasattr(self.session, "_tasks") else None
+        return bool(t is not None and not t.done() and getattr(self, "_vision_task", None) is t)
+
     def speak(self, reason: str, *, trigger_ts: int, updates: list[str]) -> None:
+        if self._vision_running():
+            log.info("[%s] responder turn skipped: vision turn in flight", self.session.room)
+            return
         self._updates_since = None
         self._turn = {"reason": reason, "updates": list(updates)}
         self.session.spawn("responder", self._speak_when_clear(reason, trigger_ts, updates))
