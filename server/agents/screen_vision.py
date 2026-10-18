@@ -35,7 +35,12 @@ PROMPT = (
     "When the user asks for a diagram, plan, steps, breakdown or 'what do I need to do', ALSO add one "
     "item {\"kind\":\"panel\",\"title\":\"short title\",\"steps\":[\"step 1\",...]} with 3 to 6 short "
     "concrete steps (under 60 characters each) grounded in what is on screen; it is drawn as a "
-    "diagram card beside the content. Use at most 8 items. Keep labels under 40 characters."
+    "diagram card beside the content. Use at most 8 items. Keep labels under 40 characters. "
+    "Example for a ticket on screen: {\"say\":\"It's SCRUM-42, the Auth0 login ticket.\",\"items\":["
+    "{\"kind\":\"box\",\"x\":0.04,\"y\":0.11,\"w\":0.62,\"h\":0.06,\"text\":\"the ticket\"},"
+    "{\"kind\":\"highlight\",\"x\":0.06,\"y\":0.31,\"w\":0.5,\"h\":0.2},"
+    "{\"kind\":\"arrow\",\"x\":0.8,\"y\":0.4,\"x2\":0.62,\"y2\":0.2}]}. "
+    "A reply with an empty items list when something is visible is a failure."
 )
 
 
