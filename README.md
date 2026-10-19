@@ -2,6 +2,8 @@
 
 ## ▶ Try it live: **[crusoehacks.vercel.app](https://crusoehacks.vercel.app)**
 
+## 🎬 Watch the 60s launch video: **[twin-launch-60s-music.mp4](docs/media/twin-launch-60s-music.mp4)**
+
 Open the link, sign in to a workspace, start a meeting, and talk to Twin. Backend: Railway (`twin-backend-production-32eb.up.railway.app`), all reasoning on NVIDIA Nemotron via Crusoe.
 
 **A teammate that joins your meeting, talks, draws, knows your code, and gets better every time.**
